@@ -7,7 +7,9 @@ import {
   type ProductPreferences,
   type InventoryPreferences,
   type BatchPreferences,
+  type DocumentNumberingPreferences,
 } from "@/lib/db/models/Business";
+import type { DocumentType } from "@/lib/constants/documentTypes";
 import { Role } from "@/lib/db/models/Role";
 import { Membership } from "@/lib/db/models/Membership";
 import { ADMIN_TEMPLATE_PERMISSIONS } from "@/lib/rbac/templates";
@@ -140,6 +142,36 @@ export async function updateDocumentPreferences(
   return Business.findOneAndUpdate(
     { _id: businessId, deletedAt: { $exists: false } },
     { $set: { "preferences.document": updates } },
+    { returnDocument: "after" },
+  );
+}
+
+/**
+ * Per-document-type custom header fields (e.g. an Invoice's "Journey Start Date") — a DIFFERENT
+ * store from setBusinessCustomFieldDefs above, which is for Company Details fields. Keyed by
+ * DocumentType so Purchases/Quotations/etc. reuse the same store in later phases.
+ */
+export async function setDocumentCustomFieldDefs(
+  businessId: string,
+  docType: DocumentType,
+  defs: CustomFieldDefDoc[],
+) {
+  await connectToDatabase();
+  return Business.findOneAndUpdate(
+    { _id: businessId, deletedAt: { $exists: false } },
+    { $set: { [`documentCustomFieldDefs.${docType}`]: defs } },
+    { returnDocument: "after" },
+  );
+}
+
+export async function updateDocumentNumberingPreferences(
+  businessId: string,
+  updates: DocumentNumberingPreferences,
+) {
+  await connectToDatabase();
+  return Business.findOneAndUpdate(
+    { _id: businessId, deletedAt: { $exists: false } },
+    { $set: { "preferences.documentNumbering": updates } },
     { returnDocument: "after" },
   );
 }

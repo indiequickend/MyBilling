@@ -289,9 +289,7 @@ layer.
 
 ## Phase 15 — Design polish pass
 
-- Invoke the `frontend-design` skill and do a deliberate visual pass over the whole app: typography,
-  color, spacing, the sidebar/dashboard/table/modal patterns noted in `project_spec.md` → Design.
-  Responsive layout down to mobile web width.
+- Invoke the `shadcn` skill and revamp the whole app ui and responsive layout down to mobile web width. ui design should be exactly like swipe
 
 **Verify**: key flows (create invoice, record payment, view report) work and look intentional at
 desktop, tablet, and mobile widths; no layout requires horizontal scrolling on a standard mobile

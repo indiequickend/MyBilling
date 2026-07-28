@@ -40,6 +40,17 @@ export async function findProductById(productId: string, businessId: string) {
   return Product.findOne({ _id: productId, businessId });
 }
 
+/** Thin, active-only wrapper around listProducts for the invoice line-item autocomplete. */
+export async function searchProductsForInvoice(businessId: string, query: string, limit = 20) {
+  await connectToDatabase();
+  const filter: Record<string, unknown> = { businessId, deletedAt: { $exists: false } };
+  if (query.trim()) {
+    const pattern = new RegExp(escapeRegex(query.trim()), "i");
+    filter.$or = [{ name: pattern }, { barcode: pattern }, { hsnOrSac: pattern }];
+  }
+  return Product.find(filter).sort({ name: 1 }).limit(limit).lean();
+}
+
 /** Ownership check: is `productId` a non-deleted product belonging to `businessId`? */
 export async function isOwnedProduct(productId: string, businessId: string): Promise<boolean> {
   await connectToDatabase();

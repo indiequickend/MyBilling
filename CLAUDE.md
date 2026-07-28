@@ -37,7 +37,7 @@ _when/in what order_. This file is _how_ — conventions every change in this re
 | Validation       | Zod — one schema per shape, shared between client form validation and the API boundary where practical                                                                                  |
 | Auth             | Custom email+password (argon2id) + optional TOTP/SMS 2FA — see `project_spec.md` → Auth                                                                                                 |
 | File storage     | Cloudinary (logos, signatures, attachments, product images)                                                                                                                             |
-| PDF generation   | Server-side HTML → PDF (Playwright) for invoices, POs, quotations, thermal receipts                                                                                                     |
+| PDF generation   | `@react-pdf/renderer` (pure JS, no headless browser/Chromium binary — required for Vercel serverless functions) for invoices, POs, quotations, thermal receipts                          |
 | Testing          | Vitest for unit/integration, Playwright for e2e                                                                                                                                         |
 | Package manager  | pnpm                                                                                                                                                                                    |
 | Database hosting | MongoDB Atlas (managed cluster — connection string supplied via `MONGODB_URI`, no local/self-hosted Mongo, no Docker)                                                                   |

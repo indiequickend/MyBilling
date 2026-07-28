@@ -7,10 +7,12 @@ import { requirePermission } from "@/lib/rbac/can";
 import {
   updateDocumentPreferences,
   updateProductsInventoryPreferences,
+  updateDocumentNumberingPreferences,
 } from "@/lib/db/queries/businesses";
 import {
   documentPreferencesFormSchema,
   productsInventoryPreferencesFormSchema,
+  documentNumberingFormSchema,
 } from "@/lib/validation/preferences";
 import { parseCheckbox } from "@/lib/validation/shared";
 
@@ -54,6 +56,31 @@ export async function updateDocumentPreferencesAction(
   await updateDocumentPreferences(context.activeBusinessId, parsed.data);
   revalidatePath("/settings/preferences/document");
   return { success: "Document preferences saved." };
+}
+
+export async function updateDocumentNumberingAction(
+  _prev: PreferencesPageState,
+  formData: FormData,
+): Promise<PreferencesPageState> {
+  const context = await requireManagePreferences();
+
+  const parsed = documentNumberingFormSchema.safeParse({
+    fyStartMonth: formData.get("fyStartMonth"),
+    configs: {
+      invoice: {
+        prefix: formData.get("invoice__prefix"),
+        padding: formData.get("invoice__padding"),
+        resetPolicy: formData.get("invoice__resetPolicy"),
+      },
+    },
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  await updateDocumentNumberingPreferences(context.activeBusinessId, parsed.data);
+  revalidatePath("/settings/preferences/document");
+  return { success: "Document numbering saved." };
 }
 
 export async function updateProductsInventoryPreferencesAction(

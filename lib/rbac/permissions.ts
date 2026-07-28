@@ -40,6 +40,11 @@ export const SETTINGS_ACTIONS = [
   "manage_roles",
   "manage_preferences",
   "manage_integrations",
+  // Signatures + Notes & Terms + per-document custom field defs — Settings-area screens, not
+  // their own STANDARD_MODULE.
+  "manage_document_settings",
+  // Bank/cash/personal accounts + transfer funds.
+  "manage_banking",
 ] as const;
 export type SettingsAction = (typeof SETTINGS_ACTIONS)[number];
 

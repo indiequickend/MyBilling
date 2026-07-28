@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DOCUMENT_TYPES, type DocumentType } from "@/lib/constants/documentTypes";
 
 // Booleans here are `z.boolean()`, not `z.coerce.boolean()` — coercion treats any
 // non-empty string (including "false") as truthy, which is wrong for HTML
@@ -19,6 +20,27 @@ export const documentPreferencesFormSchema = z.object({
   conversions: documentPreferencesSchema,
 });
 export type DocumentPreferencesFormInput = z.infer<typeof documentPreferencesFormSchema>;
+
+export const documentNumberingConfigSchema = z.object({
+  prefix: z.string().trim().max(10),
+  padding: z.coerce.number().int().min(1).max(10),
+  resetPolicy: z.enum(["never", "fiscal_year"]),
+});
+export type DocumentNumberingConfigInput = z.infer<typeof documentNumberingConfigSchema>;
+
+export const documentNumberingFormSchema = z.object({
+  fyStartMonth: z.coerce.number().int().min(1).max(12),
+  configs: z.record(z.string(), documentNumberingConfigSchema).superRefine((configs, ctx) => {
+    for (const key of Object.keys(configs)) {
+      if (!(DOCUMENT_TYPES as readonly string[]).includes(key)) {
+        ctx.addIssue({ code: "custom", message: `Unknown document type: ${key}`, path: [key] });
+      }
+    }
+  }),
+});
+export type DocumentNumberingFormInput = z.infer<typeof documentNumberingFormSchema> & {
+  configs: Partial<Record<DocumentType, z.infer<typeof documentNumberingConfigSchema>>>;
+};
 
 export const productPreferencesSchema = z.object({
   defaultItemType: z.enum(["product", "service"]),

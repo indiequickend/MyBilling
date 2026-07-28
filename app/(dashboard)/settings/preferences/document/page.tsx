@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { findBusinessById } from "@/lib/db/queries/businesses";
+import { resolveNumberingConfig } from "@/lib/documents/numbering";
 import { Tabs } from "@/components/ui/Tabs";
 import { DocumentPreferencesForm } from "./DocumentPreferencesForm";
+import { DocumentNumberingForm } from "./DocumentNumberingForm";
 
 export default async function DocumentPreferencesPage() {
   const context = await getDashboardContext();
@@ -31,6 +33,13 @@ export default async function DocumentPreferencesPage() {
           conversions: business.preferences.document.conversions,
         }}
       />
+
+      <div className="mt-10">
+        <DocumentNumberingForm
+          fyStartMonth={business.preferences.documentNumbering?.fyStartMonth ?? 4}
+          invoiceConfig={resolveNumberingConfig(business.preferences.documentNumbering, "invoice")}
+        />
+      </div>
     </div>
   );
 }

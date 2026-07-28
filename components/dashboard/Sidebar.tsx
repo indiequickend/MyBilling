@@ -8,6 +8,7 @@ type NavLink = { href: string; label: string; moduleKey?: ModuleKey; action?: Ac
 
 const MAIN_LINKS: NavLink[] = [
   { href: "/", label: "Dashboard" },
+  { href: "/sales/invoices", label: "Invoices", moduleKey: "sales_invoices", action: "view" },
   { href: "/customers", label: "Customers", moduleKey: "customers", action: "view" },
   { href: "/vendors", label: "Vendors", moduleKey: "vendors", action: "view" },
   { href: "/products", label: "Products & Services", moduleKey: "products", action: "view" },
@@ -28,6 +29,25 @@ const SETTINGS_LINKS: NavLink[] = [
     moduleKey: "settings",
     action: "manage_preferences",
   },
+  {
+    href: "/settings/signatures",
+    label: "Signatures",
+    moduleKey: "settings",
+    action: "manage_document_settings",
+  },
+  {
+    href: "/settings/notes-terms",
+    label: "Notes & Terms",
+    moduleKey: "settings",
+    action: "manage_document_settings",
+  },
+  {
+    href: "/settings/document-fields",
+    label: "Document Custom Fields",
+    moduleKey: "settings",
+    action: "manage_document_settings",
+  },
+  { href: "/settings/banks", label: "Banks", moduleKey: "settings", action: "manage_banking" },
   { href: "/settings/users", label: "Users", moduleKey: "settings", action: "manage_users" },
   {
     href: "/settings/roles",
