@@ -20,6 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userName={context.user.name}
         businesses={context.businesses}
         activeBusinessId={context.activeBusinessId}
+        membership={context.membership}
       />
       <main className="flex-1 p-8">{children}</main>
     </div>

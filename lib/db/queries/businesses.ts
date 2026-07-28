@@ -1,8 +1,17 @@
 import { connectToDatabase } from "@/lib/db/connect";
-import { Business } from "@/lib/db/models/Business";
+import {
+  Business,
+  type BusinessType,
+  type CustomFieldDefDoc,
+  type DocumentPreferences,
+  type ProductPreferences,
+  type InventoryPreferences,
+  type BatchPreferences,
+} from "@/lib/db/models/Business";
 import { Role } from "@/lib/db/models/Role";
 import { Membership } from "@/lib/db/models/Membership";
 import { ADMIN_TEMPLATE_PERMISSIONS } from "@/lib/rbac/templates";
+import type { AddressInput } from "@/lib/validation/shared";
 
 /**
  * Creates a Business together with its Admin role and the owning user's Membership
@@ -72,4 +81,81 @@ export async function listBusinessesForUser(userId: string) {
   const memberships = await Membership.find({ userId, status: "active" }).lean();
   const businessIds = memberships.map((m) => m.businessId);
   return Business.find({ _id: { $in: businessIds }, deletedAt: { $exists: false } }).lean();
+}
+
+export type BusinessDetailsUpdate = {
+  name?: string;
+  brandName?: string;
+  gstin?: string;
+  pan?: string;
+  businessType?: BusinessType;
+  phone?: string;
+  email?: string;
+  alternateContact?: string;
+  website?: string;
+  logoPublicId?: string;
+  logoUrl?: string;
+  addresses?: { billing?: AddressInput; shipping?: AddressInput };
+};
+
+export async function updateBusinessDetails(businessId: string, updates: BusinessDetailsUpdate) {
+  await connectToDatabase();
+  return Business.findOneAndUpdate(
+    { _id: businessId, deletedAt: { $exists: false } },
+    { $set: updates },
+    { returnDocument: "after" },
+  );
+}
+
+export async function setBusinessCustomFieldDefs(businessId: string, defs: CustomFieldDefDoc[]) {
+  await connectToDatabase();
+  return Business.findOneAndUpdate(
+    { _id: businessId, deletedAt: { $exists: false } },
+    { $set: { customFieldDefs: defs } },
+    { returnDocument: "after" },
+  );
+}
+
+export async function setBusinessCustomFieldValues(
+  businessId: string,
+  values: Record<string, unknown>,
+) {
+  await connectToDatabase();
+  return Business.findOneAndUpdate(
+    { _id: businessId, deletedAt: { $exists: false } },
+    { $set: { customFieldValues: values } },
+    { returnDocument: "after" },
+  );
+}
+
+export async function updateDocumentPreferences(
+  businessId: string,
+  updates: {
+    sales: DocumentPreferences;
+    purchases: DocumentPreferences;
+    conversions: DocumentPreferences;
+  },
+) {
+  await connectToDatabase();
+  return Business.findOneAndUpdate(
+    { _id: businessId, deletedAt: { $exists: false } },
+    { $set: { "preferences.document": updates } },
+    { returnDocument: "after" },
+  );
+}
+
+export async function updateProductsInventoryPreferences(
+  businessId: string,
+  updates: {
+    product: ProductPreferences;
+    inventory: Omit<InventoryPreferences, "defaultWarehouseId"> & { defaultWarehouseId?: string };
+    batch: BatchPreferences;
+  },
+) {
+  await connectToDatabase();
+  return Business.findOneAndUpdate(
+    { _id: businessId, deletedAt: { $exists: false } },
+    { $set: { "preferences.productsInventory": updates } },
+    { returnDocument: "after" },
+  );
 }
