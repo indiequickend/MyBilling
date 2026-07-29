@@ -1,0 +1,250 @@
+"use client";
+
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+import { Loader2 } from "lucide-react";
+import { FormField } from "@/components/ui/FormField";
+import { SelectField } from "@/components/ui/SelectField";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { FormError } from "@/components/auth/AuthCard";
+import { DISCOUNT_TARGETS, DISCOUNT_TARGET_LABELS } from "@/lib/constants/invoices";
+import { LineItemsEditor, type LineItemRow } from "@/components/documents/LineItemsEditor";
+import { saveSalesOrderAction, type SalesOrderFormState } from "./actions";
+
+const initialState: SalesOrderFormState = {};
+
+function SubmitIntentButton({
+  intent,
+  variant = "outline",
+  children,
+}: {
+  intent: "draft" | "finalize";
+  variant?: "default" | "outline";
+  children: React.ReactNode;
+}) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" name="intent" value={intent} disabled={pending} variant={variant}>
+      {pending ? <Loader2 className="size-4 animate-spin" data-icon="inline-start" /> : null}
+      {children}
+    </Button>
+  );
+}
+
+export type SalesOrderFormDefaultValues = {
+  customerId: string;
+  orderDate: string;
+  expectedDeliveryDate: string;
+  referenceNumber: string;
+  placeOfSupplyState: string;
+  reverseCharge: boolean;
+  roundOff: boolean;
+  notes: string;
+  terms: string;
+  noteTemplateId: string;
+  termTemplateId: string;
+  discountType: "amount" | "percentage";
+  discountValue: string;
+  discountTarget: (typeof DISCOUNT_TARGETS)[number];
+  lineItems: LineItemRow[];
+  sourceQuotationId?: string;
+};
+
+export function SalesOrderForm({
+  mode,
+  salesOrderId,
+  editableStatus,
+  customers,
+  noteTemplates,
+  termTemplates,
+  businessState,
+  defaultValues,
+}: {
+  mode: "create" | "edit";
+  salesOrderId?: string;
+  editableStatus?: "draft" | "open";
+  customers: Array<{ id: string; label: string }>;
+  noteTemplates: Array<{ id: string; label: string }>;
+  termTemplates: Array<{ id: string; label: string }>;
+  businessState: string;
+  defaultValues?: SalesOrderFormDefaultValues;
+}) {
+  const [state, formAction] = useActionState(saveSalesOrderAction, initialState);
+
+  const canDraft = mode === "create" || editableStatus === "draft";
+  const placeOfSupplyState = defaultValues?.placeOfSupplyState ?? businessState;
+
+  return (
+    <form action={formAction} className="space-y-6">
+      <FormError message={state.error} />
+      {salesOrderId ? <input type="hidden" name="salesOrderId" value={salesOrderId} /> : null}
+      {defaultValues?.sourceQuotationId ? (
+        <input type="hidden" name="sourceQuotationId" value={defaultValues.sourceQuotationId} />
+      ) : null}
+
+      <Card>
+        <CardContent>
+          <FieldGroup>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field data-invalid={state.fieldErrors?.customerId ? true : undefined}>
+                <FieldLabel htmlFor="customerId">Customer</FieldLabel>
+                <SelectField
+                  name="customerId"
+                  defaultValue={defaultValues?.customerId}
+                  placeholder="Select a customer…"
+                  options={customers.map((c) => ({ value: c.id, label: c.label }))}
+                  required
+                />
+                {state.fieldErrors?.customerId ? (
+                  <p className="text-sm text-destructive">{state.fieldErrors.customerId}</p>
+                ) : null}
+              </Field>
+              <FormField
+                label="Place of supply (state)"
+                name="placeOfSupplyState"
+                required
+                defaultValue={placeOfSupplyState}
+                error={state.fieldErrors?.placeOfSupplyState}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <FormField
+                label="Order date"
+                name="orderDate"
+                type="date"
+                required
+                defaultValue={defaultValues?.orderDate ?? new Date().toISOString().slice(0, 10)}
+                error={state.fieldErrors?.orderDate}
+              />
+              <FormField
+                label="Expected delivery"
+                name="expectedDeliveryDate"
+                type="date"
+                defaultValue={defaultValues?.expectedDeliveryDate}
+                error={state.fieldErrors?.expectedDeliveryDate}
+              />
+              <FormField
+                label="Reference number"
+                name="referenceNumber"
+                defaultValue={defaultValues?.referenceNumber}
+                error={state.fieldErrors?.referenceNumber}
+              />
+            </div>
+            <Field orientation="horizontal">
+              <Checkbox
+                id="reverseCharge"
+                name="reverseCharge"
+                defaultChecked={defaultValues?.reverseCharge}
+              />
+              <FieldLabel htmlFor="reverseCharge" className="font-normal">
+                Reverse charge applicable
+              </FieldLabel>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Line items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <LineItemsEditor
+            defaultRows={defaultValues?.lineItems ?? []}
+            businessState={businessState}
+            placeOfSupplyState={placeOfSupplyState}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Discount &amp; round-off</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-4">
+            <Field>
+              <FieldLabel htmlFor="discountType">Type</FieldLabel>
+              <SelectField
+                name="discountType"
+                defaultValue={defaultValues?.discountType ?? "percentage"}
+                placeholder="Type"
+                options={[
+                  { value: "percentage", label: "Percentage" },
+                  { value: "amount", label: "Amount" },
+                ]}
+              />
+            </Field>
+            <FormField
+              label="Value"
+              name="discountValue"
+              type="number"
+              defaultValue={defaultValues?.discountValue ?? "0"}
+            />
+            <Field>
+              <FieldLabel htmlFor="discountTarget">Applies to</FieldLabel>
+              <SelectField
+                name="discountTarget"
+                defaultValue={defaultValues?.discountTarget ?? "total"}
+                placeholder="Applies to"
+                options={DISCOUNT_TARGETS.map((t) => ({ value: t, label: DISCOUNT_TARGET_LABELS[t] }))}
+              />
+            </Field>
+            <Field orientation="horizontal" className="pt-6">
+              <Checkbox id="roundOff" name="roundOff" defaultChecked={defaultValues?.roundOff ?? true} />
+              <FieldLabel htmlFor="roundOff" className="font-normal">
+                Round off total
+              </FieldLabel>
+            </Field>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="noteTemplateId">Notes template</FieldLabel>
+              <SelectField
+                name="noteTemplateId"
+                defaultValue={defaultValues?.noteTemplateId}
+                placeholder="None"
+                options={[{ value: "", label: "None" }, ...noteTemplates.map((t) => ({ value: t.id, label: t.label }))]}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="termTemplateId">Terms template</FieldLabel>
+              <SelectField
+                name="termTemplateId"
+                defaultValue={defaultValues?.termTemplateId}
+                placeholder="None"
+                options={[{ value: "", label: "None" }, ...termTemplates.map((t) => ({ value: t.id, label: t.label }))]}
+              />
+            </Field>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="notes">Notes</FieldLabel>
+              <Textarea id="notes" name="notes" rows={3} defaultValue={defaultValues?.notes} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="terms">Terms</FieldLabel>
+              <Textarea id="terms" name="terms" rows={3} defaultValue={defaultValues?.terms} />
+            </Field>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="sticky bottom-0 z-20 flex items-center gap-3 border-t bg-background/95 py-3 backdrop-blur-sm">
+        {canDraft ? <SubmitIntentButton intent="draft">Save as Draft</SubmitIntentButton> : null}
+        <SubmitIntentButton intent="finalize" variant="default">
+          {canDraft ? "Save" : "Save changes"}
+        </SubmitIntentButton>
+      </div>
+    </form>
+  );
+}

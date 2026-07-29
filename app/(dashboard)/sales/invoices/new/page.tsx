@@ -6,9 +6,18 @@ import { listSignatures } from "@/lib/db/queries/signatures";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
 import { findBusinessById } from "@/lib/db/queries/businesses";
+import { findQuotationById } from "@/lib/db/queries/quotations";
+import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
+import { mapLineItemsForConversion, extractConvertibleHeader } from "@/lib/documents/conversion";
 import { InvoiceForm } from "../InvoiceForm";
+import type { LineItemRow } from "@/components/documents/LineItemsEditor";
 
-export default async function NewInvoicePage() {
+export default async function NewInvoicePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const sp = await searchParams;
   const context = await getDashboardContext();
   if (!context) redirect("/login");
   if (!context.activeBusinessId || !context.membership) redirect("/");
@@ -45,6 +54,30 @@ export default async function NewInvoicePage() {
     required: d.required,
   }));
 
+  // "Convert to Invoice" arrives here as /sales/invoices/new?fromQuotation=<id> or
+  // ?fromSalesOrder=<id> — pre-fill the form from the source's fields; the user can still edit
+  // everything before saving. Whole-document conversion only (no partial-quantity conversion).
+  const sourceQuotationId = sp.fromQuotation;
+  const sourceSalesOrderId = sp.fromSalesOrder;
+  const sourceQuotation = sourceQuotationId
+    ? await findQuotationById(sourceQuotationId, context.activeBusinessId)
+    : null;
+  if (sourceQuotationId && (!sourceQuotation || sourceQuotation.status !== "open")) {
+    redirect("/sales/quotations");
+  }
+  const sourceSalesOrder = sourceSalesOrderId
+    ? await findSalesOrderById(sourceSalesOrderId, context.activeBusinessId)
+    : null;
+  if (sourceSalesOrderId && (!sourceSalesOrder || sourceSalesOrder.status !== "open")) {
+    redirect("/sales/sales-orders");
+  }
+
+  const source = sourceSalesOrder ?? sourceQuotation;
+  const lineItemsFromSource: LineItemRow[] | undefined = source
+    ? mapLineItemsForConversion(source.lineItems)
+    : undefined;
+  const headerFromSource = source ? extractConvertibleHeader(source) : undefined;
+
   return (
     <div>
       <h1 className="mb-6 text-lg font-semibold">New invoice</h1>
@@ -61,24 +94,26 @@ export default async function NewInvoicePage() {
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{
-          customerId: "",
+          customerId: source ? String(source.customerId) : "",
           invoiceDate: new Date().toISOString().slice(0, 10),
           dueDate: dueDate.toISOString().slice(0, 10),
-          referenceNumber: "",
-          placeOfSupplyState: businessState,
-          reverseCharge: false,
+          referenceNumber: headerFromSource?.referenceNumber ?? "",
+          placeOfSupplyState: headerFromSource?.placeOfSupplyState ?? businessState,
+          reverseCharge: headerFromSource?.reverseCharge ?? false,
           roundOff: salesPrefs.roundOff,
-          notes: defaultNoteTemplate?.body ?? "",
-          terms: defaultTermTemplate?.body ?? "",
+          notes: headerFromSource?.notes || defaultNoteTemplate?.body || "",
+          terms: headerFromSource?.terms || defaultTermTemplate?.body || "",
           noteTemplateId: defaultNoteTemplate ? String(defaultNoteTemplate._id) : "",
           termTemplateId: defaultTermTemplate ? String(defaultTermTemplate._id) : "",
           signatureId: defaultSignature ? String(defaultSignature._id) : "",
           bankAccountId: defaultBank ? String(defaultBank._id) : "",
-          discountType: salesPrefs.defaultDiscountType,
-          discountValue: "0",
-          discountTarget: "total",
-          customFieldValues: {},
-          lineItems: [],
+          discountType: headerFromSource?.discountType ?? salesPrefs.defaultDiscountType,
+          discountValue: headerFromSource?.discountValue ?? "0",
+          discountTarget: headerFromSource?.discountTarget ?? "total",
+          customFieldValues: headerFromSource?.customFieldValues ?? {},
+          lineItems: lineItemsFromSource ?? [],
+          sourceQuotationId: sourceQuotation ? String(sourceQuotation._id) : undefined,
+          sourceSalesOrderId: sourceSalesOrder ? String(sourceSalesOrder._id) : undefined,
         }}
       />
     </div>

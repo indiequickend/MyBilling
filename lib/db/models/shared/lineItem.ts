@@ -13,6 +13,8 @@ export const documentLineItemSchema = new Schema({
   productId: { type: Schema.Types.ObjectId, ref: "Product" },
   variantId: { type: Schema.Types.ObjectId },
   description: { type: String, required: true, trim: true },
+  /** Free-text detail shown per line item on the document/PDF — e.g. booking check-in/out dates. */
+  notes: { type: String, trim: true },
   hsnOrSac: { type: String, trim: true },
   unit: { type: String, trim: true, default: "PCS" },
   quantity: { type: Number, required: true, min: 0 },

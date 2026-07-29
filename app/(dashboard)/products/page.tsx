@@ -141,7 +141,11 @@ export default async function ProductsPage({
               </TableCell>
               <TableCell>{p.type === "product" ? "Product" : "Service"}</TableCell>
               <TableCell>{p.hsnOrSac ?? "—"}</TableCell>
-              <TableCell>₹{minorToRupeesString(p.sellingPriceMinor)}</TableCell>
+              <TableCell>
+                {p.variants.length > 0
+                  ? "Varies by variant"
+                  : `₹${minorToRupeesString(p.sellingPriceMinor)}`}
+              </TableCell>
               <TableCell className="text-right">
                 {query.tab === "active" ? (
                   canDelete ? (

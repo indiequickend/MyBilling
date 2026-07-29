@@ -15,6 +15,7 @@ export type DebitNoteLineItemWriteInput = {
   productId?: string;
   variantId?: string;
   description: string;
+  notes?: string;
   hsnOrSac?: string;
   unit?: string;
   quantity: number;
@@ -108,6 +109,7 @@ export async function createDebitNote(input: CreateDebitNoteInput): Promise<Debi
     productId: li.productId ? new mongoose.Types.ObjectId(li.productId) : undefined,
     variantId: li.variantId ? new mongoose.Types.ObjectId(li.variantId) : undefined,
     description: li.description,
+    notes: li.notes,
     hsnOrSac: li.hsnOrSac,
     unit: li.unit ?? "PCS",
     quantity: li.quantity,

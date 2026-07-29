@@ -13,7 +13,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { FormError } from "@/components/auth/AuthCard";
 import { DISCOUNT_TARGETS, DISCOUNT_TARGET_LABELS } from "@/lib/constants/invoices";
 import type { CustomFieldType } from "@/lib/validation/shared";
-import { LineItemsEditor, BLANK_LINE_ITEM, type LineItemRow } from "@/components/documents/LineItemsEditor";
+import { LineItemsEditor, type LineItemRow } from "@/components/documents/LineItemsEditor";
 import { PaymentSplitsEditor } from "@/components/documents/PaymentSplitsEditor";
 import { savePurchaseAction, type PurchaseFormState } from "./actions";
 
@@ -97,7 +97,7 @@ export function PurchaseForm({
   const placeOfSupplyState = defaultValues?.placeOfSupplyState ?? businessState;
 
   return (
-    <form action={formAction} className="max-w-4xl space-y-6">
+    <form action={formAction} className="space-y-6">
       <FormError message={state.error} />
       {purchaseId ? <input type="hidden" name="purchaseId" value={purchaseId} /> : null}
       {defaultValues?.sourcePurchaseOrderId ? (
@@ -225,7 +225,7 @@ export function PurchaseForm({
         </CardHeader>
         <CardContent>
           <LineItemsEditor
-            defaultRows={defaultValues?.lineItems ?? [{ ...BLANK_LINE_ITEM }]}
+            defaultRows={defaultValues?.lineItems ?? []}
             businessState={businessState}
             placeOfSupplyState={placeOfSupplyState}
             trackItcEligibility={trackItcEligibility}

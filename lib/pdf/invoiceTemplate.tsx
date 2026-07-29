@@ -122,7 +122,10 @@ export async function InvoiceDocument(data: InvoiceTemplateData) {
           </View>
           {invoice.lineItems.map((li, idx) => (
             <View key={idx} style={[styles.tableRow, styles.rowBorder]}>
-              <Text style={styles.cellDescription}>{li.description}</Text>
+              <View style={styles.cellDescription}>
+                <Text>{li.description}</Text>
+                {li.notes ? <Text style={[styles.muted, { marginTop: 2, fontSize: 8 }]}>{li.notes}</Text> : null}
+              </View>
               <Text style={styles.cellHsn}>{li.hsnOrSac ?? ""}</Text>
               <Text style={styles.cellQty}>
                 {li.quantity} {li.unit ?? ""}

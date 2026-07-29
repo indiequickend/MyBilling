@@ -12,7 +12,6 @@ export const productVariantSchema = z.object({
   barcode: optionalTrimmed(100),
   sellingPriceOverrideMinor: optionalRupeesToMinorUnits,
   purchasePriceOverrideMinor: optionalRupeesToMinorUnits,
-  hsnOrSacOverride: optionalTrimmed(20),
 });
 export type ProductVariantInput = z.infer<typeof productVariantSchema>;
 
@@ -45,12 +44,21 @@ export const productSchema = z.object({
   categoryId: objectId.optional().or(z.literal("").transform(() => undefined)),
   groupId: objectId.optional().or(z.literal("").transform(() => undefined)),
   purchasePriceMinor: optionalRupeesToMinorUnits,
-  sellingPriceMinor: rupeesToMinorUnits,
+  sellingPriceMinor: optionalRupeesToMinorUnits,
   priceIsTaxInclusive: z.boolean(),
   taxRatePercent: z.coerce.number().min(0).max(100),
   barcode: optionalTrimmed(100),
   variants: productVariantsSchema.default([]),
   priceOverrides: priceOverridesSchema.default([]),
+}).superRefine((data, ctx) => {
+  // Selling price is only optional when variants supply their own prices instead.
+  if (data.variants.length === 0 && data.sellingPriceMinor === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Selling price is required when there are no variants",
+      path: ["sellingPriceMinor"],
+    });
+  }
 });
 export type ProductInput = z.infer<typeof productSchema>;
 

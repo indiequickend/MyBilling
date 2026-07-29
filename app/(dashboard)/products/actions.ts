@@ -62,7 +62,6 @@ function productInputFromFormData(formData: FormData) {
     barcode: row.barcode,
     sellingPriceOverrideMinor: row.sellingPriceOverrideMinor,
     purchasePriceOverrideMinor: row.purchasePriceOverrideMinor,
-    hsnOrSacOverride: row.hsnOrSacOverride,
   }));
   const priceOverrides = parseIndexedRows(formData, "priceOverride").map((row) => ({
     priceListId: row.priceListId,

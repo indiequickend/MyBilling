@@ -75,6 +75,7 @@ export default async function NewDebitNotePage({
     productId: li.productId ? String(li.productId) : "",
     variantId: li.variantId ? String(li.variantId) : "",
     description: li.description,
+    notes: li.notes ?? "",
     hsnOrSac: li.hsnOrSac ?? "",
     unit: li.unit ?? "PCS",
     quantity: String(li.quantity),

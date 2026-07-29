@@ -4,6 +4,7 @@ import { Payment } from "@/lib/db/models/Payment";
 import { Invoice, type InvoiceStatus } from "@/lib/db/models/Invoice";
 import { Purchase } from "@/lib/db/models/Purchase";
 import { DebitNote } from "@/lib/db/models/DebitNote";
+import { CreditNote } from "@/lib/db/models/CreditNote";
 import { derivePaymentStatus } from "@/lib/documents/calc";
 import type { DocumentStatus } from "@/lib/constants/documents";
 import { clampPageParams, type PaginatedResult } from "@/lib/db/queryHelpers";
@@ -106,7 +107,7 @@ export async function voidPayment(paymentId: string, businessId: string): Promis
 
 export type LedgerEntry = {
   date: Date;
-  type: "invoice" | "purchase" | "payment" | "debit_note";
+  type: "invoice" | "purchase" | "payment" | "debit_note" | "credit_note";
   description: string;
   debitMinor: number;
   creditMinor: number;
@@ -115,8 +116,8 @@ export type LedgerEntry = {
 };
 
 /**
- * Merges Invoice/Purchase + Payment + DebitNote into a single running-balance ledger. Fetches
- * the full (typically modest-sized) history for the party and
+ * Merges Invoice/Purchase + Payment + DebitNote/CreditNote into a single running-balance ledger.
+ * Fetches the full (typically modest-sized) history for the party and
  * paginates in memory — simpler than a cross-collection paginated aggregation, and fine at the
  * data volumes this app targets; revisit with a real aggregation pipeline if a single party ever
  * accumulates an unusually large history.
@@ -124,7 +125,8 @@ export type LedgerEntry = {
  * Debit/credit polarity depends on partyType, since a receivable and a payable move opposite
  * directions for the same kind of event:
  * - Customer ledger (receivable): Invoice increases what they owe us -> debit. A Payment "in"
- *   reduces it -> credit.
+ *   reduces it -> credit. A Credit Note (sales return) also reduces it -> credit, same polarity
+ *   as a payment.
  * - Vendor ledger (payable): Purchase increases what we owe them -> debit, same polarity
  *   treatment as Invoice does for customers. A Payment "out" reduces it -> credit. A Debit Note
  *   (purchase return) also reduces it -> credit, same polarity as a payment.
@@ -176,6 +178,19 @@ export async function getPartyLedger(
           .lean()
       : [];
 
+  const creditNotes =
+    partyType === "customer"
+      ? await CreditNote.find({
+          businessId,
+          customerId: partyId,
+          deletedAt: { $exists: false },
+          status: "issued",
+        })
+          .select("docNumber creditNoteDate grandTotalMinor")
+          .sort({ creditNoteDate: 1, _id: 1 })
+          .lean()
+      : [];
+
   // `_id` is a secondary sort key so same-day entries get a deterministic order (ObjectIds embed
   // a creation timestamp) instead of whatever arbitrary order Mongo returns ties in — the final
   // merge below relies on Array.sort's stability to preserve this ordering across same-date ties.
@@ -209,6 +224,14 @@ export async function getPartyLedger(
       debitMinor: 0,
       creditMinor: dn.grandTotalMinor,
       linkedDocumentId: String(dn._id),
+    })),
+    ...creditNotes.map((cn) => ({
+      date: cn.creditNoteDate,
+      type: "credit_note" as const,
+      description: cn.docNumber ? `Credit Note ${cn.docNumber}` : "Credit Note",
+      debitMinor: 0,
+      creditMinor: cn.grandTotalMinor,
+      linkedDocumentId: String(cn._id),
     })),
     ...payments.map((p) => {
       // Customer ledger: the normal flow is direction "in" (customer pays us) -> credit; an "out"

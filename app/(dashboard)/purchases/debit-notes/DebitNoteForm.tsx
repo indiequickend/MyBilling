@@ -51,7 +51,7 @@ export function DebitNoteForm({
   const [state, formAction] = useActionState(saveDebitNoteAction, initialState);
 
   return (
-    <form action={formAction} className="max-w-4xl space-y-6">
+    <form action={formAction} className="space-y-6">
       <FormError message={state.error} />
       <input type="hidden" name="linkedPurchaseId" value={linkedPurchaseId} />
 

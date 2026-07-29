@@ -12,7 +12,6 @@ const productVariantSchema = new Schema(
     barcode: { type: String, trim: true },
     sellingPriceOverrideMinor: { type: Number },
     purchasePriceOverrideMinor: { type: Number },
-    hsnOrSacOverride: { type: String, trim: true },
   },
   { timestamps: true },
 );
@@ -46,7 +45,9 @@ const productSchema = new Schema(
     groupId: { type: Schema.Types.ObjectId, ref: "ProductGroup" },
     // All prices are integer paise (CLAUDE.md rule 7), never floats.
     purchasePriceMinor: { type: Number },
-    sellingPriceMinor: { type: Number, required: true },
+    // Required unless the product has variants — each variant then carries its own
+    // sellingPriceOverrideMinor (see productVariantSchema above).
+    sellingPriceMinor: { type: Number },
     priceIsTaxInclusive: { type: Boolean, required: true, default: false },
     taxRatePercent: { type: Number, required: true, default: 0 },
     barcode: { type: String, trim: true },

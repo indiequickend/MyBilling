@@ -8,6 +8,10 @@ export const ATTACHMENT_LINKED_DOCUMENT_TYPES = [
   "debit_note",
   "expense",
   "indirect_income",
+  "quotation",
+  "sales_order",
+  "proforma_invoice",
+  "credit_note",
 ] as const;
 export type AttachmentLinkedDocumentType = (typeof ATTACHMENT_LINKED_DOCUMENT_TYPES)[number];
 

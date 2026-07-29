@@ -46,7 +46,14 @@ export async function searchProductsForInvoice(businessId: string, query: string
   const filter: Record<string, unknown> = { businessId, deletedAt: { $exists: false } };
   if (query.trim()) {
     const pattern = new RegExp(escapeRegex(query.trim()), "i");
-    filter.$or = [{ name: pattern }, { barcode: pattern }, { hsnOrSac: pattern }];
+    filter.$or = [
+      { name: pattern },
+      { barcode: pattern },
+      { hsnOrSac: pattern },
+      { "variants.name": pattern },
+      { "variants.sku": pattern },
+      { "variants.barcode": pattern },
+    ];
   }
   return Product.find(filter).sort({ name: 1 }).limit(limit).lean();
 }
@@ -68,7 +75,6 @@ export type ProductVariantInput = {
   barcode?: string;
   sellingPriceOverrideMinor?: number;
   purchasePriceOverrideMinor?: number;
-  hsnOrSacOverride?: string;
 };
 
 export type ProductPriceOverrideInput = { priceListId: string; priceMinor: number };
@@ -82,7 +88,7 @@ export type ProductInput = {
   categoryId?: string;
   groupId?: string;
   purchasePriceMinor?: number;
-  sellingPriceMinor: number;
+  sellingPriceMinor?: number;
   priceIsTaxInclusive: boolean;
   taxRatePercent: number;
   barcode?: string;

@@ -7,6 +7,7 @@ import {
   Building,
   Building2,
   ChevronDown,
+  ClipboardList,
   FileStack,
   FileText,
   LandmarkIcon,
@@ -32,6 +33,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 const ICONS: Record<NavIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
   invoices: FileText,
+  quotations: ClipboardList,
   purchases: ShoppingCart,
   expenses: Receipt,
   customers: Users,

@@ -22,6 +22,10 @@ const invoiceSchema = new Schema(
     // Snapshotted at save time — an invoice's printed party details must not silently change if
     // the Customer record is edited afterward.
     customerSnapshot: { type: customerSnapshotSchema, required: true },
+    // Set only when this Invoice was created via "Convert to Invoice" from a Quotation or Sales
+    // Order — traceability only, mirrors Purchase.sourcePurchaseOrderId. At most one is ever set.
+    sourceQuotationId: { type: Schema.Types.ObjectId, ref: "Quotation" },
+    sourceSalesOrderId: { type: Schema.Types.ObjectId, ref: "SalesOrder" },
 
     // Absent while status is "draft" — a document number is reserved only on finalize (see
     // lib/db/queries/invoices.ts), so abandoned drafts never burn a legal invoice number.
@@ -109,6 +113,8 @@ export type InvoiceDoc = {
   businessId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId;
   customerSnapshot: InvoiceCustomerSnapshot;
+  sourceQuotationId?: mongoose.Types.ObjectId;
+  sourceSalesOrderId?: mongoose.Types.ObjectId;
   docNumber?: string;
   seriesKey?: string;
   status: InvoiceStatus;

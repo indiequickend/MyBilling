@@ -27,6 +27,9 @@ import {
   type InvoiceWriteFailureReason,
   type InvoicePaymentSplitWriteInput,
 } from "@/lib/db/queries/invoices";
+// Only the "Convert to Invoice" flow (Quotation/Sales Order features) ever sets these.
+import { markQuotationClosed } from "@/lib/db/queries/quotations";
+import { markSalesOrderClosed } from "@/lib/db/queries/salesOrders";
 
 export type InvoiceFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type InvoiceActionState = { error?: string };
@@ -71,6 +74,7 @@ function parseLineItemRows(formData: FormData) {
     productId: row.productId || undefined,
     variantId: row.variantId || undefined,
     description: row.description,
+    notes: row.notes || undefined,
     hsnOrSac: row.hsnOrSac || undefined,
     unit: row.unit || undefined,
     quantity: row.quantity,
@@ -163,6 +167,8 @@ async function parseInvoiceForm(
   }
 
   const h = headerParsed.data;
+  const sourceQuotationId = String(formData.get("sourceQuotationId") ?? "") || undefined;
+  const sourceSalesOrderId = String(formData.get("sourceSalesOrderId") ?? "") || undefined;
   const input: InvoiceWriteInput = {
     businessId,
     customerId: h.customerId,
@@ -183,6 +189,8 @@ async function parseInvoiceForm(
     termTemplateId: h.termTemplateId,
     signatureId: h.signatureId,
     bankAccountId: h.bankAccountId,
+    sourceQuotationId,
+    sourceSalesOrderId,
   };
 
   const payments: InvoicePaymentSplitWriteInput[] = paymentsParsed.data.map((p) => ({
@@ -221,6 +229,14 @@ export async function saveInvoiceAction(
       finalize: intent !== "draft",
       payments: intent === "draft" ? undefined : parsed.payments,
     });
+    if (result.ok && parsed.input.sourceQuotationId) {
+      await markQuotationClosed(parsed.input.sourceQuotationId, context.activeBusinessId);
+      revalidatePath("/sales/quotations");
+    }
+    if (result.ok && parsed.input.sourceSalesOrderId) {
+      await markSalesOrderClosed(parsed.input.sourceSalesOrderId, context.activeBusinessId);
+      revalidatePath("/sales/sales-orders");
+    }
   } else {
     requirePermission(context.membership, "sales_invoices", "edit");
     const existing = await findInvoiceById(invoiceId, context.activeBusinessId);

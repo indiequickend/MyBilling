@@ -6,7 +6,7 @@ import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findPurchaseOrderById } from "@/lib/db/queries/purchaseOrders";
-import { minorToRupeesString } from "@/lib/utils/money";
+import { mapLineItemsForConversion, extractConvertibleHeader } from "@/lib/documents/conversion";
 import { PurchaseForm } from "../PurchaseForm";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
 
@@ -61,20 +61,10 @@ export default async function NewPurchasePage({
     redirect("/purchases/orders");
   }
 
-  const lineItemsFromPO: LineItemRow[] | undefined = sourcePO?.lineItems.map((li) => ({
-    productId: li.productId ? String(li.productId) : "",
-    variantId: li.variantId ? String(li.variantId) : "",
-    description: li.description,
-    hsnOrSac: li.hsnOrSac ?? "",
-    unit: li.unit ?? "PCS",
-    quantity: String(li.quantity),
-    unitPriceMinor: minorToRupeesString(li.unitPriceMinor),
-    discountType: li.discountType,
-    discountValue:
-      li.discountType === "percentage" ? String(li.discountValue) : minorToRupeesString(li.discountValue),
-    taxRatePercent: String(li.taxRatePercent),
-    itcEligible: true,
-  }));
+  const lineItemsFromPO: LineItemRow[] | undefined = sourcePO
+    ? mapLineItemsForConversion(sourcePO.lineItems)
+    : undefined;
+  const headerFromPO = sourcePO ? extractConvertibleHeader(sourcePO) : undefined;
 
   return (
     <div>
@@ -95,23 +85,19 @@ export default async function NewPurchasePage({
           vendorId: sourcePO ? String(sourcePO.vendorId) : "",
           purchaseDate: new Date().toISOString().slice(0, 10),
           dueDate: dueDate.toISOString().slice(0, 10),
-          referenceNumber: sourcePO?.referenceNumber ?? "",
+          referenceNumber: headerFromPO?.referenceNumber ?? "",
           vendorInvoiceNumber: "",
-          placeOfSupplyState: sourcePO?.placeOfSupplyState ?? businessState,
-          reverseCharge: sourcePO?.reverseCharge ?? false,
+          placeOfSupplyState: headerFromPO?.placeOfSupplyState ?? businessState,
+          reverseCharge: headerFromPO?.reverseCharge ?? false,
           roundOff: purchasePrefs.roundOff,
-          notes: sourcePO?.notes ?? defaultNoteTemplate?.body ?? "",
-          terms: sourcePO?.terms ?? defaultTermTemplate?.body ?? "",
+          notes: headerFromPO?.notes || defaultNoteTemplate?.body || "",
+          terms: headerFromPO?.terms || defaultTermTemplate?.body || "",
           noteTemplateId: defaultNoteTemplate ? String(defaultNoteTemplate._id) : "",
           termTemplateId: defaultTermTemplate ? String(defaultTermTemplate._id) : "",
           bankAccountId: defaultBank ? String(defaultBank._id) : "",
-          discountType: sourcePO?.discountType ?? purchasePrefs.defaultDiscountType,
-          discountValue: sourcePO
-            ? sourcePO.discountType === "percentage"
-              ? String(sourcePO.discountValue)
-              : minorToRupeesString(sourcePO.discountValue)
-            : "0",
-          discountTarget: sourcePO?.discountTarget ?? "total",
+          discountType: headerFromPO?.discountType ?? purchasePrefs.defaultDiscountType,
+          discountValue: headerFromPO?.discountValue ?? "0",
+          discountTarget: headerFromPO?.discountTarget ?? "total",
           customFieldValues: {},
           lineItems: lineItemsFromPO ?? [],
           sourcePurchaseOrderId: sourcePO ? String(sourcePO._id) : undefined,

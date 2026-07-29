@@ -72,6 +72,7 @@ function parseLineItemRows(formData: FormData) {
     productId: row.productId || undefined,
     variantId: row.variantId || undefined,
     description: row.description,
+    notes: row.notes || undefined,
     hsnOrSac: row.hsnOrSac || undefined,
     unit: row.unit || undefined,
     quantity: row.quantity,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
@@ -46,6 +46,7 @@ export function ProductForm({
 }) {
   const action = mode === "create" ? createProductAction : updateProductAction;
   const [state, formAction] = useActionState(action, initialState);
+  const [variants, setVariants] = useState<VariantRow[]>(defaultValues?.variants ?? []);
 
   return (
     <form action={formAction} className="max-w-3xl space-y-6">
@@ -116,9 +117,13 @@ export function ProductForm({
 
             <div className="grid gap-4 sm:grid-cols-3">
               <FormField
-                label="Selling price"
+                label={
+                  variants.length > 0
+                    ? "Selling price (optional — variants below have their own)"
+                    : "Selling price"
+                }
                 name="sellingPriceMinor"
-                required
+                required={variants.length === 0}
                 defaultValue={defaultValues?.sellingPriceMinor}
                 error={state.fieldErrors?.sellingPriceMinor}
               />
@@ -182,7 +187,7 @@ export function ProductForm({
           <CardTitle>Variants</CardTitle>
         </CardHeader>
         <CardContent>
-          <VariantsEditor defaultVariants={defaultValues?.variants ?? []} />
+          <VariantsEditor rows={variants} onChange={setVariants} />
         </CardContent>
       </Card>
 

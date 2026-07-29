@@ -144,3 +144,36 @@ export const paginationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
+
+/**
+ * `discountValue`'s meaning depends on the sibling `discountType`: minor units (paise) when
+ * "amount", a raw 0-100 percent when "percentage" — matching lib/documents/calc.ts and every
+ * document line-item schema. A raw string/number is accepted since a form submits one text input
+ * regardless of which discount type is selected; this normalizes it to a number or reports a Zod
+ * issue at `discountValue`. Shared by every document type's line-item/discount schema (Invoice,
+ * Purchase, PurchaseOrder, DebitNote, Quotation, SalesOrder, ProformaInvoice, CreditNote).
+ */
+export function normalizeDiscountValue(
+  discountType: "amount" | "percentage",
+  rawValue: string | number,
+  ctx: z.RefinementCtx,
+): number | typeof z.NEVER {
+  if (discountType === "percentage") {
+    const pct = typeof rawValue === "number" ? rawValue : Number(rawValue);
+    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter a discount percentage between 0 and 100",
+        path: ["discountValue"],
+      });
+      return z.NEVER;
+    }
+    return pct;
+  }
+  const parsed = rupeesToMinorUnits.safeParse(rawValue);
+  if (!parsed.success) {
+    ctx.addIssue({ code: "custom", message: "Enter a valid discount amount", path: ["discountValue"] });
+    return z.NEVER;
+  }
+  return parsed.data;
+}

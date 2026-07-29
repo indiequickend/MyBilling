@@ -14,16 +14,37 @@ export async function GET(request: Request) {
     const query = new URL(request.url).searchParams.get("q") ?? "";
     const products = await searchProductsForInvoice(context.businessId, query, 20);
     return NextResponse.json({
-      products: products.map((p) => ({
-        id: String(p._id),
-        name: p.name,
-        hsnOrSac: p.hsnOrSac ?? "",
-        unit: p.unit ?? "PCS",
-        sellingPriceMinor: p.sellingPriceMinor,
-        priceIsTaxInclusive: p.priceIsTaxInclusive,
-        taxRatePercent: p.taxRatePercent,
-        barcode: p.barcode ?? "",
-      })),
+      // A product with variants contributes one search result per variant (e.g.
+      // "Darjeeling Homestay MAP") instead of one result for the bare product, since
+      // the bare product has no sellable price/HSN of its own in that case.
+      products: products.flatMap((p) => {
+        if (p.variants.length === 0) {
+          return [
+            {
+              id: String(p._id),
+              variantId: "",
+              name: p.name,
+              hsnOrSac: p.hsnOrSac ?? "",
+              unit: p.unit ?? "PCS",
+              sellingPriceMinor: p.sellingPriceMinor ?? 0,
+              priceIsTaxInclusive: p.priceIsTaxInclusive,
+              taxRatePercent: p.taxRatePercent,
+              barcode: p.barcode ?? "",
+            },
+          ];
+        }
+        return p.variants.map((v) => ({
+          id: String(p._id),
+          variantId: String(v._id),
+          name: `${p.name} ${v.name}`,
+          hsnOrSac: p.hsnOrSac ?? "",
+          unit: p.unit ?? "PCS",
+          sellingPriceMinor: v.sellingPriceOverrideMinor ?? p.sellingPriceMinor ?? 0,
+          priceIsTaxInclusive: p.priceIsTaxInclusive,
+          taxRatePercent: p.taxRatePercent,
+          barcode: v.barcode ?? p.barcode ?? "",
+        }));
+      }),
     });
   } catch (err) {
     if (err instanceof UnauthorizedError) {

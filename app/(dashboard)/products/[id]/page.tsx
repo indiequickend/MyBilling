@@ -100,8 +100,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <div>
               <dt className="text-muted-foreground">Selling price</dt>
               <dd className="font-medium">
-                ₹{minorToRupeesString(product.sellingPriceMinor)}{" "}
-                {product.priceIsTaxInclusive ? "(tax-inclusive)" : "(tax-exclusive)"}
+                {product.variants.length > 0 && product.sellingPriceMinor == null ? (
+                  "Varies by variant"
+                ) : (
+                  <>
+                    ₹{minorToRupeesString(product.sellingPriceMinor)}{" "}
+                    {product.priceIsTaxInclusive ? "(tax-inclusive)" : "(tax-exclusive)"}
+                  </>
+                )}
               </dd>
             </div>
             <div>

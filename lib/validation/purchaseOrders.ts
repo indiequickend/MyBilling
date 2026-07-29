@@ -1,38 +1,14 @@
 import { z } from "zod";
 import { DISCOUNT_TARGETS } from "@/lib/constants/invoices";
-import { objectId, optionalTrimmed, rupeesToMinorUnits } from "@/lib/validation/shared";
+import { objectId, optionalTrimmed, rupeesToMinorUnits, normalizeDiscountValue } from "@/lib/validation/shared";
 
 const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
-
-function normalizeDiscountValue(
-  discountType: "amount" | "percentage",
-  rawValue: string | number,
-  ctx: z.RefinementCtx,
-): number | typeof z.NEVER {
-  if (discountType === "percentage") {
-    const pct = typeof rawValue === "number" ? rawValue : Number(rawValue);
-    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Enter a discount percentage between 0 and 100",
-        path: ["discountValue"],
-      });
-      return z.NEVER;
-    }
-    return pct;
-  }
-  const parsed = rupeesToMinorUnits.safeParse(rawValue);
-  if (!parsed.success) {
-    ctx.addIssue({ code: "custom", message: "Enter a valid discount amount", path: ["discountValue"] });
-    return z.NEVER;
-  }
-  return parsed.data;
-}
 
 const rawPurchaseOrderLineItemSchema = z.object({
   productId: optionalObjectId,
   variantId: optionalObjectId,
   description: z.string().trim().min(1, "Description is required").max(500),
+  notes: optionalTrimmed(2000),
   hsnOrSac: optionalTrimmed(20),
   unit: optionalTrimmed(20),
   quantity: z.coerce.number().positive("Quantity must be greater than zero"),

@@ -53,7 +53,6 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
             barcode: v.barcode ?? "",
             sellingPriceOverrideMinor: minorToRupeesString(v.sellingPriceOverrideMinor),
             purchasePriceOverrideMinor: minorToRupeesString(v.purchasePriceOverrideMinor),
-            hsnOrSacOverride: v.hsnOrSacOverride ?? "",
           })),
           priceOverrides: product.priceOverrides.map((p) => ({
             priceListId: String(p.priceListId),

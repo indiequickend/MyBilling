@@ -41,6 +41,7 @@ const rawPurchaseLineItemSchema = z.object({
   productId: optionalObjectId,
   variantId: optionalObjectId,
   description: z.string().trim().min(1, "Description is required").max(500),
+  notes: optionalTrimmed(2000),
   hsnOrSac: optionalTrimmed(20),
   unit: optionalTrimmed(20),
   quantity: z.coerce.number().positive("Quantity must be greater than zero"),
