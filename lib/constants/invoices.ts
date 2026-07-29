@@ -9,6 +9,17 @@ export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   cancelled: "Cancelled",
 };
 
+export const INVOICE_STATUS_BADGE_VARIANT: Record<
+  InvoiceStatus,
+  "success" | "warning" | "danger" | "outline"
+> = {
+  draft: "outline",
+  pending: "warning",
+  partially_paid: "warning",
+  paid: "success",
+  cancelled: "danger",
+};
+
 export const DISCOUNT_TARGETS = ["unit_price", "price_with_tax", "net_amount", "total"] as const;
 export type DiscountTarget = (typeof DISCOUNT_TARGETS)[number];
 

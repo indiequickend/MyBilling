@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
 import { updateRoleAction, deleteRoleAction, type RolesPageState } from "./actions";
 import { PermissionMatrixFields } from "./PermissionMatrixFields";
@@ -38,18 +39,15 @@ export function RoleEditForm({
       </form>
 
       {!isSystemDefault ? (
-        <form action={deleteFormAction} className="border-t border-slate-200 pt-4">
+        <form action={deleteFormAction} className="border-t pt-4">
           <FormError message={deleteState.error} />
           <input type="hidden" name="roleId" value={roleId} />
-          <button
-            type="submit"
-            className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
-          >
+          <Button type="submit" variant="destructive">
             Delete role
-          </button>
+          </Button>
         </form>
       ) : (
-        <p className="border-t border-slate-200 pt-4 text-xs text-slate-500">
+        <p className="border-t pt-4 text-xs text-muted-foreground">
           This is the default Admin role and can&apos;t be deleted.
         </p>
       )}

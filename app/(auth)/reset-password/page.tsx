@@ -14,10 +14,10 @@ export default async function ResetPasswordPage({
   if (!token) {
     return (
       <AuthCard title="Invalid link">
-        <p className="text-sm text-slate-600">This password reset link is missing its token.</p>
+        <p className="text-sm text-muted-foreground">This password reset link is missing its token.</p>
         <Link
           href="/forgot-password"
-          className="block text-sm font-medium text-slate-900 underline"
+          className="block text-sm font-medium underline underline-offset-4"
         >
           Request a new link
         </Link>

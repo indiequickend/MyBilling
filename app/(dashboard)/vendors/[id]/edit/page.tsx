@@ -13,7 +13,7 @@ export default async function EditVendorPage({ params }: { params: Promise<{ id:
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "vendors", "edit")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to edit vendors.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to edit vendors.</p>;
   }
 
   const [vendor, groups] = await Promise.all([
@@ -24,7 +24,7 @@ export default async function EditVendorPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Edit vendor</h1>
+      <h1 className="mb-6 text-lg font-semibold">Edit vendor</h1>
       <VendorForm
         mode="edit"
         vendorId={String(vendor._id)}

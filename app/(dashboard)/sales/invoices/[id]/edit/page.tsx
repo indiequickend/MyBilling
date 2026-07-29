@@ -20,7 +20,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "sales_invoices", "edit")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to edit invoices.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to edit invoices.</p>;
   }
 
   const invoice = await findInvoiceById(id, context.activeBusinessId);
@@ -64,7 +64,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Edit invoice</h1>
+      <h1 className="mb-6 text-lg font-semibold">Edit invoice</h1>
       <InvoiceForm
         mode="edit"
         invoiceId={id}

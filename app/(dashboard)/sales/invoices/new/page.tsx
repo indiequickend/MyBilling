@@ -14,7 +14,7 @@ export default async function NewInvoicePage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "sales_invoices", "create")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to create invoices.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to create invoices.</p>;
   }
 
   const [customers, signatures, bankAccounts, noteTemplates, termTemplates, business] = await Promise.all([
@@ -47,7 +47,7 @@ export default async function NewInvoicePage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">New invoice</h1>
+      <h1 className="mb-6 text-lg font-semibold">New invoice</h1>
       <InvoiceForm
         mode="create"
         customers={customers.items.map((c) => ({

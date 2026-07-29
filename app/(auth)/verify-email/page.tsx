@@ -27,12 +27,12 @@ export default async function VerifyEmailPage({
 
   return (
     <AuthCard title={success ? "Email verified" : "Invalid or expired link"}>
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted-foreground">
         {success
           ? "Your email has been verified. You can now log in."
           : "This verification link is invalid or has expired. Try logging in to request a new one."}
       </p>
-      <Link href="/login" className="block text-sm font-medium text-slate-900 underline">
+      <Link href="/login" className="block text-sm font-medium underline underline-offset-4">
         Go to login
       </Link>
     </AuthCard>

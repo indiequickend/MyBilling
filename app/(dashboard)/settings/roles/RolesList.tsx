@@ -1,4 +1,5 @@
 import { RoleEditForm } from "./RoleEditForm";
+import { Badge } from "@/components/ui/badge";
 import type { PermissionMatrix } from "@/lib/db/models/Role";
 
 type RoleRow = {
@@ -10,16 +11,12 @@ type RoleRow = {
 
 export function RolesList({ roles }: { roles: RoleRow[] }) {
   return (
-    <div className="divide-y divide-slate-200 rounded-md border border-slate-200">
+    <div className="divide-y rounded-lg border">
       {roles.map((role) => (
         <details key={String(role._id)} className="group p-4">
           <summary className="flex cursor-pointer list-none items-center justify-between">
-            <span className="text-sm font-medium text-slate-900">{role.name}</span>
-            {role.isSystemDefault ? (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                default
-              </span>
-            ) : null}
+            <span className="text-sm font-medium">{role.name}</span>
+            {role.isSystemDefault ? <Badge variant="outline">default</Badge> : null}
           </summary>
           <div className="mt-4">
             <RoleEditForm

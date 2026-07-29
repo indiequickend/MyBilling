@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 function hrefForPage(
   basePath: string,
@@ -26,28 +28,41 @@ export function Pagination({
 }) {
   if (totalPages <= 1) return null;
 
-  const linkClass = "rounded-md border border-slate-300 px-3 py-1 hover:bg-slate-50";
-  const disabledClass = "rounded-md border border-slate-200 px-3 py-1 text-slate-300";
-
   return (
-    <nav className="mt-4 flex items-center justify-between text-sm text-slate-600">
-      {page > 1 ? (
-        <Link href={hrefForPage(basePath, searchParams, page - 1)} className={linkClass}>
-          Previous
-        </Link>
-      ) : (
-        <span className={disabledClass}>Previous</span>
-      )}
+    <nav className="flex items-center justify-end gap-3 text-sm text-muted-foreground">
       <span>
         Page {page} of {totalPages}
       </span>
-      {page < totalPages ? (
-        <Link href={hrefForPage(basePath, searchParams, page + 1)} className={linkClass}>
-          Next
-        </Link>
-      ) : (
-        <span className={disabledClass}>Next</span>
-      )}
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon-sm"
+          disabled={page <= 1}
+          asChild={page > 1}
+        >
+          {page > 1 ? (
+            <Link href={hrefForPage(basePath, searchParams, page - 1)} aria-label="Previous page">
+              <ChevronLeft />
+            </Link>
+          ) : (
+            <ChevronLeft />
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          disabled={page >= totalPages}
+          asChild={page < totalPages}
+        >
+          {page < totalPages ? (
+            <Link href={hrefForPage(basePath, searchParams, page + 1)} aria-label="Next page">
+              <ChevronRight />
+            </Link>
+          ) : (
+            <ChevronRight />
+          )}
+        </Button>
+      </div>
     </nav>
   );
 }

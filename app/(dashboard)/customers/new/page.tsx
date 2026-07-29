@@ -11,7 +11,7 @@ export default async function NewCustomerPage() {
 
   if (!can(context.membership, "customers", "create")) {
     return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to create customers.</p>
+      <p className="text-sm text-destructive">You don&apos;t have permission to create customers.</p>
     );
   }
 
@@ -19,7 +19,7 @@ export default async function NewCustomerPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">New customer</h1>
+      <h1 className="mb-6 text-lg font-semibold">New customer</h1>
       <CustomerForm
         mode="create"
         groups={groups.map((g) => ({ id: String(g._id), name: g.name }))}

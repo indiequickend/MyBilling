@@ -12,9 +12,7 @@ export default async function NewProductPage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "products", "create")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to create products.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to create products.</p>;
   }
 
   const [categories, groups, priceLists] = await Promise.all([
@@ -25,7 +23,7 @@ export default async function NewProductPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">New product</h1>
+      <h1 className="mb-6 text-lg font-semibold">New product</h1>
       <ProductForm
         mode="create"
         categories={categories.map((c) => ({ id: String(c._id), name: c.name }))}

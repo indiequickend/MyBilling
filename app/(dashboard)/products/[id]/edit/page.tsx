@@ -15,7 +15,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "products", "edit")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to edit products.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to edit products.</p>;
   }
 
   const [product, categories, groups, priceLists] = await Promise.all([
@@ -28,7 +28,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Edit product</h1>
+      <h1 className="mb-6 text-lg font-semibold">Edit product</h1>
       <ProductForm
         mode="edit"
         productId={String(product._id)}

@@ -12,7 +12,7 @@ export default async function EditBankAccountPage({ params }: { params: Promise<
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "settings", "manage_banking")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to edit accounts.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to edit accounts.</p>;
   }
 
   const account = await findBankAccountById(id, context.activeBusinessId);
@@ -20,7 +20,7 @@ export default async function EditBankAccountPage({ params }: { params: Promise<
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Edit bank account</h1>
+      <h1 className="mb-6 text-lg font-semibold">Edit bank account</h1>
       <BankAccountForm
         mode="edit"
         bankAccountId={String(account._id)}

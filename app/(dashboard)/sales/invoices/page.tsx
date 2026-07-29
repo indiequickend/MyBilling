@@ -1,15 +1,35 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { MoreHorizontal, Plus } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listInvoices, sumInvoiceTotals } from "@/lib/db/queries/invoices";
 import { invoiceListQuerySchema } from "@/lib/validation/invoices";
-import { INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
+import { INVOICE_STATUS_BADGE_VARIANT, INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
 import { minorToRupeesString } from "@/lib/utils/money";
-import { Table, Thead, Th, Tbody, Tr, Td, TableEmptyState } from "@/components/ui/Table";
-import { Tabs } from "@/components/ui/Tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableEmptyState } from "@/components/ui/TableEmptyState";
+import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -31,7 +51,7 @@ export default async function InvoicesPage({
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "sales_invoices", "view")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const query = invoiceListQuerySchema.parse({
@@ -58,22 +78,23 @@ export default async function InvoicesPage({
   ]);
 
   const canCreate = can(context.membership, "sales_invoices", "create");
+  const canEdit = can(context.membership, "sales_invoices", "edit");
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">Invoices</h1>
+        <h1 className="text-lg font-semibold">Invoices</h1>
         {canCreate ? (
-          <Link
-            href="/sales/invoices/new"
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            + New invoice
-          </Link>
+          <Button asChild>
+            <Link href="/sales/invoices/new">
+              <Plus data-icon="inline-start" />
+              New invoice
+            </Link>
+          </Button>
         ) : null}
       </div>
 
-      <Tabs
+      <LinkTabs
         tabs={TABS.map((t) => ({
           label: t.label,
           href: t.key === "all" ? "/sales/invoices" : `/sales/invoices?tab=${t.key}`,
@@ -86,52 +107,91 @@ export default async function InvoicesPage({
           defaultValue={query.q}
           placeholder="Search invoice #, reference, customer…"
           hiddenParams={{ tab: query.tab }}
-        />
+        >
+          <DateRangeFilter dateFrom={query.dateFrom} dateTo={query.dateTo} />
+        </SearchInput>
       </div>
 
       <Table>
-        <Thead>
-          <Th>Invoice #</Th>
-          <Th>Date</Th>
-          <Th>Customer</Th>
-          <Th>Status</Th>
-          <Th>Total</Th>
-          <Th>Paid</Th>
-        </Thead>
-        <Tbody>
-          {items.length === 0 ? <TableEmptyState colSpan={6} message="No invoices found." /> : null}
-          {items.map((inv) => (
-            <Tr key={String(inv._id)}>
-              <Td>
-                <Link
-                  href={`/sales/invoices/${String(inv._id)}`}
-                  className="font-medium text-slate-900 hover:underline"
-                >
-                  {inv.docNumber ?? "Draft"}
-                </Link>
-              </Td>
-              <Td>{new Date(inv.invoiceDate).toLocaleDateString()}</Td>
-              <Td>{inv.customerSnapshot.displayName}</Td>
-              <Td>{INVOICE_STATUS_LABELS[inv.status]}</Td>
-              <Td>₹{minorToRupeesString(inv.grandTotalMinor)}</Td>
-              <Td>₹{minorToRupeesString(inv.amountPaidMinor)}</Td>
-            </Tr>
-          ))}
-        </Tbody>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Invoice #</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Customer</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Total</TableHead>
+            <TableHead>Paid</TableHead>
+            <TableHead className="w-10" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.length === 0 ? <TableEmptyState colSpan={7} message="No invoices found." /> : null}
+          {items.map((inv) => {
+            const id = String(inv._id);
+            return (
+              <TableRow key={id} className="group">
+                <TableCell>
+                  <Link href={`/sales/invoices/${id}`} className="font-medium hover:underline">
+                    {inv.docNumber ?? "Draft"}
+                  </Link>
+                </TableCell>
+                <TableCell>{new Date(inv.invoiceDate).toLocaleDateString()}</TableCell>
+                <TableCell>{inv.customerSnapshot.displayName}</TableCell>
+                <TableCell>
+                  <Badge variant={INVOICE_STATUS_BADGE_VARIANT[inv.status]}>
+                    {INVOICE_STATUS_LABELS[inv.status]}
+                  </Badge>
+                </TableCell>
+                <TableCell>₹{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
+                <TableCell>₹{minorToRupeesString(inv.amountPaidMinor)}</TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/sales/invoices/${id}`}>View</Link>
+                    </Button>
+                    {canEdit ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm" aria-label="More actions">
+                            <MoreHorizontal />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/sales/invoices/${id}/edit`}>Edit</Link>
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+        {items.length > 0 ? (
+          <TableFooter>
+            <TableRow className="hover:bg-muted/50">
+              <TableCell colSpan={4}>Total</TableCell>
+              <TableCell>₹{minorToRupeesString(totals.totalMinor)}</TableCell>
+              <TableCell>₹{minorToRupeesString(totals.paidMinor)}</TableCell>
+              <TableCell />
+            </TableRow>
+          </TableFooter>
+        ) : null}
       </Table>
 
-      <div className="mt-4 flex justify-end gap-6 text-sm text-slate-600">
-        <span>Total: ₹{minorToRupeesString(totals.totalMinor)}</span>
-        <span>Paid: ₹{minorToRupeesString(totals.paidMinor)}</span>
+      <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
         <span>Pending: ₹{minorToRupeesString(totals.pendingMinor)}</span>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          basePath="/sales/invoices"
+          searchParams={{ q: query.q, tab: query.tab }}
+        />
       </div>
-
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        basePath="/sales/invoices"
-        searchParams={{ q: query.q, tab: query.tab }}
-      />
     </div>
   );
 }

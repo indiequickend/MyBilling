@@ -9,14 +9,12 @@ export default async function NewWarehousePage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "inventory", "edit")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to create warehouses.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to create warehouses.</p>;
   }
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">New warehouse</h1>
+      <h1 className="mb-6 text-lg font-semibold">New warehouse</h1>
       <WarehouseForm mode="create" />
     </div>
   );

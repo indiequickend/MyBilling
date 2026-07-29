@@ -3,6 +3,7 @@ import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { toPlainAddress } from "@/lib/db/models/shared/address";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CompanyDetailsForm } from "./CompanyDetailsForm";
 import { CustomFieldDefsEditor } from "./CustomFieldDefsEditor";
 import { CustomFieldValuesForm } from "./CustomFieldValuesForm";
@@ -13,9 +14,7 @@ export default async function CompanyDetailsPage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "settings", "manage_company")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const business = await findBusinessById(context.activeBusinessId);
@@ -31,40 +30,51 @@ export default async function CompanyDetailsPage() {
   const values = { ...business.customFieldValues } as Record<string, unknown>;
 
   return (
-    <div className="max-w-3xl space-y-10">
-      <div>
-        <h1 className="mb-4 text-lg font-semibold text-slate-900">Company Details</h1>
-        <CompanyDetailsForm
-          details={{
-            name: business.name,
-            brandName: business.brandName ?? "",
-            gstin: business.gstin ?? "",
-            pan: business.pan ?? "",
-            businessType: business.businessType ?? "",
-            phone: business.phone ?? "",
-            email: business.email ?? "",
-            alternateContact: business.alternateContact ?? "",
-            website: business.website ?? "",
-            billing: toPlainAddress(business.addresses?.billing),
-            shipping: toPlainAddress(business.addresses?.shipping),
-            logoUrl: business.logoUrl ?? null,
-          }}
-        />
-      </div>
+    <div className="max-w-3xl space-y-6">
+      <h1 className="text-lg font-semibold">Company Details</h1>
 
-      <div>
-        <h2 className="mb-1 text-base font-semibold text-slate-900">Custom fields</h2>
-        <p className="mb-4 text-sm text-slate-500">
-          Define extra fields for your business (e.g. MSME Registration, Trade License).
-        </p>
-        <CustomFieldDefsEditor defaultDefs={defs} />
-      </div>
+      <Card>
+        <CardContent>
+          <CompanyDetailsForm
+            details={{
+              name: business.name,
+              brandName: business.brandName ?? "",
+              gstin: business.gstin ?? "",
+              pan: business.pan ?? "",
+              businessType: business.businessType ?? "",
+              phone: business.phone ?? "",
+              email: business.email ?? "",
+              alternateContact: business.alternateContact ?? "",
+              website: business.website ?? "",
+              billing: toPlainAddress(business.addresses?.billing),
+              shipping: toPlainAddress(business.addresses?.shipping),
+              logoUrl: business.logoUrl ?? null,
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Custom fields</CardTitle>
+          <CardDescription>
+            Define extra fields for your business (e.g. MSME Registration, Trade License).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CustomFieldDefsEditor defaultDefs={defs} />
+        </CardContent>
+      </Card>
 
       {defs.length > 0 ? (
-        <div>
-          <h2 className="mb-4 text-base font-semibold text-slate-900">Custom field values</h2>
-          <CustomFieldValuesForm defs={defs} values={values} />
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Custom field values</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CustomFieldValuesForm defs={defs} values={values} />
+          </CardContent>
+        </Card>
       ) : null}
     </div>
   );

@@ -2,7 +2,18 @@ import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listPriceLists } from "@/lib/db/queries/priceLists";
-import { Table, Thead, Th, Tbody, Tr, Td, TableEmptyState } from "@/components/ui/Table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableEmptyState } from "@/components/ui/TableEmptyState";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { CreatePriceListForm } from "./CreatePriceListForm";
 import {
   updatePriceListAction,
@@ -17,9 +28,7 @@ export default async function PriceListsPage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "products", "view")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const [active, deleted] = await Promise.all([
@@ -30,97 +39,81 @@ export default async function PriceListsPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <div>
-        <h1 className="mb-4 text-lg font-semibold text-slate-900">Price lists</h1>
+        <h1 className="mb-4 text-lg font-semibold">Price lists</h1>
         <CreatePriceListForm />
       </div>
 
       <Table>
-        <Thead>
-          <Th>Name</Th>
-          <Th>Default</Th>
-          <Th />
-        </Thead>
-        <Tbody>
-          {active.length === 0 ? (
-            <TableEmptyState colSpan={3} message="No price lists yet." />
-          ) : null}
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Default</TableHead>
+            <TableHead className="w-24" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {active.length === 0 ? <TableEmptyState colSpan={3} message="No price lists yet." /> : null}
           {active.map((p) => (
-            <Tr key={String(p._id)}>
-              <Td>
+            <TableRow key={String(p._id)}>
+              <TableCell>
                 <form action={updatePriceListAction} className="flex items-center gap-2">
                   <input type="hidden" name="priceListId" value={String(p._id)} />
-                  <input
-                    name="name"
-                    defaultValue={p.name}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                  >
+                  <Input name="name" defaultValue={p.name} className="h-8" />
+                  <Button type="submit" variant="outline" size="sm">
                     Save
-                  </button>
+                  </Button>
                 </form>
-              </Td>
-              <Td>
+              </TableCell>
+              <TableCell>
                 {p.isDefault ? (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                    Default
-                  </span>
+                  <Badge variant="success">Default</Badge>
                 ) : (
                   <form action={setDefaultPriceListAction}>
                     <input type="hidden" name="priceListId" value={String(p._id)} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                    >
+                    <Button type="submit" variant="outline" size="sm">
                       Set default
-                    </button>
+                    </Button>
                   </form>
                 )}
-              </Td>
-              <Td className="text-right">
+              </TableCell>
+              <TableCell className="text-right">
                 <form action={softDeletePriceListAction}>
                   <input type="hidden" name="priceListId" value={String(p._id)} />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                  >
+                  <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
                     Delete
-                  </button>
+                  </Button>
                 </form>
-              </Td>
-            </Tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </Tbody>
+        </TableBody>
       </Table>
 
       {deleted.length > 0 ? (
         <div>
-          <h2 className="mb-2 text-sm font-medium text-slate-700">Deleted</h2>
+          <h2 className="mb-2 text-sm font-medium">Deleted</h2>
           <Table>
-            <Thead>
-              <Th>Name</Th>
-              <Th />
-            </Thead>
-            <Tbody>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead className="w-24" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {deleted.map((p) => (
-                <Tr key={String(p._id)}>
-                  <Td>{p.name}</Td>
-                  <Td className="text-right">
+                <TableRow key={String(p._id)}>
+                  <TableCell>{p.name}</TableCell>
+                  <TableCell className="text-right">
                     <form action={restorePriceListAction}>
                       <input type="hidden" name="priceListId" value={String(p._id)} />
-                      <button
-                        type="submit"
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                      >
+                      <Button type="submit" variant="outline" size="sm">
                         Restore
-                      </button>
+                      </Button>
                     </form>
-                  </Td>
-                </Tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </Tbody>
+            </TableBody>
           </Table>
         </div>
       ) : null}

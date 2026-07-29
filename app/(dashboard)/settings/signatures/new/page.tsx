@@ -10,13 +10,13 @@ export default async function NewSignaturePage() {
 
   if (!can(context.membership, "settings", "manage_document_settings")) {
     return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to create signatures.</p>
+      <p className="text-sm text-destructive">You don&apos;t have permission to create signatures.</p>
     );
   }
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">New signature</h1>
+      <h1 className="mb-6 text-lg font-semibold">New signature</h1>
       <SignatureForm mode="create" />
     </div>
   );

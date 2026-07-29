@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui/button";
 import { softDeleteBankAccountAction, type DeleteBankAccountState } from "./actions";
 
 const initialState: DeleteBankAccountState = {};
@@ -12,13 +13,10 @@ export function DeleteBankAccountButton({ bankAccountId }: { bankAccountId: stri
   return (
     <form action={formAction} className="inline-flex flex-col items-end gap-1">
       <input type="hidden" name="bankAccountId" value={bankAccountId} />
-      <button
-        type="submit"
-        className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-      >
+      <Button type="submit" variant="destructive" size="sm">
         Delete
-      </button>
-      {state.error ? <span className="max-w-40 text-right text-xs text-red-600">{state.error}</span> : null}
+      </Button>
+      {state.error ? <span className="max-w-40 text-right text-xs text-destructive">{state.error}</span> : null}
     </form>
   );
 }

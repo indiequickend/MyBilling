@@ -12,9 +12,7 @@ export default async function EditWarehousePage({ params }: { params: Promise<{ 
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "inventory", "edit")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to edit warehouses.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to edit warehouses.</p>;
   }
 
   const warehouse = await findWarehouseById(id, context.activeBusinessId);
@@ -22,7 +20,7 @@ export default async function EditWarehousePage({ params }: { params: Promise<{ 
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Edit warehouse</h1>
+      <h1 className="mb-6 text-lg font-semibold">Edit warehouse</h1>
       <WarehouseForm
         mode="edit"
         warehouseId={String(warehouse._id)}

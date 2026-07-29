@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { resolveNumberingConfig } from "@/lib/documents/numbering";
-import { Tabs } from "@/components/ui/Tabs";
+import { LinkTabs } from "@/components/ui/LinkTabs";
 import { DocumentPreferencesForm } from "./DocumentPreferencesForm";
 import { DocumentNumberingForm } from "./DocumentNumberingForm";
 
@@ -16,7 +16,7 @@ export default async function DocumentPreferencesPage() {
 
   return (
     <div>
-      <Tabs
+      <LinkTabs
         tabs={[
           { label: "Document", href: "/settings/preferences/document", active: true },
           {

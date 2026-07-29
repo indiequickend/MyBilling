@@ -2,8 +2,10 @@
 
 import { useActionState } from "react";
 import { FormField } from "@/components/ui/FormField";
+import { SelectField } from "@/components/ui/SelectField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError } from "@/components/auth/AuthCard";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { BANK_ACCOUNT_TYPES, BANK_ACCOUNT_TYPE_LABELS } from "@/lib/constants/payments";
 import { createBankAccountAction, updateBankAccountAction, type BankAccountFormState } from "./actions";
 
@@ -34,20 +36,15 @@ export function BankAccountForm({
       <FormError message={state.error} />
       {bankAccountId ? <input type="hidden" name="bankAccountId" value={bankAccountId} /> : null}
 
-      <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Type</span>
-        <select
+      <Field>
+        <FieldLabel htmlFor="type">Type</FieldLabel>
+        <SelectField
           name="type"
           defaultValue={defaultValues?.type ?? "bank"}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        >
-          {BANK_ACCOUNT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {BANK_ACCOUNT_TYPE_LABELS[t]}
-            </option>
-          ))}
-        </select>
-      </label>
+          placeholder="Type"
+          options={BANK_ACCOUNT_TYPES.map((t) => ({ value: t, label: BANK_ACCOUNT_TYPE_LABELS[t] }))}
+        />
+      </Field>
 
       <FormField
         label="Name"

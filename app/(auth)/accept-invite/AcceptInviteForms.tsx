@@ -19,8 +19,8 @@ export function NewUserAcceptForm({ token, email }: { token: string; email: stri
     <form action={formAction} className="space-y-4">
       <FormError message={state.error} />
       <input type="hidden" name="token" value={token} />
-      <p className="text-sm text-slate-600">
-        Creating an account for <span className="font-medium text-slate-900">{email}</span>
+      <p className="text-sm text-muted-foreground">
+        Creating an account for <span className="font-medium text-foreground">{email}</span>
       </p>
       <FormField label="Your name" name="name" required autoComplete="name" />
       <FormField

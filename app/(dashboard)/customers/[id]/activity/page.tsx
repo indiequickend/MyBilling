@@ -9,7 +9,7 @@ export default async function CustomerActivityPage({
   return (
     <div>
       <PartyDetailTabs basePath={`/customers/${id}`} active="activity" />
-      <p className="text-sm text-slate-500">No activity recorded yet for this customer.</p>
+      <p className="text-sm text-muted-foreground">No activity recorded yet for this customer.</p>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
-import { Sidebar } from "@/components/dashboard/Sidebar";
+import { buildNavGroups } from "@/lib/dashboard/navigation";
+import { SidebarNav } from "@/components/dashboard/SidebarNav";
+import { Topbar } from "@/components/dashboard/Topbar";
 
 // Every page under this layout depends on the live session/business/permission
 // state for the current request — none of it may be statically prerendered or
@@ -14,15 +16,24 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
+  const { main, settings } = buildNavGroups(context.membership);
+  // Plain-serialize before crossing into client components — `context.businesses` holds full
+  // Mongoose documents (ObjectId/toJSON), which React cannot pass as Client Component props.
+  const businesses = context.businesses.map((b) => ({ _id: String(b._id), name: b.name }));
+
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar
-        userName={context.user.name}
-        businesses={context.businesses}
-        activeBusinessId={context.activeBusinessId}
-        membership={context.membership}
-      />
-      <main className="flex-1 p-8">{children}</main>
+    <div className="flex min-h-screen bg-muted/30">
+      <SidebarNav main={main} settings={settings} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar
+          userName={context.user.name}
+          businesses={businesses}
+          activeBusinessId={context.activeBusinessId}
+          main={main}
+          settings={settings}
+        />
+        <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+      </div>
     </div>
   );
 }

@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findCustomerById } from "@/lib/db/queries/customers";
+import { Button } from "@/components/ui/button";
+import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
 
 export default async function CustomerDetailLayout({
   children,
@@ -17,9 +20,7 @@ export default async function CustomerDetailLayout({
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "customers", "view")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view customers.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view customers.</p>;
   }
 
   const customer = await findCustomerById(id, context.activeBusinessId);
@@ -28,18 +29,21 @@ export default async function CustomerDetailLayout({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">{customer.displayName}</h1>
-          {customer.companyName ? (
-            <p className="text-sm text-slate-500">{customer.companyName}</p>
-          ) : null}
+        <div className="flex items-center gap-3">
+          <PartyAvatar id={id} name={customer.displayName} className="size-10" />
+          <div>
+            <h1 className="text-lg font-semibold">{customer.displayName}</h1>
+            {customer.companyName ? (
+              <p className="text-sm text-muted-foreground">{customer.companyName}</p>
+            ) : null}
+          </div>
         </div>
-        <Link
-          href={`/customers/${id}/edit`}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-        >
-          Edit
-        </Link>
+        <Button variant="outline" asChild>
+          <Link href={`/customers/${id}/edit`}>
+            <Pencil data-icon="inline-start" />
+            Edit
+          </Link>
+        </Button>
       </div>
       {children}
     </div>

@@ -5,6 +5,7 @@ import { FormField } from "@/components/ui/FormField";
 import { AddressFields, type AddressFieldValues } from "@/components/ui/AddressFields";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError } from "@/components/auth/AuthCard";
+import { Card, CardContent } from "@/components/ui/card";
 import { createWarehouseAction, updateWarehouseAction, type WarehouseFormState } from "./actions";
 
 const initialState: WarehouseFormState = {};
@@ -26,15 +27,19 @@ export function WarehouseForm({
       <FormError message={state.error} />
       {warehouseId ? <input type="hidden" name="warehouseId" value={warehouseId} /> : null}
 
-      <FormField
-        label="Name"
-        name="name"
-        required
-        defaultValue={defaultValues?.name}
-        error={state.fieldErrors?.name}
-      />
+      <Card>
+        <CardContent className="space-y-4">
+          <FormField
+            label="Name"
+            name="name"
+            required
+            defaultValue={defaultValues?.name}
+            error={state.fieldErrors?.name}
+          />
 
-      <AddressFields legend="Address" namePrefix="address" defaultValue={defaultValues?.address} />
+          <AddressFields legend="Address" namePrefix="address" defaultValue={defaultValues?.address} />
+        </CardContent>
+      </Card>
 
       <div className="max-w-xs">
         <SubmitButton pendingText="Saving…">

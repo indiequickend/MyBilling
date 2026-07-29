@@ -5,7 +5,7 @@ export default async function VendorLedgerPage({ params }: { params: Promise<{ i
   return (
     <div>
       <PartyDetailTabs basePath={`/vendors/${id}`} active="ledger" />
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-muted-foreground">
         No ledger entries yet. This tab populates once purchases and payments exist for this vendor.
       </p>
     </div>

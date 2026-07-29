@@ -1,3 +1,6 @@
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { changeMembershipRoleAction, setMembershipStatusAction } from "./actions";
 
 type MemberRow = {
@@ -16,30 +19,30 @@ export function MembersTable({
   roles: Array<{ _id: unknown; name: string }>;
 }) {
   return (
-    <table className="w-full border-collapse text-sm">
-      <thead>
-        <tr className="border-b border-slate-200 text-left text-slate-500">
-          <th className="py-2 pr-4 font-medium">Name</th>
-          <th className="py-2 pr-4 font-medium">Email</th>
-          <th className="py-2 pr-4 font-medium">Role</th>
-          <th className="py-2 pr-4 font-medium">Status</th>
-          <th className="py-2 font-medium" />
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Name</TableHead>
+          <TableHead>Email</TableHead>
+          <TableHead>Role</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead />
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {members.map((m) => {
           const membershipId = String(m._id);
           return (
-            <tr key={membershipId} className="border-b border-slate-100">
-              <td className="py-2 pr-4">{m.user?.name ?? "—"}</td>
-              <td className="py-2 pr-4">{m.user?.email ?? "—"}</td>
-              <td className="py-2 pr-4">
+            <TableRow key={membershipId}>
+              <TableCell>{m.user?.name ?? "—"}</TableCell>
+              <TableCell>{m.user?.email ?? "—"}</TableCell>
+              <TableCell>
                 <form action={changeMembershipRoleAction} className="flex items-center gap-2">
                   <input type="hidden" name="membershipId" value={membershipId} />
                   <select
                     name="roleId"
                     defaultValue={String(m.roleId)}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                    className="h-8 rounded-lg border border-input bg-transparent px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
                     {roles.map((r) => (
                       <option key={String(r._id)} value={String(r._id)}>
@@ -47,26 +50,15 @@ export function MembersTable({
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                  >
+                  <Button type="submit" variant="outline" size="sm">
                     Save
-                  </button>
+                  </Button>
                 </form>
-              </td>
-              <td className="py-2 pr-4">
-                <span
-                  className={
-                    m.status === "active"
-                      ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700"
-                      : "rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
-                  }
-                >
-                  {m.status}
-                </span>
-              </td>
-              <td className="py-2 text-right">
+              </TableCell>
+              <TableCell>
+                <Badge variant={m.status === "active" ? "success" : "outline"}>{m.status}</Badge>
+              </TableCell>
+              <TableCell className="text-right">
                 <form action={setMembershipStatusAction}>
                   <input type="hidden" name="membershipId" value={membershipId} />
                   <input
@@ -74,18 +66,15 @@ export function MembersTable({
                     name="status"
                     value={m.status === "active" ? "deactivated" : "active"}
                   />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                  >
+                  <Button type="submit" variant="outline" size="sm">
                     {m.status === "active" ? "Deactivate" : "Activate"}
-                  </button>
+                  </Button>
                 </form>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           );
         })}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

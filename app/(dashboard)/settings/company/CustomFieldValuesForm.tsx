@@ -2,8 +2,10 @@
 
 import { useActionState } from "react";
 import { FormField } from "@/components/ui/FormField";
+import { SelectField } from "@/components/ui/SelectField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
+import { Field, FieldLabel } from "@/components/ui/field";
 import type { CustomFieldType } from "@/lib/validation/shared";
 import { updateCustomFieldValuesAction, type CompanyPageState } from "./actions";
 
@@ -29,35 +31,27 @@ export function CustomFieldValuesForm({
       <FormError message={state.error} />
       <FormNotice message={state.success} />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         {defs.map((def) => {
           const value = values[def.key];
           if (def.type === "select") {
             return (
-              <label key={def.key} className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">
+              <Field key={def.key}>
+                <FieldLabel htmlFor={def.key}>
                   {def.label}
                   {def.required ? " *" : ""}
-                </span>
-                <select
+                </FieldLabel>
+                <SelectField
                   name={def.key}
                   defaultValue={typeof value === "string" ? value : ""}
+                  placeholder="Select…"
                   required={def.required}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Select…</option>
-                  {def.options.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  options={def.options.map((o) => ({ value: o, label: o }))}
+                />
                 {state.fieldErrors?.[def.key] ? (
-                  <span role="alert" className="mt-1 block text-xs text-red-600">
-                    {state.fieldErrors[def.key]}
-                  </span>
+                  <p className="text-sm text-destructive">{state.fieldErrors[def.key]}</p>
                 ) : null}
-              </label>
+              </Field>
             );
           }
           return (

@@ -17,9 +17,9 @@ export default async function CheckEmailPage({
 
   return (
     <AuthCard title={heading} subtitle={email}>
-      <p className="text-sm text-slate-600">{body}</p>
+      <p className="text-sm text-muted-foreground">{body}</p>
       {isVerify && email ? <ResendVerificationForm email={email} /> : null}
-      <Link href="/login" className="block text-sm font-medium text-slate-900 underline">
+      <Link href="/login" className="block text-sm font-medium underline underline-offset-4">
         Back to login
       </Link>
     </AuthCard>

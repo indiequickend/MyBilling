@@ -2,7 +2,17 @@ import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listProductCategories } from "@/lib/db/queries/productCategories";
-import { Table, Thead, Th, Tbody, Tr, Td, TableEmptyState } from "@/components/ui/Table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableEmptyState } from "@/components/ui/TableEmptyState";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { CreateCategoryForm } from "./CreateCategoryForm";
 import {
   updateProductCategoryAction,
@@ -16,9 +26,7 @@ export default async function ProductCategoriesPage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "products", "view")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const [active, deleted] = await Promise.all([
@@ -29,79 +37,68 @@ export default async function ProductCategoriesPage() {
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <h1 className="mb-4 text-lg font-semibold text-slate-900">Product categories</h1>
+        <h1 className="mb-4 text-lg font-semibold">Product categories</h1>
         <CreateCategoryForm />
       </div>
 
       <Table>
-        <Thead>
-          <Th>Name</Th>
-          <Th />
-        </Thead>
-        <Tbody>
-          {active.length === 0 ? (
-            <TableEmptyState colSpan={2} message="No categories yet." />
-          ) : null}
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead className="w-24" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {active.length === 0 ? <TableEmptyState colSpan={2} message="No categories yet." /> : null}
           {active.map((c) => (
-            <Tr key={String(c._id)}>
-              <Td>
+            <TableRow key={String(c._id)}>
+              <TableCell>
                 <form action={updateProductCategoryAction} className="flex items-center gap-2">
                   <input type="hidden" name="categoryId" value={String(c._id)} />
-                  <input
-                    name="name"
-                    defaultValue={c.name}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                  >
+                  <Input name="name" defaultValue={c.name} className="h-8" />
+                  <Button type="submit" variant="outline" size="sm">
                     Save
-                  </button>
+                  </Button>
                 </form>
-              </Td>
-              <Td className="text-right">
+              </TableCell>
+              <TableCell className="text-right">
                 <form action={softDeleteProductCategoryAction}>
                   <input type="hidden" name="categoryId" value={String(c._id)} />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                  >
+                  <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
                     Delete
-                  </button>
+                  </Button>
                 </form>
-              </Td>
-            </Tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </Tbody>
+        </TableBody>
       </Table>
 
       {deleted.length > 0 ? (
         <div>
-          <h2 className="mb-2 text-sm font-medium text-slate-700">Deleted</h2>
+          <h2 className="mb-2 text-sm font-medium">Deleted</h2>
           <Table>
-            <Thead>
-              <Th>Name</Th>
-              <Th />
-            </Thead>
-            <Tbody>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead className="w-24" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {deleted.map((c) => (
-                <Tr key={String(c._id)}>
-                  <Td>{c.name}</Td>
-                  <Td className="text-right">
+                <TableRow key={String(c._id)}>
+                  <TableCell>{c.name}</TableCell>
+                  <TableCell className="text-right">
                     <form action={restoreProductCategoryAction}>
                       <input type="hidden" name="categoryId" value={String(c._id)} />
-                      <button
-                        type="submit"
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                      >
+                      <Button type="submit" variant="outline" size="sm">
                         Restore
-                      </button>
+                      </Button>
                     </form>
-                  </Td>
-                </Tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </Tbody>
+            </TableBody>
           </Table>
         </div>
       ) : null}

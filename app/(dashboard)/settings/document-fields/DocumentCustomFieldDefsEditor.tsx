@@ -1,7 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { X } from "lucide-react";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
 import { CUSTOM_FIELD_TYPES, type CustomFieldType } from "@/lib/validation/shared";
 import { updateDocumentCustomFieldDefsAction, type DocumentFieldsPageState } from "./actions";
@@ -15,6 +18,9 @@ type Row = {
 };
 
 const initialState: DocumentFieldsPageState = {};
+
+const fieldClass =
+  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50";
 
 /**
  * Per-document-type custom header fields for Invoices (e.g. a travel agency's "Journey Start
@@ -57,37 +63,34 @@ export function DocumentCustomFieldDefsEditor({
 
       <div className="space-y-3">
         {rows.map((row, i) => (
-          <div
-            key={i}
-            className="grid grid-cols-12 items-end gap-2 rounded-md border border-slate-200 p-3"
-          >
+          <div key={i} className="grid grid-cols-12 items-end gap-2 rounded-lg border bg-muted/30 p-3">
             <label className="col-span-3 block text-xs">
-              <span className="mb-1 block font-medium text-slate-700">Key</span>
+              <span className="mb-1 block font-medium text-muted-foreground">Key</span>
               <input
                 name={`documentField__${i}__key`}
                 value={row.key}
                 onChange={(e) => updateRow(i, { key: e.target.value })}
                 placeholder="journey_start_date"
-                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                className={fieldClass}
               />
             </label>
             <label className="col-span-3 block text-xs">
-              <span className="mb-1 block font-medium text-slate-700">Label</span>
+              <span className="mb-1 block font-medium text-muted-foreground">Label</span>
               <input
                 name={`documentField__${i}__label`}
                 value={row.label}
                 onChange={(e) => updateRow(i, { label: e.target.value })}
                 placeholder="Journey Start Date"
-                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                className={fieldClass}
               />
             </label>
             <label className="col-span-2 block text-xs">
-              <span className="mb-1 block font-medium text-slate-700">Type</span>
+              <span className="mb-1 block font-medium text-muted-foreground">Type</span>
               <select
                 name={`documentField__${i}__type`}
                 value={row.type}
                 onChange={(e) => updateRow(i, { type: e.target.value as CustomFieldType })}
-                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                className={fieldClass}
               >
                 {CUSTOM_FIELD_TYPES.map((t) => (
                   <option key={t} value={t}>
@@ -97,46 +100,44 @@ export function DocumentCustomFieldDefsEditor({
               </select>
             </label>
             <label className="col-span-3 block text-xs">
-              <span className="mb-1 block font-medium text-slate-700">Options (if select)</span>
+              <span className="mb-1 block font-medium text-muted-foreground">Options (if select)</span>
               <input
                 name={`documentField__${i}__options`}
                 value={row.options}
                 onChange={(e) => updateRow(i, { options: e.target.value })}
                 placeholder="Comma, separated"
                 disabled={row.type !== "select"}
-                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-50"
+                className={fieldClass}
               />
             </label>
             <div className="col-span-1 flex items-center justify-between">
-              <label className="flex items-center gap-1 text-xs text-slate-600">
-                <input
-                  type="checkbox"
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Checkbox
                   name={`documentField__${i}__required`}
                   checked={row.required}
-                  onChange={(e) => updateRow(i, { required: e.target.checked })}
+                  onCheckedChange={(checked) => updateRow(i, { required: checked === true })}
                 />
                 Req.
               </label>
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => removeRow(i)}
-              className="col-span-12 justify-self-start text-xs text-red-600 hover:underline"
+              className="col-span-12 justify-self-start text-destructive hover:text-destructive"
             >
+              <X data-icon="inline-start" />
               Remove field
-            </button>
+            </Button>
           </div>
         ))}
       </div>
 
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={addRow}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-        >
+        <Button type="button" variant="outline" onClick={addRow}>
           + Add field
-        </button>
+        </Button>
         <div className="max-w-xs">
           <SubmitButton pendingText="Saving…">Save custom fields</SubmitButton>
         </div>

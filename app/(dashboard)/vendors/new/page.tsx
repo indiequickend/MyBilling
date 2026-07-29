@@ -11,7 +11,7 @@ export default async function NewVendorPage() {
 
   if (!can(context.membership, "vendors", "create")) {
     return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to create vendors.</p>
+      <p className="text-sm text-destructive">You don&apos;t have permission to create vendors.</p>
     );
   }
 
@@ -19,7 +19,7 @@ export default async function NewVendorPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">New vendor</h1>
+      <h1 className="mb-6 text-lg font-semibold">New vendor</h1>
       <VendorForm mode="create" groups={groups.map((g) => ({ id: String(g._id), name: g.name }))} />
     </div>
   );

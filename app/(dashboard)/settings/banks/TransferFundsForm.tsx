@@ -1,8 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
+import { FormField } from "@/components/ui/FormField";
+import { SelectField } from "@/components/ui/SelectField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { transferFundsAction, type TransferFundsFormState } from "./actions";
 
 const initialState: TransferFundsFormState = {};
@@ -16,7 +19,7 @@ export function TransferFundsForm({
 
   if (accounts.length < 2) {
     return (
-      <p className="text-sm text-slate-500">Add at least two accounts to transfer funds between them.</p>
+      <p className="text-sm text-muted-foreground">Add at least two accounts to transfer funds between them.</p>
     );
   }
 
@@ -26,68 +29,38 @@ export function TransferFundsForm({
       <FormNotice message={state.success} />
 
       <div className="grid grid-cols-2 gap-4">
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-slate-700">From</span>
-          <select
+        <Field>
+          <FieldLabel htmlFor="fromAccountId">From</FieldLabel>
+          <SelectField
             name="fromAccountId"
             defaultValue={accounts[0].id}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-slate-700">To</span>
-          <select
+            placeholder="From account"
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="toAccountId">To</FieldLabel>
+          <SelectField
             name="toAccountId"
             defaultValue={accounts[1].id}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            placeholder="To account"
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+          />
+        </Field>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Amount</span>
-          <input
-            type="number"
-            name="amountMinor"
-            step="0.01"
-            min="0"
-            required
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Date</span>
-          <input
-            type="date"
-            name="transferDate"
-            required
-            defaultValue={new Date().toISOString().slice(0, 10)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
+        <FormField label="Amount" name="amountMinor" type="number" required />
+        <FormField
+          label="Date"
+          name="transferDate"
+          type="date"
+          required
+          defaultValue={new Date().toISOString().slice(0, 10)}
+        />
       </div>
 
-      <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Note (optional)</span>
-        <input
-          type="text"
-          name="note"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        />
-      </label>
+      <FormField label="Note (optional)" name="note" />
 
       <div className="max-w-xs">
         <SubmitButton pendingText="Transferring…">Transfer funds</SubmitButton>

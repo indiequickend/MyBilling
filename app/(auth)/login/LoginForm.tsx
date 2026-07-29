@@ -24,7 +24,7 @@ export function LoginForm() {
         autoComplete="current-password"
       />
       <div className="text-right text-sm">
-        <Link href="/forgot-password" className="text-slate-600 underline">
+        <Link href="/forgot-password" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">
           Forgot password?
         </Link>
       </div>

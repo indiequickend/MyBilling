@@ -1,3 +1,7 @@
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
 export function SearchInput({
   defaultValue,
   placeholder = "Search…",
@@ -17,20 +21,20 @@ export function SearchInput({
             value ? <input key={key} type="hidden" name={key} value={value} /> : null,
           )
         : null}
-      <input
-        type="search"
-        name="q"
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
-      />
+      <div className="relative w-full max-w-xs">
+        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          name="q"
+          defaultValue={defaultValue}
+          placeholder={placeholder}
+          className="pl-8"
+        />
+      </div>
       {children}
-      <button
-        type="submit"
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-      >
+      <Button type="submit" variant="outline">
         Search
-      </button>
+      </Button>
     </form>
   );
 }

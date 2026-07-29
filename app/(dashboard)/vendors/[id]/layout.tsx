@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findVendorById } from "@/lib/db/queries/vendors";
+import { Button } from "@/components/ui/button";
+import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
 
 export default async function VendorDetailLayout({
   children,
@@ -17,7 +20,7 @@ export default async function VendorDetailLayout({
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "vendors", "view")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to view vendors.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view vendors.</p>;
   }
 
   const vendor = await findVendorById(id, context.activeBusinessId);
@@ -26,18 +29,21 @@ export default async function VendorDetailLayout({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">{vendor.displayName}</h1>
-          {vendor.companyName ? (
-            <p className="text-sm text-slate-500">{vendor.companyName}</p>
-          ) : null}
+        <div className="flex items-center gap-3">
+          <PartyAvatar id={id} name={vendor.displayName} className="size-10" />
+          <div>
+            <h1 className="text-lg font-semibold">{vendor.displayName}</h1>
+            {vendor.companyName ? (
+              <p className="text-sm text-muted-foreground">{vendor.companyName}</p>
+            ) : null}
+          </div>
         </div>
-        <Link
-          href={`/vendors/${id}/edit`}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-        >
-          Edit
-        </Link>
+        <Button variant="outline" asChild>
+          <Link href={`/vendors/${id}/edit`}>
+            <Pencil data-icon="inline-start" />
+            Edit
+          </Link>
+        </Button>
       </div>
       {children}
     </div>

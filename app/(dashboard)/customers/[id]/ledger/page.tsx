@@ -3,7 +3,15 @@ import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { getPartyLedger } from "@/lib/db/queries/payments";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { PartyDetailTabs } from "@/components/dashboard/PartyDetailTabs";
-import { Table, Thead, Th, Tbody, Tr, Td, TableEmptyState } from "@/components/ui/Table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 
 export default async function CustomerLedgerPage({
@@ -27,30 +35,34 @@ export default async function CustomerLedgerPage({
       <PartyDetailTabs basePath={`/customers/${id}`} active="ledger" />
 
       <Table>
-        <Thead>
-          <Th>Date</Th>
-          <Th>Type</Th>
-          <Th>Description</Th>
-          <Th>You Get</Th>
-          <Th>You Got</Th>
-          <Th>Balance</Th>
-        </Thead>
-        <Tbody>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead>You Get</TableHead>
+            <TableHead>You Got</TableHead>
+            <TableHead>Balance</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {items.length === 0 ? <TableEmptyState colSpan={6} message="No ledger entries yet." /> : null}
           {items.map((entry, i) => (
-            <Tr key={i}>
-              <Td>{new Date(entry.date).toLocaleDateString()}</Td>
-              <Td className="capitalize">{entry.type}</Td>
-              <Td>{entry.description}</Td>
-              <Td>{entry.debitMinor > 0 ? `₹${minorToRupeesString(entry.debitMinor)}` : "—"}</Td>
-              <Td>{entry.creditMinor > 0 ? `₹${minorToRupeesString(entry.creditMinor)}` : "—"}</Td>
-              <Td>₹{minorToRupeesString(entry.balanceMinor)}</Td>
-            </Tr>
+            <TableRow key={i}>
+              <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+              <TableCell className="capitalize">{entry.type}</TableCell>
+              <TableCell>{entry.description}</TableCell>
+              <TableCell>{entry.debitMinor > 0 ? `₹${minorToRupeesString(entry.debitMinor)}` : "—"}</TableCell>
+              <TableCell>{entry.creditMinor > 0 ? `₹${minorToRupeesString(entry.creditMinor)}` : "—"}</TableCell>
+              <TableCell>₹{minorToRupeesString(entry.balanceMinor)}</TableCell>
+            </TableRow>
           ))}
-        </Tbody>
+        </TableBody>
       </Table>
 
-      <Pagination page={page} totalPages={totalPages} basePath={`/customers/${id}/ledger`} searchParams={{}} />
+      <div className="mt-4 flex justify-end">
+        <Pagination page={page} totalPages={totalPages} basePath={`/customers/${id}/ledger`} searchParams={{}} />
+      </div>
     </div>
   );
 }

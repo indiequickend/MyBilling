@@ -3,6 +3,7 @@ import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listMembershipsForBusiness } from "@/lib/db/queries/memberships";
 import { listRolesForBusiness } from "@/lib/db/queries/roles";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InviteForm } from "./InviteForm";
 import { MembersTable } from "./MembersTable";
 
@@ -12,9 +13,7 @@ export default async function UsersPage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "settings", "manage_users")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const [members, roles] = await Promise.all([
@@ -28,16 +27,24 @@ export default async function UsersPage() {
   const roleOptions = roles.map((r) => ({ id: String(r._id), name: r.name }));
 
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="mb-4 text-lg font-semibold text-slate-900">Invite someone</h1>
-        <InviteForm roles={roleOptions} />
+        <h1 className="mb-4 text-lg font-semibold">Invite someone</h1>
+        <Card>
+          <CardContent>
+            <InviteForm roles={roleOptions} />
+          </CardContent>
+        </Card>
       </div>
 
-      <div>
-        <h2 className="mb-4 text-base font-semibold text-slate-900">Members</h2>
-        <MembersTable members={members} roles={roles} />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Members</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MembersTable members={members} roles={roles} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

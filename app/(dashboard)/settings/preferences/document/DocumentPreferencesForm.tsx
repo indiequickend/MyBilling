@@ -3,6 +3,9 @@
 import { useActionState } from "react";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SelectField } from "@/components/ui/SelectField";
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import type { DocumentPreferencesInput } from "@/lib/validation/preferences";
 import { updateDocumentPreferencesAction, type PreferencesPageState } from "../actions";
 
@@ -24,47 +27,49 @@ function Section({
   prefs: DocumentPreferencesInput;
 }) {
   return (
-    <fieldset className="space-y-3 rounded-md border border-slate-200 p-4">
-      <legend className="px-1 text-sm font-medium text-slate-900">{label}</legend>
+    <FieldSet className="rounded-lg border p-4">
+      <FieldLegend variant="label">{label}</FieldLegend>
+      <FieldGroup className="gap-3">
+        <Field orientation="horizontal">
+          <Checkbox name={`${category}__roundOff`} defaultChecked={prefs.roundOff} />
+          <FieldLabel className="font-normal">Round off totals</FieldLabel>
+        </Field>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input type="checkbox" name={`${category}__roundOff`} defaultChecked={prefs.roundOff} />
-        Round off totals
-      </label>
+        <Field orientation="horizontal">
+          <Checkbox
+            name={`${category}__showHeaderFieldSuggestions`}
+            defaultChecked={prefs.showHeaderFieldSuggestions}
+          />
+          <FieldLabel className="font-normal">Show header-field suggestions</FieldLabel>
+        </Field>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input
-          type="checkbox"
-          name={`${category}__showHeaderFieldSuggestions`}
-          defaultChecked={prefs.showHeaderFieldSuggestions}
-        />
-        Show header-field suggestions
-      </label>
+        <Field className="max-w-xs">
+          <FieldLabel>Default discount type</FieldLabel>
+          <SelectField
+            name={`${category}__defaultDiscountType`}
+            defaultValue={prefs.defaultDiscountType}
+            placeholder="Type"
+            options={[
+              { value: "percentage", label: "Percentage" },
+              { value: "amount", label: "Amount" },
+            ]}
+          />
+        </Field>
 
-      <label className="block max-w-xs text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Default discount type</span>
-        <select
-          name={`${category}__defaultDiscountType`}
-          defaultValue={prefs.defaultDiscountType}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        >
-          <option value="percentage">Percentage</option>
-          <option value="amount">Amount</option>
-        </select>
-      </label>
-
-      <label className="block max-w-xs text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Default due date (days)</span>
-        <input
-          type="number"
-          name={`${category}__defaultDueDateDays`}
-          defaultValue={prefs.defaultDueDateDays}
-          min={0}
-          max={365}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        />
-      </label>
-    </fieldset>
+        <Field className="max-w-xs">
+          <FieldLabel htmlFor={`${category}-defaultDueDateDays`}>Default due date (days)</FieldLabel>
+          <input
+            id={`${category}-defaultDueDateDays`}
+            type="number"
+            name={`${category}__defaultDueDateDays`}
+            defaultValue={prefs.defaultDueDateDays}
+            min={0}
+            max={365}
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          />
+        </Field>
+      </FieldGroup>
+    </FieldSet>
   );
 }
 

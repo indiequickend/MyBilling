@@ -1,14 +1,25 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listVendors } from "@/lib/db/queries/vendors";
 import { listPartyGroups } from "@/lib/db/queries/partyGroups";
 import { vendorListQuerySchema } from "@/lib/validation/vendors";
-import { Table, Thead, Th, Tbody, Tr, Td, TableEmptyState } from "@/components/ui/Table";
-import { Tabs } from "@/components/ui/Tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableEmptyState } from "@/components/ui/TableEmptyState";
+import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
+import { Button } from "@/components/ui/button";
+import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
 import { softDeleteVendorAction, restoreVendorAction } from "./actions";
 
 export default async function VendorsPage({
@@ -22,9 +33,7 @@ export default async function VendorsPage({
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "vendors", "view")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const query = vendorListQuerySchema.parse({
@@ -50,23 +59,23 @@ export default async function VendorsPage({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">Vendors</h1>
+        <h1 className="text-lg font-semibold">Vendors</h1>
         <div className="flex items-center gap-3">
-          <Link href="/vendors/groups" className="text-sm text-slate-500 hover:underline">
-            Manage groups
-          </Link>
+          <Button variant="link" asChild className="text-muted-foreground">
+            <Link href="/vendors/groups">Manage groups</Link>
+          </Button>
           {canCreate ? (
-            <Link
-              href="/vendors/new"
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              + New vendor
-            </Link>
+            <Button asChild>
+              <Link href="/vendors/new">
+                <Plus data-icon="inline-start" />
+                New vendor
+              </Link>
+            </Button>
           ) : null}
         </div>
       </div>
 
-      <Tabs
+      <LinkTabs
         tabs={[
           { label: "Active", href: "/vendors", active: query.tab === "active" },
           { label: "Deleted", href: "/vendors?tab=deleted", active: query.tab === "deleted" },
@@ -83,7 +92,7 @@ export default async function VendorsPage({
             <select
               name="groupId"
               defaultValue={query.groupId ?? ""}
-              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
               <option value="">All groups</option>
               {groups.map((g) => (
@@ -97,64 +106,63 @@ export default async function VendorsPage({
       </div>
 
       <Table>
-        <Thead>
-          <Th>Name</Th>
-          <Th>Company</Th>
-          <Th>GSTIN</Th>
-          <Th>Phone</Th>
-          <Th />
-        </Thead>
-        <Tbody>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Company</TableHead>
+            <TableHead>GSTIN</TableHead>
+            <TableHead>Phone</TableHead>
+            <TableHead className="w-24" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {items.length === 0 ? <TableEmptyState colSpan={5} message="No vendors found." /> : null}
-          {items.map((v) => (
-            <Tr key={String(v._id)}>
-              <Td>
-                <Link
-                  href={`/vendors/${String(v._id)}/ledger`}
-                  className="font-medium text-slate-900 hover:underline"
-                >
-                  {v.displayName}
-                </Link>
-              </Td>
-              <Td>{v.companyName ?? "—"}</Td>
-              <Td>{v.gstin ?? "—"}</Td>
-              <Td>{v.phone ?? "—"}</Td>
-              <Td className="text-right">
-                {query.tab === "active" ? (
-                  canDelete ? (
-                    <form action={softDeleteVendorAction}>
-                      <input type="hidden" name="vendorId" value={String(v._id)} />
-                      <button
-                        type="submit"
-                        className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
+          {items.map((v) => {
+            const id = String(v._id);
+            return (
+              <TableRow key={id}>
+                <TableCell>
+                  <Link href={`/vendors/${id}/ledger`} className="flex items-center gap-2.5 font-medium hover:underline">
+                    <PartyAvatar id={id} name={v.displayName} />
+                    {v.displayName}
+                  </Link>
+                </TableCell>
+                <TableCell>{v.companyName ?? "—"}</TableCell>
+                <TableCell>{v.gstin ?? "—"}</TableCell>
+                <TableCell>{v.phone ?? "—"}</TableCell>
+                <TableCell className="text-right">
+                  {query.tab === "active" ? (
+                    canDelete ? (
+                      <form action={softDeleteVendorAction}>
+                        <input type="hidden" name="vendorId" value={id} />
+                        <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                          Delete
+                        </Button>
+                      </form>
+                    ) : null
+                  ) : (
+                    <form action={restoreVendorAction}>
+                      <input type="hidden" name="vendorId" value={id} />
+                      <Button type="submit" variant="outline" size="sm">
+                        Restore
+                      </Button>
                     </form>
-                  ) : null
-                ) : (
-                  <form action={restoreVendorAction}>
-                    <input type="hidden" name="vendorId" value={String(v._id)} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                    >
-                      Restore
-                    </button>
-                  </form>
-                )}
-              </Td>
-            </Tr>
-          ))}
-        </Tbody>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
       </Table>
 
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        basePath="/vendors"
-        searchParams={{ q: query.q, groupId: query.groupId, tab: query.tab }}
-      />
+      <div className="mt-4 flex justify-end">
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          basePath="/vendors"
+          searchParams={{ q: query.q, groupId: query.groupId, tab: query.tab }}
+        />
+      </div>
     </div>
   );
 }

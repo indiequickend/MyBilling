@@ -14,7 +14,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
 
   if (!can(context.membership, "customers", "edit")) {
     return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to edit customers.</p>
+      <p className="text-sm text-destructive">You don&apos;t have permission to edit customers.</p>
     );
   }
 
@@ -26,7 +26,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Edit customer</h1>
+      <h1 className="mb-6 text-lg font-semibold">Edit customer</h1>
       <CustomerForm
         mode="edit"
         customerId={String(customer._id)}

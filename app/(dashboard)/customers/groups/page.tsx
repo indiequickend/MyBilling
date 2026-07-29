@@ -2,7 +2,18 @@ import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listPartyGroups } from "@/lib/db/queries/partyGroups";
-import { Table, Thead, Th, Tbody, Tr, Td, TableEmptyState } from "@/components/ui/Table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableEmptyState } from "@/components/ui/TableEmptyState";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { CreateGroupForm } from "./CreateGroupForm";
 import {
   updateCustomerGroupAction,
@@ -16,9 +27,7 @@ export default async function CustomerGroupsPage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "customers", "view")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const [active, deleted] = await Promise.all([
@@ -27,80 +36,79 @@ export default async function CustomerGroupsPage() {
   ]);
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="mb-4 text-lg font-semibold text-slate-900">Customer groups</h1>
+        <h1 className="mb-4 text-lg font-semibold">Customer groups</h1>
         <CreateGroupForm />
       </div>
 
-      <Table>
-        <Thead>
-          <Th>Name</Th>
-          <Th />
-        </Thead>
-        <Tbody>
-          {active.length === 0 ? <TableEmptyState colSpan={2} message="No groups yet." /> : null}
-          {active.map((g) => (
-            <Tr key={String(g._id)}>
-              <Td>
-                <form action={updateCustomerGroupAction} className="flex items-center gap-2">
-                  <input type="hidden" name="groupId" value={String(g._id)} />
-                  <input
-                    name="name"
-                    defaultValue={g.name}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                  >
-                    Save
-                  </button>
-                </form>
-              </Td>
-              <Td className="text-right">
-                <form action={softDeleteCustomerGroupAction}>
-                  <input type="hidden" name="groupId" value={String(g._id)} />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                  >
-                    Delete
-                  </button>
-                </form>
-              </Td>
-            </Tr>
-          ))}
-        </Tbody>
-      </Table>
+      <Card>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {active.length === 0 ? <TableEmptyState colSpan={2} message="No groups yet." /> : null}
+              {active.map((g) => (
+                <TableRow key={String(g._id)}>
+                  <TableCell>
+                    <form action={updateCustomerGroupAction} className="flex items-center gap-2">
+                      <input type="hidden" name="groupId" value={String(g._id)} />
+                      <Input name="name" defaultValue={g.name} className="h-8 max-w-48" />
+                      <Button type="submit" variant="outline" size="sm">
+                        Save
+                      </Button>
+                    </form>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <form action={softDeleteCustomerGroupAction}>
+                      <input type="hidden" name="groupId" value={String(g._id)} />
+                      <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                        Delete
+                      </Button>
+                    </form>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {deleted.length > 0 ? (
         <div>
-          <h2 className="mb-2 text-sm font-medium text-slate-700">Deleted</h2>
-          <Table>
-            <Thead>
-              <Th>Name</Th>
-              <Th />
-            </Thead>
-            <Tbody>
-              {deleted.map((g) => (
-                <Tr key={String(g._id)}>
-                  <Td>{g.name}</Td>
-                  <Td className="text-right">
-                    <form action={restoreCustomerGroupAction}>
-                      <input type="hidden" name="groupId" value={String(g._id)} />
-                      <button
-                        type="submit"
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                      >
-                        Restore
-                      </button>
-                    </form>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
+          <h2 className="mb-2 text-sm font-medium">Deleted</h2>
+          <Card>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {deleted.map((g) => (
+                    <TableRow key={String(g._id)}>
+                      <TableCell>{g.name}</TableCell>
+                      <TableCell className="text-right">
+                        <form action={restoreCustomerGroupAction}>
+                          <input type="hidden" name="groupId" value={String(g._id)} />
+                          <Button type="submit" variant="outline" size="sm">
+                            Restore
+                          </Button>
+                        </form>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       ) : null}
     </div>

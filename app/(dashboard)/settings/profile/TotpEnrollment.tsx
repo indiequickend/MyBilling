@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
+import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
 import {
   startTotpEnrollmentAction,
@@ -22,12 +24,9 @@ export function TotpEnrollment({ enabled }: { enabled: boolean }) {
       <div className="space-y-3">
         <FormNotice message="Two-factor authentication is enabled." />
         <form action={disableTotpAction}>
-          <button
-            type="submit"
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-          >
+          <Button type="submit" variant="outline">
             Disable 2FA
-          </button>
+          </Button>
         </form>
       </div>
     );
@@ -37,7 +36,7 @@ export function TotpEnrollment({ enabled }: { enabled: boolean }) {
     return (
       <div className="space-y-3">
         <FormNotice message="Two-factor authentication is enabled. Save these backup codes — each works once if you lose access to your authenticator app." />
-        <ul className="grid grid-cols-2 gap-1 rounded-md border border-slate-200 bg-slate-50 p-4 font-mono text-sm">
+        <ul className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/30 p-4 font-mono text-sm">
           {backupCodes.map((code) => (
             <li key={code}>{code}</li>
           ))}
@@ -52,7 +51,7 @@ export function TotpEnrollment({ enabled }: { enabled: boolean }) {
         {/* eslint-disable-next-line @next/next/no-img-element -- dynamically generated data: URI, not an optimizable static/remote image */}
         <img src={qrDataUrl} alt="Scan with your authenticator app" width={200} height={200} />
         {secret ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             Can&apos;t scan it? Enter this code manually:{" "}
             <span data-testid="totp-secret" className="font-mono">
               {secret}
@@ -75,21 +74,19 @@ export function TotpEnrollment({ enabled }: { enabled: boolean }) {
           className="space-y-4"
         >
           <FormField label="6-digit code" name="code" required autoComplete="one-time-code" />
-          <button
-            type="submit"
-            disabled={isPending}
-            className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-          >
+          <Button type="submit" disabled={isPending} className="w-full">
+            {isPending ? <Loader2 className="size-4 animate-spin" data-icon="inline-start" /> : null}
             {isPending ? "Verifying…" : "Confirm"}
-          </button>
+          </Button>
         </form>
       </div>
     );
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       disabled={isPending}
       onClick={() => {
         startTransition(async () => {
@@ -99,9 +96,9 @@ export function TotpEnrollment({ enabled }: { enabled: boolean }) {
           setPhase("confirm");
         });
       }}
-      className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
     >
+      {isPending ? <Loader2 className="size-4 animate-spin" data-icon="inline-start" /> : null}
       {isPending ? "Starting…" : "Enable 2FA"}
-    </button>
+    </Button>
   );
 }

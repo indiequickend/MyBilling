@@ -3,8 +3,10 @@
 import { useActionState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { AddressFields, type AddressFieldValues } from "@/components/ui/AddressFields";
+import { SelectField } from "@/components/ui/SelectField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { BUSINESS_TYPES, BUSINESS_TYPE_LABELS } from "@/lib/constants/businessTypes";
 import { updateCompanyDetailsAction, type CompanyPageState } from "./actions";
 
@@ -41,25 +43,26 @@ export function CompanyDetailsForm({
           <img
             src={details.logoUrl}
             alt="Company logo"
-            className="h-16 w-16 rounded-md border border-slate-200 object-contain"
+            className="h-16 w-16 rounded-lg border object-contain"
           />
         ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-slate-300 text-xs text-slate-400">
+          <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">
             No logo
           </div>
         )}
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Logo</span>
+        <Field>
+          <FieldLabel htmlFor="logo">Logo</FieldLabel>
           <input
+            id="logo"
             type="file"
             name="logo"
             accept="image/png,image/jpeg,image/webp"
             className="text-sm"
           />
-        </label>
+        </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           label="Legal company name"
           name="name"
@@ -75,7 +78,7 @@ export function CompanyDetailsForm({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           label="GSTIN"
           name="gstin"
@@ -92,23 +95,17 @@ export function CompanyDetailsForm({
         />
       </div>
 
-      <label className="block">
-        <span className="mb-1 block text-sm font-medium text-slate-700">Business type</span>
-        <select
+      <Field>
+        <FieldLabel htmlFor="businessType">Business type</FieldLabel>
+        <SelectField
           name="businessType"
           defaultValue={details.businessType}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        >
-          <option value="">Select…</option>
-          {BUSINESS_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {BUSINESS_TYPE_LABELS[t]}
-            </option>
-          ))}
-        </select>
-      </label>
+          placeholder="Select…"
+          options={BUSINESS_TYPES.map((t) => ({ value: t, label: BUSINESS_TYPE_LABELS[t] }))}
+        />
+      </Field>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           label="Phone"
           name="phone"
@@ -124,7 +121,7 @@ export function CompanyDetailsForm({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           label="Alternate contact"
           name="alternateContact"
@@ -133,7 +130,7 @@ export function CompanyDetailsForm({
         <FormField label="Website" name="website" defaultValue={details.website} />
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid gap-6 sm:grid-cols-2">
         <AddressFields
           legend="Billing address"
           namePrefix="billing"

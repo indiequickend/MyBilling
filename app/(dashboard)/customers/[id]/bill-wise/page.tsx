@@ -6,7 +6,15 @@ import { INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
 import { PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { PartyDetailTabs } from "@/components/dashboard/PartyDetailTabs";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/ui/Table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default async function CustomerBillWisePage({
   params,
@@ -25,46 +33,49 @@ export default async function CustomerBillWisePage({
       <PartyDetailTabs basePath={`/customers/${id}`} active="bill-wise" />
 
       {bills.length === 0 ? (
-        <p className="text-sm text-slate-500">No bill-wise payment matches yet.</p>
+        <p className="text-sm text-muted-foreground">No bill-wise payment matches yet.</p>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {bills.map((bill) => (
-            <div key={bill.invoiceId} className="rounded-md border border-slate-200 p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <Link
-                  href={`/sales/invoices/${bill.invoiceId}`}
-                  className="font-medium text-slate-900 hover:underline"
-                >
-                  {bill.docNumber ?? "Draft"}
-                </Link>
-                <span className="text-sm text-slate-500">{INVOICE_STATUS_LABELS[bill.status]}</span>
-              </div>
-              <div className="mb-3 grid grid-cols-3 gap-4 text-sm text-slate-600">
-                <span>Total: ₹{minorToRupeesString(bill.grandTotalMinor)}</span>
-                <span>Paid: ₹{minorToRupeesString(bill.amountPaidMinor)}</span>
-                <span>Balance: ₹{minorToRupeesString(bill.balanceMinor)}</span>
-              </div>
-              {bill.payments.length > 0 ? (
-                <Table>
-                  <Thead>
-                    <Th>Date</Th>
-                    <Th>Mode</Th>
-                    <Th>Amount</Th>
-                  </Thead>
-                  <Tbody>
-                    {bill.payments.map((p) => (
-                      <Tr key={p.paymentId}>
-                        <Td>{new Date(p.date).toLocaleDateString()}</Td>
-                        <Td>{PAYMENT_MODE_LABELS[p.mode]}</Td>
-                        <Td>₹{minorToRupeesString(p.amountMinor)}</Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              ) : (
-                <p className="text-sm text-slate-500">No payments recorded against this bill.</p>
-              )}
-            </div>
+            <Card key={bill.invoiceId}>
+              <CardContent>
+                <div className="mb-2 flex items-center justify-between">
+                  <Link href={`/sales/invoices/${bill.invoiceId}`} className="font-medium hover:underline">
+                    {bill.docNumber ?? "Draft"}
+                  </Link>
+                  <span className="text-sm text-muted-foreground">
+                    {INVOICE_STATUS_LABELS[bill.status]}
+                  </span>
+                </div>
+                <div className="mb-3 grid grid-cols-3 gap-4 text-sm text-muted-foreground">
+                  <span>Total: ₹{minorToRupeesString(bill.grandTotalMinor)}</span>
+                  <span>Paid: ₹{minorToRupeesString(bill.amountPaidMinor)}</span>
+                  <span>Balance: ₹{minorToRupeesString(bill.balanceMinor)}</span>
+                </div>
+                {bill.payments.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Mode</TableHead>
+                        <TableHead>Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bill.payments.map((p) => (
+                        <TableRow key={p.paymentId}>
+                          <TableCell>{new Date(p.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{PAYMENT_MODE_LABELS[p.mode]}</TableCell>
+                          <TableCell>₹{minorToRupeesString(p.amountMinor)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No payments recorded against this bill.</p>
+                )}
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError } from "@/components/auth/AuthCard";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { createSignatureAction, updateSignatureAction, type SignatureFormState } from "./actions";
 
 const initialState: SignatureFormState = {};
@@ -39,21 +40,22 @@ export function SignatureForm({
           <img
             src={defaultValues.imageUrl}
             alt="Current signature"
-            className="h-16 w-32 rounded-md border border-slate-200 object-contain"
+            className="h-16 w-32 rounded-lg border object-contain"
           />
         ) : null}
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-slate-700">
+        <Field>
+          <FieldLabel htmlFor="image">
             {mode === "create" ? "Signature image" : "Replace image (optional)"}
-          </span>
+          </FieldLabel>
           <input
+            id="image"
             type="file"
             name="image"
             accept="image/png,image/jpeg,image/webp"
             required={mode === "create"}
             className="text-sm"
           />
-        </label>
+        </Field>
       </div>
 
       <div className="max-w-xs">

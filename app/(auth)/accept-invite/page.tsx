@@ -19,7 +19,7 @@ export default async function AcceptInvitePage({
   if (!token) {
     return (
       <AuthCard title="Invalid invitation">
-        <p className="text-sm text-slate-600">This invitation link is missing its token.</p>
+        <p className="text-sm text-muted-foreground">This invitation link is missing its token.</p>
       </AuthCard>
     );
   }
@@ -28,7 +28,7 @@ export default async function AcceptInvitePage({
   if (!invitation) {
     return (
       <AuthCard title="Invalid or expired invitation">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted-foreground">
           This invitation link is invalid or has expired. Ask the business admin to send a new one.
         </p>
       </AuthCard>
@@ -58,11 +58,11 @@ export default async function AcceptInvitePage({
 
   return (
     <AuthCard title="Log in to accept" subtitle={subtitle}>
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted-foreground">
         An account already exists for <span className="font-medium">{invitation.email}</span>. Log
         in as that account, then return to this link to accept.
       </p>
-      <Link href="/login" className="block text-sm font-medium text-slate-900 underline">
+      <Link href="/login" className="block text-sm font-medium underline underline-offset-4">
         Go to login
       </Link>
     </AuthCard>

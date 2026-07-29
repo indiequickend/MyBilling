@@ -9,12 +9,12 @@ export default async function NewBankAccountPage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "settings", "manage_banking")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to create accounts.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to create accounts.</p>;
   }
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">New bank account</h1>
+      <h1 className="mb-6 text-lg font-semibold">New bank account</h1>
       <BankAccountForm mode="create" />
     </div>
   );

@@ -1,4 +1,4 @@
-import { Tabs } from "@/components/ui/Tabs";
+import { LinkTabs } from "@/components/ui/LinkTabs";
 
 const TAB_DEFS = [
   { key: "ledger", label: "Ledger" },
@@ -23,7 +23,7 @@ export function PartyDetailTabs({
   active: PartyDetailTabKey;
 }) {
   return (
-    <Tabs
+    <LinkTabs
       tabs={TAB_DEFS.map((t) => ({
         label: t.label,
         href: `${basePath}/${t.key}`,

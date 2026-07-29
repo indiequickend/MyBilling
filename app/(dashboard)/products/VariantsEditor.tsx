@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export type VariantRow = {
   name: string;
@@ -20,7 +22,8 @@ const BLANK_ROW: VariantRow = {
   hsnOrSacOverride: "",
 };
 
-const inputClass = "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm";
+const fieldClass =
+  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export function VariantsEditor({ defaultVariants }: { defaultVariants: VariantRow[] }) {
   const [rows, setRows] = useState<VariantRow[]>(defaultVariants);
@@ -30,48 +33,47 @@ export function VariantsEditor({ defaultVariants }: { defaultVariants: VariantRo
   }
 
   return (
-    <fieldset className="space-y-3">
-      <legend className="mb-1 text-sm font-medium text-slate-700">Variants</legend>
-      <p className="text-xs text-slate-500">
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
         Each variant is its own stock-tracked SKU under this product (e.g. size/color).
       </p>
 
       {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-6 gap-2 rounded-md border border-slate-200 p-3">
+        <div key={i} className="grid grid-cols-6 gap-2 rounded-lg border bg-muted/30 p-3">
           <input
             name={`variant__${i}__name`}
             value={row.name}
             onChange={(e) => update(i, { name: e.target.value })}
             placeholder="Name (e.g. Red - L)"
-            className={inputClass}
+            className={fieldClass}
           />
           <input
             name={`variant__${i}__sku`}
             value={row.sku}
             onChange={(e) => update(i, { sku: e.target.value })}
             placeholder="SKU"
-            className={inputClass}
+            className={fieldClass}
           />
           <input
             name={`variant__${i}__barcode`}
             value={row.barcode}
             onChange={(e) => update(i, { barcode: e.target.value })}
             placeholder="Barcode"
-            className={inputClass}
+            className={fieldClass}
           />
           <input
             name={`variant__${i}__sellingPriceOverrideMinor`}
             value={row.sellingPriceOverrideMinor}
             onChange={(e) => update(i, { sellingPriceOverrideMinor: e.target.value })}
             placeholder="Selling price"
-            className={inputClass}
+            className={fieldClass}
           />
           <input
             name={`variant__${i}__purchasePriceOverrideMinor`}
             value={row.purchasePriceOverrideMinor}
             onChange={(e) => update(i, { purchasePriceOverrideMinor: e.target.value })}
             placeholder="Purchase price"
-            className={inputClass}
+            className={fieldClass}
           />
           <div className="flex items-center gap-2">
             <input
@@ -79,26 +81,25 @@ export function VariantsEditor({ defaultVariants }: { defaultVariants: VariantRo
               value={row.hsnOrSacOverride}
               onChange={(e) => update(i, { hsnOrSacOverride: e.target.value })}
               placeholder="HSN/SAC"
-              className={inputClass}
+              className={fieldClass}
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
-              className="shrink-0 text-xs text-red-600 hover:underline"
+              aria-label="Remove variant"
+              className="shrink-0 text-destructive hover:text-destructive"
             >
-              Remove
-            </button>
+              <X />
+            </Button>
           </div>
         </div>
       ))}
 
-      <button
-        type="button"
-        onClick={() => setRows((prev) => [...prev, { ...BLANK_ROW }])}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-      >
+      <Button type="button" variant="outline" onClick={() => setRows((prev) => [...prev, { ...BLANK_ROW }])}>
         + Add variant
-      </button>
-    </fieldset>
+      </Button>
+    </div>
   );
 }

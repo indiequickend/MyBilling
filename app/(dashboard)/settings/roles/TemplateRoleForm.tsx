@@ -2,8 +2,10 @@
 
 import { useActionState } from "react";
 import { FormField } from "@/components/ui/FormField";
+import { SelectField } from "@/components/ui/SelectField";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { createRoleFromTemplateAction, type RolesPageState } from "./actions";
 import { ROLE_TEMPLATES } from "@/lib/rbac/templates";
 
@@ -20,17 +22,18 @@ export function TemplateRoleForm() {
         <FormNotice message={state.success} />
         <FormField label="Role name" name="name" required placeholder="e.g. Cashier" />
       </div>
-      <label className="block">
-        <span className="mb-1 block text-sm font-medium text-slate-700">Based on</span>
-        <select name="template" className="rounded-md border border-slate-300 px-3 py-2 text-sm">
-          {templateNames.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </label>
-      <SubmitButton pendingText="Creating…">Create</SubmitButton>
+      <Field className="w-40">
+        <FieldLabel htmlFor="template">Based on</FieldLabel>
+        <SelectField
+          name="template"
+          defaultValue={templateNames[0]}
+          placeholder="Template"
+          options={templateNames.map((t) => ({ value: t, label: t }))}
+        />
+      </Field>
+      <SubmitButton pendingText="Creating…" className="w-auto">
+        Create
+      </SubmitButton>
     </form>
   );
 }

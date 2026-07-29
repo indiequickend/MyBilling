@@ -11,7 +11,7 @@ export default async function EditSignaturePage({ params }: { params: Promise<{ 
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "settings", "manage_document_settings")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to edit signatures.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to edit signatures.</p>;
   }
 
   const signature = await findSignatureById(id, context.activeBusinessId);
@@ -19,7 +19,7 @@ export default async function EditSignaturePage({ params }: { params: Promise<{ 
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Edit signature</h1>
+      <h1 className="mb-6 text-lg font-semibold">Edit signature</h1>
       <SignatureForm
         mode="edit"
         signatureId={String(signature._id)}

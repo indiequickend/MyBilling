@@ -1,9 +1,20 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listWarehouses } from "@/lib/db/queries/warehouses";
-import { Table, Thead, Th, Tbody, Tr, Td, TableEmptyState } from "@/components/ui/Table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableEmptyState } from "@/components/ui/TableEmptyState";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   setDefaultWarehouseAction,
   softDeleteWarehouseAction,
@@ -16,9 +27,7 @@ export default async function WarehousesPage() {
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "inventory", "view")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const [active, deleted] = await Promise.all([
@@ -31,106 +40,94 @@ export default async function WarehousesPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">Warehouses</h1>
+        <h1 className="text-lg font-semibold">Warehouses</h1>
         {canEdit ? (
-          <Link
-            href="/inventory/warehouses/new"
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            + New warehouse
-          </Link>
+          <Button asChild>
+            <Link href="/inventory/warehouses/new">
+              <Plus data-icon="inline-start" />
+              New warehouse
+            </Link>
+          </Button>
         ) : null}
       </div>
 
       <Table>
-        <Thead>
-          <Th>Name</Th>
-          <Th>City</Th>
-          <Th>Default</Th>
-          <Th />
-        </Thead>
-        <Tbody>
-          {active.length === 0 ? (
-            <TableEmptyState colSpan={4} message="No warehouses yet." />
-          ) : null}
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>City</TableHead>
+            <TableHead>Default</TableHead>
+            <TableHead className="w-24" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {active.length === 0 ? <TableEmptyState colSpan={4} message="No warehouses yet." /> : null}
           {active.map((w) => (
-            <Tr key={String(w._id)}>
-              <Td>
+            <TableRow key={String(w._id)}>
+              <TableCell>
                 {canEdit ? (
-                  <Link
-                    href={`/inventory/warehouses/${String(w._id)}/edit`}
-                    className="font-medium text-slate-900 hover:underline"
-                  >
+                  <Link href={`/inventory/warehouses/${String(w._id)}/edit`} className="font-medium hover:underline">
                     {w.name}
                   </Link>
                 ) : (
-                  <span className="font-medium text-slate-900">{w.name}</span>
+                  <span className="font-medium">{w.name}</span>
                 )}
-              </Td>
-              <Td>{w.address?.city ?? "—"}</Td>
-              <Td>
+              </TableCell>
+              <TableCell>{w.address?.city ?? "—"}</TableCell>
+              <TableCell>
                 {w.isDefault ? (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                    Default
-                  </span>
+                  <Badge variant="success">Default</Badge>
                 ) : canEdit ? (
                   <form action={setDefaultWarehouseAction}>
                     <input type="hidden" name="warehouseId" value={String(w._id)} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                    >
+                    <Button type="submit" variant="outline" size="sm">
                       Set default
-                    </button>
+                    </Button>
                   </form>
                 ) : null}
-              </Td>
-              <Td className="text-right">
+              </TableCell>
+              <TableCell className="text-right">
                 {canEdit ? (
                   <form action={softDeleteWarehouseAction}>
                     <input type="hidden" name="warehouseId" value={String(w._id)} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                    >
+                    <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
                       Delete
-                    </button>
+                    </Button>
                   </form>
                 ) : null}
-              </Td>
-            </Tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </Tbody>
+        </TableBody>
       </Table>
 
       {deleted.length > 0 ? (
         <div>
-          <h2 className="mb-2 text-sm font-medium text-slate-700">Deleted</h2>
+          <h2 className="mb-2 text-sm font-medium">Deleted</h2>
           <Table>
-            <Thead>
-              <Th>Name</Th>
-              <Th />
-            </Thead>
-            <Tbody>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead className="w-24" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {deleted.map((w) => (
-                <Tr key={String(w._id)}>
-                  <Td>{w.name}</Td>
-                  <Td className="text-right">
+                <TableRow key={String(w._id)}>
+                  <TableCell>{w.name}</TableCell>
+                  <TableCell className="text-right">
                     {canEdit ? (
                       <form action={restoreWarehouseAction}>
                         <input type="hidden" name="warehouseId" value={String(w._id)} />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                        >
+                        <Button type="submit" variant="outline" size="sm">
                           Restore
-                        </button>
+                        </Button>
                       </form>
                     ) : null}
-                  </Td>
-                </Tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </Tbody>
+            </TableBody>
           </Table>
         </div>
       ) : null}

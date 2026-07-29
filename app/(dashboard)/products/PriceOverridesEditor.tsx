@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export type PriceOverrideRow = { priceListId: string; priceMinor: string };
 
-const inputClass = "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm";
+const fieldClass =
+  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export function PriceOverridesEditor({
   defaultOverrides,
@@ -22,16 +25,14 @@ export function PriceOverridesEditor({
   }
 
   return (
-    <fieldset className="space-y-3">
-      <legend className="mb-1 text-sm font-medium text-slate-700">Price list overrides</legend>
-
+    <div className="space-y-3">
       {rows.map((row, i) => (
         <div key={i} className="flex items-center gap-2">
           <select
             name={`priceOverride__${i}__priceListId`}
             value={row.priceListId}
             onChange={(e) => update(i, { priceListId: e.target.value })}
-            className={inputClass}
+            className={fieldClass}
           >
             <option value="">Select price list…</option>
             {priceLists.map((p) => (
@@ -45,25 +46,28 @@ export function PriceOverridesEditor({
             value={row.priceMinor}
             onChange={(e) => update(i, { priceMinor: e.target.value })}
             placeholder="Price"
-            className={inputClass}
+            className={fieldClass}
           />
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
-            className="shrink-0 text-xs text-red-600 hover:underline"
+            aria-label="Remove override"
+            className="shrink-0 text-destructive hover:text-destructive"
           >
-            Remove
-          </button>
+            <X />
+          </Button>
         </div>
       ))}
 
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={() => setRows((prev) => [...prev, { priceListId: "", priceMinor: "" }])}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
       >
         + Add price list override
-      </button>
-    </fieldset>
+      </Button>
+    </div>
   );
 }

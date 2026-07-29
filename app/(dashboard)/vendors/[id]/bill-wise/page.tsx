@@ -5,7 +5,7 @@ export default async function VendorBillWisePage({ params }: { params: Promise<{
   return (
     <div>
       <PartyDetailTabs basePath={`/vendors/${id}`} active="bill-wise" />
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-muted-foreground">
         No bill-wise payment matches yet. Payments matched to specific bills will appear here.
       </p>
     </div>

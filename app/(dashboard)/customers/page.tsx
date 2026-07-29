@@ -1,14 +1,25 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listCustomers } from "@/lib/db/queries/customers";
 import { listPartyGroups } from "@/lib/db/queries/partyGroups";
 import { customerListQuerySchema } from "@/lib/validation/customers";
-import { Table, Thead, Th, Tbody, Tr, Td, TableEmptyState } from "@/components/ui/Table";
-import { Tabs } from "@/components/ui/Tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TableEmptyState } from "@/components/ui/TableEmptyState";
+import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
+import { Button } from "@/components/ui/button";
+import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
 import { softDeleteCustomerAction, restoreCustomerAction } from "./actions";
 
 export default async function CustomersPage({
@@ -22,9 +33,7 @@ export default async function CustomersPage({
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "customers", "view")) {
-    return (
-      <p className="text-sm text-red-700">You don&apos;t have permission to view this page.</p>
-    );
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
   const query = customerListQuerySchema.parse({
@@ -50,23 +59,23 @@ export default async function CustomersPage({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">Customers</h1>
+        <h1 className="text-lg font-semibold">Customers</h1>
         <div className="flex items-center gap-3">
-          <Link href="/customers/groups" className="text-sm text-slate-500 hover:underline">
-            Manage groups
-          </Link>
+          <Button variant="link" asChild className="text-muted-foreground">
+            <Link href="/customers/groups">Manage groups</Link>
+          </Button>
           {canCreate ? (
-            <Link
-              href="/customers/new"
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              + New customer
-            </Link>
+            <Button asChild>
+              <Link href="/customers/new">
+                <Plus data-icon="inline-start" />
+                New customer
+              </Link>
+            </Button>
           ) : null}
         </div>
       </div>
 
-      <Tabs
+      <LinkTabs
         tabs={[
           { label: "Active", href: "/customers", active: query.tab === "active" },
           { label: "Deleted", href: "/customers?tab=deleted", active: query.tab === "deleted" },
@@ -83,7 +92,7 @@ export default async function CustomersPage({
             <select
               name="groupId"
               defaultValue={query.groupId ?? ""}
-              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
               <option value="">All groups</option>
               {groups.map((g) => (
@@ -97,66 +106,65 @@ export default async function CustomersPage({
       </div>
 
       <Table>
-        <Thead>
-          <Th>Name</Th>
-          <Th>Company</Th>
-          <Th>GSTIN</Th>
-          <Th>Phone</Th>
-          <Th />
-        </Thead>
-        <Tbody>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Company</TableHead>
+            <TableHead>GSTIN</TableHead>
+            <TableHead>Phone</TableHead>
+            <TableHead className="w-24" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {items.length === 0 ? (
             <TableEmptyState colSpan={5} message="No customers found." />
           ) : null}
-          {items.map((c) => (
-            <Tr key={String(c._id)}>
-              <Td>
-                <Link
-                  href={`/customers/${String(c._id)}/ledger`}
-                  className="font-medium text-slate-900 hover:underline"
-                >
-                  {c.displayName}
-                </Link>
-              </Td>
-              <Td>{c.companyName ?? "—"}</Td>
-              <Td>{c.gstin ?? "—"}</Td>
-              <Td>{c.phone ?? "—"}</Td>
-              <Td className="text-right">
-                {query.tab === "active" ? (
-                  canDelete ? (
-                    <form action={softDeleteCustomerAction}>
-                      <input type="hidden" name="customerId" value={String(c._id)} />
-                      <button
-                        type="submit"
-                        className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
+          {items.map((c) => {
+            const id = String(c._id);
+            return (
+              <TableRow key={id}>
+                <TableCell>
+                  <Link href={`/customers/${id}/ledger`} className="flex items-center gap-2.5 font-medium hover:underline">
+                    <PartyAvatar id={id} name={c.displayName} />
+                    {c.displayName}
+                  </Link>
+                </TableCell>
+                <TableCell>{c.companyName ?? "—"}</TableCell>
+                <TableCell>{c.gstin ?? "—"}</TableCell>
+                <TableCell>{c.phone ?? "—"}</TableCell>
+                <TableCell className="text-right">
+                  {query.tab === "active" ? (
+                    canDelete ? (
+                      <form action={softDeleteCustomerAction}>
+                        <input type="hidden" name="customerId" value={id} />
+                        <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                          Delete
+                        </Button>
+                      </form>
+                    ) : null
+                  ) : (
+                    <form action={restoreCustomerAction}>
+                      <input type="hidden" name="customerId" value={id} />
+                      <Button type="submit" variant="outline" size="sm">
+                        Restore
+                      </Button>
                     </form>
-                  ) : null
-                ) : (
-                  <form action={restoreCustomerAction}>
-                    <input type="hidden" name="customerId" value={String(c._id)} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                    >
-                      Restore
-                    </button>
-                  </form>
-                )}
-              </Td>
-            </Tr>
-          ))}
-        </Tbody>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
       </Table>
 
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        basePath="/customers"
-        searchParams={{ q: query.q, groupId: query.groupId, tab: query.tab }}
-      />
+      <div className="mt-4 flex justify-end">
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          basePath="/customers"
+          searchParams={{ q: query.q, groupId: query.groupId, tab: query.tab }}
+        />
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { listWarehouses } from "@/lib/db/queries/warehouses";
-import { Tabs } from "@/components/ui/Tabs";
+import { LinkTabs } from "@/components/ui/LinkTabs";
 import { ProductsInventoryPreferencesForm } from "./ProductsInventoryPreferencesForm";
 
 export default async function ProductsInventoryPreferencesPage() {
@@ -21,7 +21,7 @@ export default async function ProductsInventoryPreferencesPage() {
 
   return (
     <div>
-      <Tabs
+      <LinkTabs
         tabs={[
           { label: "Document", href: "/settings/preferences/document", active: false },
           {

@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 import { computeLineItem } from "@/lib/invoices/calc";
 import { minorToRupeesString } from "@/lib/utils/money";
+import { Button } from "@/components/ui/button";
 
 export type LineItemRow = {
   productId: string;
@@ -41,7 +43,8 @@ type ProductSearchResult = {
   barcode: string;
 };
 
-const inputClass = "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm";
+const fieldClass =
+  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 function rowPreviewTotal(row: LineItemRow, businessState: string, placeOfSupplyState: string): string {
   const quantity = Number(row.quantity);
@@ -87,10 +90,10 @@ function ProductSearchBox({ onSelect }: { onSelect: (product: ProductSearchResul
         onFocus={() => results.length > 0 && setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Search product or barcode…"
-        className={inputClass}
+        className={fieldClass}
       />
       {open && results.length > 0 ? (
-        <ul className="absolute z-10 mt-1 max-h-48 w-64 overflow-auto rounded-md border border-slate-200 bg-white text-sm shadow-lg">
+        <ul className="absolute z-10 mt-1 max-h-48 w-64 overflow-auto rounded-lg border bg-popover text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10">
           {results.map((p) => (
             <li key={p.id}>
               <button
@@ -101,10 +104,10 @@ function ProductSearchBox({ onSelect }: { onSelect: (product: ProductSearchResul
                   setResults([]);
                   setOpen(false);
                 }}
-                className="block w-full px-3 py-2 text-left hover:bg-slate-50"
+                className="block w-full px-3 py-2 text-left hover:bg-muted"
               >
                 {p.name}
-                {p.barcode ? <span className="text-slate-400"> · {p.barcode}</span> : null}
+                {p.barcode ? <span className="text-muted-foreground"> · {p.barcode}</span> : null}
               </button>
             </li>
           ))}
@@ -147,14 +150,12 @@ export function LineItemsEditor({
   }
 
   return (
-    <fieldset className="space-y-3">
-      <legend className="mb-1 text-sm font-medium text-slate-700">Line items</legend>
-
+    <div className="space-y-3">
       <div className="space-y-3">
         {rows.map((row, i) => (
-          <div key={i} className="space-y-2 rounded-md border border-slate-200 p-3">
+          <div key={i} className="space-y-2 rounded-lg border bg-muted/30 p-3">
             <div className="grid grid-cols-12 gap-2">
-              <div className="col-span-3">
+              <div className="col-span-12 sm:col-span-3">
                 <ProductSearchBox onSelect={(p) => selectProduct(i, p)} />
               </div>
               <input
@@ -163,21 +164,21 @@ export function LineItemsEditor({
                 onChange={(e) => update(i, { description: e.target.value })}
                 placeholder="Description"
                 required
-                className={`col-span-3 ${inputClass}`}
+                className={`col-span-6 sm:col-span-3 ${fieldClass}`}
               />
               <input
                 name={`lineItem__${i}__hsnOrSac`}
                 value={row.hsnOrSac}
                 onChange={(e) => update(i, { hsnOrSac: e.target.value })}
                 placeholder="HSN/SAC"
-                className={`col-span-1 ${inputClass}`}
+                className={`col-span-3 sm:col-span-1 ${fieldClass}`}
               />
               <input
                 name={`lineItem__${i}__unit`}
                 value={row.unit}
                 onChange={(e) => update(i, { unit: e.target.value })}
                 placeholder="Unit"
-                className={`col-span-1 ${inputClass}`}
+                className={`col-span-3 sm:col-span-1 ${fieldClass}`}
               />
               <input
                 name={`lineItem__${i}__quantity`}
@@ -188,7 +189,7 @@ export function LineItemsEditor({
                 onChange={(e) => update(i, { quantity: e.target.value })}
                 placeholder="Qty"
                 required
-                className={`col-span-1 ${inputClass}`}
+                className={`col-span-3 sm:col-span-1 ${fieldClass}`}
               />
               <input
                 name={`lineItem__${i}__unitPriceMinor`}
@@ -199,19 +200,19 @@ export function LineItemsEditor({
                 onChange={(e) => update(i, { unitPriceMinor: e.target.value })}
                 placeholder="Unit price"
                 required
-                className={`col-span-2 ${inputClass}`}
+                className={`col-span-3 sm:col-span-2 ${fieldClass}`}
               />
               <input type="hidden" name={`lineItem__${i}__productId`} value={row.productId} />
             </div>
 
-            <div className="grid grid-cols-12 gap-2">
+            <div className="grid grid-cols-12 items-center gap-2">
               <select
                 name={`lineItem__${i}__discountType`}
                 value={row.discountType}
                 onChange={(e) =>
                   update(i, { discountType: e.target.value as LineItemRow["discountType"] })
                 }
-                className={`col-span-2 ${inputClass}`}
+                className={`col-span-4 sm:col-span-2 ${fieldClass}`}
               >
                 <option value="percentage">Discount %</option>
                 <option value="amount">Discount ₹</option>
@@ -223,7 +224,7 @@ export function LineItemsEditor({
                 step="0.01"
                 value={row.discountValue}
                 onChange={(e) => update(i, { discountValue: e.target.value })}
-                className={`col-span-2 ${inputClass}`}
+                className={`col-span-4 sm:col-span-2 ${fieldClass}`}
               />
               <input
                 name={`lineItem__${i}__taxRatePercent`}
@@ -234,31 +235,30 @@ export function LineItemsEditor({
                 value={row.taxRatePercent}
                 onChange={(e) => update(i, { taxRatePercent: e.target.value })}
                 placeholder="Tax %"
-                className={`col-span-2 ${inputClass}`}
+                className={`col-span-4 sm:col-span-2 ${fieldClass}`}
               />
-              <div className="col-span-4 flex items-center text-sm text-slate-600">
+              <div className="col-span-8 flex items-center text-sm text-muted-foreground sm:col-span-4">
                 Line total: ₹{rowPreviewTotal(row, businessState, placeOfSupplyState)}
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
                 disabled={rows.length === 1}
-                className="col-span-2 justify-self-end text-xs text-red-600 hover:underline disabled:text-slate-300"
+                className="col-span-4 justify-self-end text-destructive hover:text-destructive sm:col-span-2"
               >
+                <X data-icon="inline-start" />
                 Remove
-              </button>
+              </Button>
             </div>
           </div>
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setRows((prev) => [...prev, { ...BLANK_LINE_ITEM }])}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-      >
+      <Button type="button" variant="outline" onClick={() => setRows((prev) => [...prev, { ...BLANK_LINE_ITEM }])}>
         + Add line
-      </button>
-    </fieldset>
+      </Button>
+    </div>
   );
 }

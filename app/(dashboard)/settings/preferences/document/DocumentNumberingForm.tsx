@@ -2,7 +2,10 @@
 
 import { useActionState } from "react";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { FormField } from "@/components/ui/FormField";
+import { SelectField } from "@/components/ui/SelectField";
 import { FormError, FormNotice } from "@/components/auth/AuthCard";
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import type { DocumentNumberingConfigInput } from "@/lib/validation/preferences";
 import { updateDocumentNumberingAction, type PreferencesPageState } from "../actions";
 
@@ -27,58 +30,39 @@ export function DocumentNumberingForm({
       <FormError message={state.error} />
       <FormNotice message={state.success} />
 
-      <fieldset className="space-y-3 rounded-md border border-slate-200 p-4">
-        <legend className="px-1 text-sm font-medium text-slate-900">Invoice numbering</legend>
-
-        <label className="block max-w-xs text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Prefix</span>
-          <input
-            name="invoice__prefix"
-            defaultValue={invoiceConfig.prefix}
-            placeholder="INV-"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
-
-        <label className="block max-w-xs text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Number padding</span>
-          <input
-            type="number"
+      <FieldSet className="rounded-lg border p-4">
+        <FieldLegend variant="label">Invoice numbering</FieldLegend>
+        <FieldGroup className="max-w-xs gap-3">
+          <FormField label="Prefix" name="invoice__prefix" defaultValue={invoiceConfig.prefix} placeholder="INV-" />
+          <FormField
+            label="Number padding"
             name="invoice__padding"
-            min={1}
-            max={10}
-            defaultValue={invoiceConfig.padding}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            type="number"
+            defaultValue={String(invoiceConfig.padding)}
           />
-        </label>
-
-        <label className="block max-w-xs text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Reset</span>
-          <select
-            name="invoice__resetPolicy"
-            defaultValue={invoiceConfig.resetPolicy}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          >
-            <option value="fiscal_year">Every fiscal year</option>
-            <option value="never">Never (one continuous series)</option>
-          </select>
-        </label>
-
-        <label className="block max-w-xs text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Fiscal year starts in</span>
-          <select
-            name="fyStartMonth"
-            defaultValue={fyStartMonth}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          >
-            {MONTHS.map((m, i) => (
-              <option key={m} value={i + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-      </fieldset>
+          <Field>
+            <FieldLabel htmlFor="invoice__resetPolicy">Reset</FieldLabel>
+            <SelectField
+              name="invoice__resetPolicy"
+              defaultValue={invoiceConfig.resetPolicy}
+              placeholder="Reset policy"
+              options={[
+                { value: "fiscal_year", label: "Every fiscal year" },
+                { value: "never", label: "Never (one continuous series)" },
+              ]}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="fyStartMonth">Fiscal year starts in</FieldLabel>
+            <SelectField
+              name="fyStartMonth"
+              defaultValue={String(fyStartMonth)}
+              placeholder="Month"
+              options={MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))}
+            />
+          </Field>
+        </FieldGroup>
+      </FieldSet>
 
       <div className="max-w-xs">
         <SubmitButton pendingText="Saving…">Save numbering settings</SubmitButton>

@@ -1,18 +1,13 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findInvoiceById } from "@/lib/db/queries/invoices";
-import { INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
+import { INVOICE_STATUS_BADGE_VARIANT, INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CancelInvoiceButton, DeleteInvoiceButton } from "./InvoiceActionButtons";
-
-const STATUS_BADGE_CLASS: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-700",
-  pending: "bg-amber-50 text-amber-700",
-  partially_paid: "bg-amber-50 text-amber-700",
-  paid: "bg-emerald-50 text-emerald-700",
-  cancelled: "bg-red-50 text-red-700",
-};
 
 const EDITABLE_STATUSES = ["draft", "pending", "partially_paid"];
 const CANCELLABLE_STATUSES = ["draft", "pending", "partially_paid"];
@@ -31,7 +26,7 @@ export default async function InvoiceDetailLayout({
   if (!context.activeBusinessId || !context.membership) redirect("/");
 
   if (!can(context.membership, "sales_invoices", "view")) {
-    return <p className="text-sm text-red-700">You don&apos;t have permission to view invoices.</p>;
+    return <p className="text-sm text-destructive">You don&apos;t have permission to view invoices.</p>;
   }
 
   const invoice = await findInvoiceById(id, context.activeBusinessId);
@@ -45,37 +40,33 @@ export default async function InvoiceDetailLayout({
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-slate-900">
-              {invoice.docNumber ?? "Draft invoice"}
-            </h1>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[invoice.status]}`}
-            >
+            <h1 className="text-lg font-semibold">{invoice.docNumber ?? "Draft invoice"}</h1>
+            <Badge variant={INVOICE_STATUS_BADGE_VARIANT[invoice.status]}>
               {INVOICE_STATUS_LABELS[invoice.status]}
-            </span>
+            </Badge>
           </div>
-          <p className="text-sm text-slate-500">{invoice.customerSnapshot.displayName}</p>
+          <p className="text-sm text-muted-foreground">{invoice.customerSnapshot.displayName}</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {invoice.docNumber ? (
-            <a
-              href={`/api/sales/invoices/${id}/pdf`}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              Download PDF
-            </a>
+            <Button variant="outline" asChild>
+              <a href={`/api/sales/invoices/${id}/pdf`}>
+                <Download data-icon="inline-start" />
+                Download PDF
+              </a>
+            </Button>
           ) : null}
           {canEdit ? (
-            <Link
-              href={`/sales/invoices/${id}/edit`}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              Edit
-            </Link>
+            <Button variant="outline" asChild>
+              <Link href={`/sales/invoices/${id}/edit`}>
+                <Pencil data-icon="inline-start" />
+                Edit
+              </Link>
+            </Button>
           ) : null}
           {canCancel ? <CancelInvoiceButton invoiceId={id} /> : null}
           {canDelete ? <DeleteInvoiceButton invoiceId={id} /> : null}
