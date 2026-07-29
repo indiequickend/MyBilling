@@ -7,6 +7,10 @@ import { requirePermission } from "@/lib/rbac/can";
 import { setDocumentCustomFieldDefs } from "@/lib/db/queries/businesses";
 import { documentCustomFieldDefsSchema } from "@/lib/validation/documentCustomFields";
 import { parseIndexedRows } from "@/lib/validation/shared";
+import type { DocumentType } from "@/lib/constants/documentTypes";
+
+/** Only these doc types have a working create/edit form that reads documentCustomFieldDefs so far. */
+const SUPPORTED_DOC_TYPES: DocumentType[] = ["invoice", "purchase"];
 
 export type DocumentFieldsPageState = { error?: string; success?: string };
 
@@ -23,6 +27,11 @@ export async function updateDocumentCustomFieldDefsAction(
   formData: FormData,
 ): Promise<DocumentFieldsPageState> {
   const context = await requireDocumentSettingsPermission();
+
+  const rawDocType = String(formData.get("docType") ?? "invoice");
+  const docType: DocumentType = SUPPORTED_DOC_TYPES.includes(rawDocType as DocumentType)
+    ? (rawDocType as DocumentType)
+    : "invoice";
 
   const rows = parseIndexedRows(formData, "documentField").map((row) => ({
     key: row.key,
@@ -42,7 +51,7 @@ export async function updateDocumentCustomFieldDefsAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  await setDocumentCustomFieldDefs(context.activeBusinessId, "invoice", parsed.data);
+  await setDocumentCustomFieldDefs(context.activeBusinessId, docType, parsed.data);
   revalidatePath("/settings/document-fields");
   return { success: "Document custom fields updated." };
 }

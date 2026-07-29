@@ -7,7 +7,7 @@ const optionalObjectId = objectId.optional().or(z.literal("").transform(() => un
 
 /**
  * `discountValue`'s meaning depends on the sibling `discountType`: minor units (paise) when
- * "amount", a raw 0-100 percent when "percentage" — matching lib/invoices/calc.ts and the
+ * "amount", a raw 0-100 percent when "percentage" — matching lib/documents/calc.ts and the
  * DocumentLineItem/Invoice schema comments. A raw string/number is accepted since a form submits
  * one text input regardless of which discount type is selected; this normalizes it to a number
  * or reports a Zod issue at `discountValue`.

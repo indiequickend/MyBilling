@@ -21,6 +21,10 @@ const documentPreferencesSchema = new Schema(
     defaultDiscountType: { type: String, enum: ["amount", "percentage"], default: "percentage" },
     showHeaderFieldSuggestions: { type: Boolean, default: true },
     defaultDueDateDays: { type: Number, default: 15 },
+    // Purchases-only: gates both the visibility of the per-line-item ITC-eligible checkbox and
+    // its default value (shown+defaulted true when on, hidden+forced false when off). Unused by
+    // sales/conversions.
+    trackItcEligibility: { type: Boolean, default: false },
   },
   { _id: false },
 );
@@ -123,6 +127,7 @@ export type DocumentPreferences = {
   defaultDiscountType: "amount" | "percentage";
   showHeaderFieldSuggestions: boolean;
   defaultDueDateDays: number;
+  trackItcEligibility: boolean;
 };
 
 export type ProductPreferences = {

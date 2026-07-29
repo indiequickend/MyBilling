@@ -1,0 +1,44 @@
+import { z } from "zod";
+import { PAYMENT_MODES } from "@/lib/constants/payments";
+import { objectId, optionalTrimmed, rupeesToMinorUnits, gstinSchema } from "@/lib/validation/shared";
+
+const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
+
+export const expenseHeaderSchema = z.object({
+  categoryId: objectId,
+  amountMinor: rupeesToMinorUnits,
+  mode: z.enum(PAYMENT_MODES),
+  bankAccountId: objectId,
+  vendorId: optionalObjectId,
+  supplierName: optionalTrimmed(200),
+  supplierGstin: gstinSchema,
+  description: optionalTrimmed(500),
+  expenseDate: z.string().trim().min(1, "Expense date is required"),
+});
+export type ExpenseHeaderInput = z.infer<typeof expenseHeaderSchema>;
+
+export const expenseListQuerySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+  categoryId: objectId.optional().or(z.literal("").transform(() => undefined)),
+  tab: z.enum(["all", "recorded", "cancelled", "deleted"]).default("all"),
+  page: z.coerce.number().int().min(1).default(1),
+});
+
+/** One CSV row of the bulk-upload format. Category and bank account are free-text names (matched
+ * against existing records — category is auto-created if new, bank account must already exist),
+ * not raw ids — a spreadsheet author shouldn't have to look up ObjectIds by hand. */
+export const expenseRowSchema = z.object({
+  categoryName: z.string().trim().min(1, "Category is required").max(100),
+  amountMinor: rupeesToMinorUnits,
+  mode: z.enum(PAYMENT_MODES),
+  bankAccountName: z.string().trim().min(1, "Bank/cash account is required").max(200),
+  supplierName: optionalTrimmed(200),
+  supplierGstin: gstinSchema,
+  description: optionalTrimmed(500),
+  expenseDate: z.string().trim().min(1, "Expense date is required"),
+});
+export type ExpenseRowInput = z.infer<typeof expenseRowSchema>;
+
+/** Documented, enforced ceiling for a single bulk-upload request — this app has no background
+ * job infrastructure, so an upload is validated and inserted synchronously in one request. */
+export const EXPENSE_BULK_UPLOAD_MAX_ROWS = 500;

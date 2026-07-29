@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   computeLineItem,
-  computeInvoiceTotals,
+  computeDocumentTotals,
   exclusiveUnitPriceMinor,
-  deriveInvoiceStatus,
-} from "@/lib/invoices/calc";
+  derivePaymentStatus,
+} from "@/lib/documents/calc";
 
 describe("exclusiveUnitPriceMinor", () => {
   it("returns the price unchanged when it is already tax-exclusive", () => {
@@ -63,13 +63,13 @@ describe("computeLineItem", () => {
   });
 });
 
-describe("computeInvoiceTotals", () => {
+describe("computeDocumentTotals", () => {
   const oneLine = [
     { quantity: 1, unitPriceMinor: 100_000, discountType: "percentage" as const, discountValue: 0, taxRatePercent: 18 },
   ];
 
   it("computes a no-discount, no-round-off intra-state invoice", () => {
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       oneLine,
       { type: "percentage", value: 0, target: "total" },
       false,
@@ -93,7 +93,7 @@ describe("computeInvoiceTotals", () => {
   });
 
   it("a post-tax discount target (total) leaves the tax total unchanged", () => {
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       oneLine,
       { type: "percentage", value: 10, target: "total" },
       false,
@@ -106,7 +106,7 @@ describe("computeInvoiceTotals", () => {
   });
 
   it("a pre-tax discount target (net_amount) proportionally reduces the tax total", () => {
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       oneLine,
       { type: "percentage", value: 10, target: "net_amount" },
       false,
@@ -123,7 +123,7 @@ describe("computeInvoiceTotals", () => {
   });
 
   it("unit_price target behaves the same as net_amount (both collapse to the pre-tax base)", () => {
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       oneLine,
       { type: "percentage", value: 10, target: "unit_price" },
       false,
@@ -135,7 +135,7 @@ describe("computeInvoiceTotals", () => {
   });
 
   it("price_with_tax target behaves the same as total (both collapse to the tax-inclusive base)", () => {
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       oneLine,
       { type: "percentage", value: 10, target: "price_with_tax" },
       false,
@@ -150,7 +150,7 @@ describe("computeInvoiceTotals", () => {
     const oddLine = [
       { quantity: 3, unitPriceMinor: 33_333, discountType: "percentage" as const, discountValue: 0, taxRatePercent: 18 },
     ];
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       oddLine,
       { type: "percentage", value: 0, target: "total" },
       true,
@@ -167,7 +167,7 @@ describe("computeInvoiceTotals", () => {
     const oddLine = [
       { quantity: 3, unitPriceMinor: 33_333, discountType: "percentage" as const, discountValue: 0, taxRatePercent: 18 },
     ];
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       oddLine,
       { type: "percentage", value: 0, target: "total" },
       false,
@@ -179,7 +179,7 @@ describe("computeInvoiceTotals", () => {
   });
 
   it("clamps a document-level discount that would exceed its base", () => {
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       oneLine,
       { type: "amount", value: 999_999, target: "net_amount" },
       false,
@@ -191,7 +191,7 @@ describe("computeInvoiceTotals", () => {
   });
 
   it("sums CGST/SGST/IGST across multiple lines with mixed tax rates", () => {
-    const totals = computeInvoiceTotals(
+    const totals = computeDocumentTotals(
       [
         { quantity: 1, unitPriceMinor: 100_000, discountType: "percentage", discountValue: 0, taxRatePercent: 18 },
         { quantity: 1, unitPriceMinor: 50_000, discountType: "percentage", discountValue: 0, taxRatePercent: 5 },
@@ -208,20 +208,20 @@ describe("computeInvoiceTotals", () => {
   });
 });
 
-describe("deriveInvoiceStatus", () => {
+describe("derivePaymentStatus", () => {
   it("is pending when nothing has been paid", () => {
-    expect(deriveInvoiceStatus(10_000, 0)).toBe("pending");
+    expect(derivePaymentStatus(10_000, 0)).toBe("pending");
   });
 
   it("is partially_paid when some but not all has been paid", () => {
-    expect(deriveInvoiceStatus(10_000, 4_000)).toBe("partially_paid");
+    expect(derivePaymentStatus(10_000, 4_000)).toBe("partially_paid");
   });
 
   it("is paid once the amount paid reaches the grand total", () => {
-    expect(deriveInvoiceStatus(10_000, 10_000)).toBe("paid");
+    expect(derivePaymentStatus(10_000, 10_000)).toBe("paid");
   });
 
   it("is paid even if overpaid", () => {
-    expect(deriveInvoiceStatus(10_000, 10_500)).toBe("paid");
+    expect(derivePaymentStatus(10_000, 10_500)).toBe("paid");
   });
 });

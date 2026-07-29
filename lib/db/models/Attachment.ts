@@ -1,7 +1,14 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 
-// Only "invoice" is wired up this phase; extend as later phases add attachable document types.
-export const ATTACHMENT_LINKED_DOCUMENT_TYPES = ["invoice"] as const;
+// Extend as later phases add attachable document types.
+export const ATTACHMENT_LINKED_DOCUMENT_TYPES = [
+  "invoice",
+  "purchase",
+  "purchase_order",
+  "debit_note",
+  "expense",
+  "indirect_income",
+] as const;
 export type AttachmentLinkedDocumentType = (typeof ATTACHMENT_LINKED_DOCUMENT_TYPES)[number];
 
 const attachmentSchema = new Schema(

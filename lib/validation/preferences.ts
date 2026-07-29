@@ -11,6 +11,9 @@ export const documentPreferencesSchema = z.object({
   defaultDiscountType: z.enum(["amount", "percentage"]),
   showHeaderFieldSuggestions: z.boolean(),
   defaultDueDateDays: z.coerce.number().int().min(0).max(365),
+  // Purchases-only in the UI (see settings/preferences), but present on every category to match
+  // the shared documentPreferencesSchema Mongoose subschema.
+  trackItcEligibility: z.boolean(),
 });
 export type DocumentPreferencesInput = z.infer<typeof documentPreferencesSchema>;
 

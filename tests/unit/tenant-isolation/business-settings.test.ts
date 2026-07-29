@@ -56,6 +56,7 @@ describe("business settings — tenant isolation", () => {
       defaultDiscountType: "amount" as const,
       showHeaderFieldSuggestions: false,
       defaultDueDateDays: 30,
+      trackItcEligibility: false,
     };
     await updateDocumentPreferences(tenants.businessAId, {
       sales: prefs,

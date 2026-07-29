@@ -9,7 +9,7 @@ import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { InvoiceForm } from "../../InvoiceForm";
-import type { LineItemRow } from "../../LineItemsEditor";
+import type { LineItemRow } from "@/components/documents/LineItemsEditor";
 
 const EDITABLE_STATUSES = ["draft", "pending", "partially_paid"];
 

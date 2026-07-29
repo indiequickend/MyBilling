@@ -15,6 +15,8 @@ import {
   Package,
   PenTool,
   ShieldCheck,
+  ShoppingCart,
+  Receipt,
   SlidersHorizontal,
   UserCircle,
   Users,
@@ -30,6 +32,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 const ICONS: Record<NavIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
   invoices: FileText,
+  purchases: ShoppingCart,
+  expenses: Receipt,
   customers: Users,
   vendors: Building2,
   products: Package,

@@ -9,14 +9,19 @@ import { PAYMENT_MODES } from "@/lib/constants/payments";
 const paymentSchema = new Schema(
   {
     businessId: { type: Schema.Types.ObjectId, ref: "Business", required: true, index: true },
-    partyType: { type: String, enum: ["customer", "vendor"], required: true },
-    partyId: { type: Schema.Types.ObjectId, required: true, index: true },
+    // Optional: Expense/Indirect Income payments (Phase 4) have no linked Customer/Vendor.
+    partyType: { type: String, enum: ["customer", "vendor"] },
+    partyId: { type: Schema.Types.ObjectId, index: true },
     direction: { type: String, enum: ["in", "out"], required: true },
     amountMinor: { type: Number, required: true },
     mode: { type: String, enum: PAYMENT_MODES, required: true },
     bankAccountId: { type: Schema.Types.ObjectId, ref: "BankAccount", required: true },
     paymentDate: { type: Date, required: true },
-    linkedDocumentType: { type: String, enum: ["invoice"], required: true },
+    linkedDocumentType: {
+      type: String,
+      enum: ["invoice", "purchase", "expense", "indirect_income"],
+      required: true,
+    },
     linkedDocumentId: { type: Schema.Types.ObjectId, required: true, index: true },
     referenceNote: { type: String, trim: true },
     createdByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },

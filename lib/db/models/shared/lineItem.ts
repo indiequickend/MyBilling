@@ -19,7 +19,7 @@ export const documentLineItemSchema = new Schema({
   unitPriceMinor: { type: Number, required: true },
   discountType: { type: String, enum: ["amount", "percentage"], required: true, default: "percentage" },
   // Minor units (paise) when discountType is "amount"; a raw 0-100 percent when "percentage" —
-  // see lib/invoices/calc.ts for the shared interpretation.
+  // see lib/documents/calc.ts for the shared interpretation.
   discountValue: { type: Number, required: true, default: 0 },
   taxRatePercent: { type: Number, required: true, default: 0 },
   cgstMinor: { type: Number, required: true, default: 0 },
@@ -27,6 +27,10 @@ export const documentLineItemSchema = new Schema({
   igstMinor: { type: Number, required: true, default: 0 },
   taxableAmountMinor: { type: Number, required: true },
   totalMinor: { type: Number, required: true },
+  // Only meaningful on Purchase line items, and only shown/editable in the UI when the business's
+  // trackItcEligibility preference is on (see Business.preferences.document.purchases); Invoice
+  // lines simply never read it. Defaults true so a line is ITC-eligible unless marked otherwise.
+  itcEligible: { type: Boolean, required: true, default: true },
 });
 
 export type DocumentLineItemDoc = InferSchemaType<typeof documentLineItemSchema>;

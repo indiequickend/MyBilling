@@ -22,3 +22,14 @@ export function detectImageMimeType(buffer: Buffer): string | null {
   }
   return null;
 }
+
+/** Like detectImageMimeType, but also accepts PDFs — for receipt/document attachments where a
+ * scanned image or a PDF are both valid (see lib/storage/cloudinary.ts's ALLOWED_MIME_TYPES). */
+export function detectAttachmentMimeType(buffer: Buffer): string | null {
+  const imageType = detectImageMimeType(buffer);
+  if (imageType) return imageType;
+  if (buffer.length >= 5 && buffer.subarray(0, 5).toString("ascii") === "%PDF-") {
+    return "application/pdf";
+  }
+  return null;
+}

@@ -18,6 +18,9 @@ export const ADMIN_TEMPLATE_PERMISSIONS: PermissionMatrix = fullyGranted(
 
 /** Financial modules only; no settings/user management. */
 export const ACCOUNTS_TEMPLATE_PERMISSIONS: PermissionMatrix = fullyGranted([
+  "purchases",
+  "purchase_orders",
+  "debit_notes",
   "expenses",
   "indirect_income",
   "payments",

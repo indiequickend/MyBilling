@@ -12,7 +12,7 @@ import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
 import { createPayment, type CreatePaymentInput } from "@/lib/db/queries/payments";
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
-import { computeInvoiceTotals, deriveInvoiceStatus, type LineItemCalcInput } from "@/lib/invoices/calc";
+import { computeDocumentTotals, derivePaymentStatus, type LineItemCalcInput } from "@/lib/documents/calc";
 import type { DiscountTarget, InvoiceStatus } from "@/lib/constants/invoices";
 import type { PaymentMode } from "@/lib/constants/payments";
 
@@ -141,7 +141,7 @@ type PreparedInvoiceWrite = {
   ok: true;
   customer: InstanceType<typeof Customer>;
   business: InstanceType<typeof Business>;
-  totals: ReturnType<typeof computeInvoiceTotals>;
+  totals: ReturnType<typeof computeDocumentTotals>;
   lineItemDocs: InvoiceLineItemDoc[];
 };
 
@@ -164,7 +164,7 @@ async function prepareInvoiceWrite(
     taxRatePercent: li.taxRatePercent,
   }));
 
-  const totals = computeInvoiceTotals(
+  const totals = computeDocumentTotals(
     lineItemCalcInputs,
     { type: input.discountType, value: input.discountValue, target: input.discountTarget },
     input.roundOff,
@@ -322,7 +322,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
         }
         const paidMinor = createdPayments.reduce((s, p) => s + p.amountMinor, 0);
         invoiceDoc.amountPaidMinor = paidMinor;
-        invoiceDoc.status = deriveInvoiceStatus(invoiceDoc.grandTotalMinor, paidMinor);
+        invoiceDoc.status = derivePaymentStatus(invoiceDoc.grandTotalMinor, paidMinor);
         await invoiceDoc.save({ session });
       }
 
@@ -353,7 +353,7 @@ export async function updateInvoice(
   const status: InvoiceStatus =
     existing.status === "draft"
       ? "draft"
-      : deriveInvoiceStatus(prepared.totals.grandTotalMinor, existing.amountPaidMinor);
+      : derivePaymentStatus(prepared.totals.grandTotalMinor, existing.amountPaidMinor);
 
   const updated = await Invoice.findOneAndUpdate(
     { _id: invoiceId, businessId },
@@ -421,7 +421,7 @@ export async function finalizeInvoiceDraft(
           }
           const paidMinor = createdPayments.reduce((s, p) => s + p.amountMinor, 0);
           updated.amountPaidMinor = paidMinor;
-          updated.status = deriveInvoiceStatus(updated.grandTotalMinor, paidMinor);
+          updated.status = derivePaymentStatus(updated.grandTotalMinor, paidMinor);
           await updated.save({ session });
         }
 
@@ -483,7 +483,7 @@ export async function recordInvoicePayment(
         createdPayments.push(payment);
       }
       invoice.amountPaidMinor += paidSum;
-      invoice.status = deriveInvoiceStatus(invoice.grandTotalMinor, invoice.amountPaidMinor);
+      invoice.status = derivePaymentStatus(invoice.grandTotalMinor, invoice.amountPaidMinor);
       await invoice.save({ session });
 
       result = { ok: true, invoice, payments: createdPayments };

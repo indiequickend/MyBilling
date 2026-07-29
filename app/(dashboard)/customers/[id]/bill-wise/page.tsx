@@ -37,10 +37,10 @@ export default async function CustomerBillWisePage({
       ) : (
         <div className="space-y-4">
           {bills.map((bill) => (
-            <Card key={bill.invoiceId}>
+            <Card key={bill.documentId}>
               <CardContent>
                 <div className="mb-2 flex items-center justify-between">
-                  <Link href={`/sales/invoices/${bill.invoiceId}`} className="font-medium hover:underline">
+                  <Link href={`/sales/invoices/${bill.documentId}`} className="font-medium hover:underline">
                     {bill.docNumber ?? "Draft"}
                   </Link>
                   <span className="text-sm text-muted-foreground">

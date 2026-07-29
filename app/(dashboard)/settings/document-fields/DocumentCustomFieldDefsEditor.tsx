@@ -23,14 +23,16 @@ const fieldClass =
   "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50";
 
 /**
- * Per-document-type custom header fields for Invoices (e.g. a travel agency's "Journey Start
- * Date") — a different store from the Company Details custom fields editor this mirrors
- * (app/(dashboard)/settings/company/CustomFieldDefsEditor.tsx). Only "invoice" is wired up this
- * phase; the underlying store is already keyed by document type for later phases to reuse.
+ * Per-document-type custom header fields (e.g. a travel agency's "Journey Start Date" on
+ * Invoices) — a different store from the Company Details custom fields editor this mirrors
+ * (app/(dashboard)/settings/company/CustomFieldDefsEditor.tsx). `docType` selects which of
+ * Business.documentCustomFieldDefs's per-type buckets this instance edits/saves.
  */
 export function DocumentCustomFieldDefsEditor({
+  docType,
   defaultDefs,
 }: {
+  docType: string;
   defaultDefs: Array<{
     key: string;
     label: string;
@@ -58,6 +60,7 @@ export function DocumentCustomFieldDefsEditor({
 
   return (
     <form action={formAction} className="space-y-4">
+      <input type="hidden" name="docType" value={docType} />
       <FormError message={state.error} />
       <FormNotice message={state.success} />
 

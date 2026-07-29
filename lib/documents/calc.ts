@@ -1,5 +1,5 @@
 import { splitTax, isSameState } from "@/lib/tax/gstSplit";
-import type { DiscountTarget, InvoiceStatus } from "@/lib/constants/invoices";
+import type { DiscountTarget } from "@/lib/constants/invoices";
 
 export type LineItemCalcInput = {
   quantity: number;
@@ -18,7 +18,7 @@ export type LineItemCalcResult = {
   totalMinor: number;
 };
 
-/** Converts a tax-inclusive unit price to the tax-exclusive figure invoice line items store. */
+/** Converts a tax-inclusive unit price to the tax-exclusive figure document line items store. */
 export function exclusiveUnitPriceMinor(
   priceMinor: number,
   taxRatePercent: number,
@@ -59,14 +59,14 @@ export function computeLineItem(
   };
 }
 
-export type InvoiceDiscount = {
+export type DocumentDiscount = {
   type: "amount" | "percentage";
   /** Minor units when type is "amount", a raw 0-100 percent when "percentage". */
   value: number;
   target: DiscountTarget;
 };
 
-export type InvoiceTotals = {
+export type DocumentTotals = {
   subtotalMinor: number;
   totalTaxMinor: number;
   totalCgstMinor: number;
@@ -87,14 +87,19 @@ export type InvoiceTotals = {
  * "total" both discount the final tax-inclusive figure (a post-tax settlement-style reduction
  * that leaves the GST liability itself unchanged). Round-off, when enabled, rounds the final
  * grand total to the nearest whole rupee, applied last.
+ *
+ * Shared by every document type (Invoice, Purchase, and later Quotation/Sales Order/Proforma
+ * Invoice/Credit Note/Debit Note) — the math has nothing document-specific in it. For a Purchase,
+ * `placeOfSupplyState` is the vendor/supplier's state rather than a customer's delivery state,
+ * but the CGST/SGST-vs-IGST split logic (same-state vs cross-state) is identical either way.
  */
-export function computeInvoiceTotals(
+export function computeDocumentTotals(
   lineItems: LineItemCalcInput[],
-  discount: InvoiceDiscount,
+  discount: DocumentDiscount,
   roundOff: boolean,
   businessState: string,
   placeOfSupplyState: string,
-): InvoiceTotals {
+): DocumentTotals {
   const computedLines = lineItems.map((item) => computeLineItem(item, businessState, placeOfSupplyState));
 
   const subtotalMinor = computedLines.reduce((sum, l) => sum + l.taxableAmountMinor, 0);
@@ -151,8 +156,13 @@ export function computeInvoiceTotals(
   };
 }
 
-/** Never returns "draft" or "cancelled" — those are explicit status transitions, not derived from amounts. */
-export function deriveInvoiceStatus(grandTotalMinor: number, amountPaidMinor: number): InvoiceStatus {
+export type DerivedPaymentStatus = "pending" | "partially_paid" | "paid";
+
+/**
+ * Never returns "draft" or "cancelled" — those are explicit status transitions, not derived from
+ * amounts. Shared by every payable/receivable document type (Invoice, Purchase, ...).
+ */
+export function derivePaymentStatus(grandTotalMinor: number, amountPaidMinor: number): DerivedPaymentStatus {
   if (amountPaidMinor <= 0) return "pending";
   if (amountPaidMinor >= grandTotalMinor) return "paid";
   return "partially_paid";

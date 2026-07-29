@@ -50,7 +50,7 @@ const invoiceSchema = new Schema(
 
     discountType: { type: String, enum: ["amount", "percentage"], required: true, default: "percentage" },
     // Minor units (paise) when discountType is "amount"; a raw 0-100 percent when "percentage" —
-    // see lib/invoices/calc.ts for the shared interpretation.
+    // see lib/documents/calc.ts for the shared interpretation.
     discountValue: { type: Number, required: true, default: 0 },
     discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "total" },
     discountAmountMinor: { type: Number, required: true, default: 0 },

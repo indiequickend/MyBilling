@@ -2,12 +2,15 @@ import type { ClientSession } from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Payment } from "@/lib/db/models/Payment";
 import { Invoice, type InvoiceStatus } from "@/lib/db/models/Invoice";
-import { deriveInvoiceStatus } from "@/lib/invoices/calc";
+import { Purchase } from "@/lib/db/models/Purchase";
+import { DebitNote } from "@/lib/db/models/DebitNote";
+import { derivePaymentStatus } from "@/lib/documents/calc";
+import type { DocumentStatus } from "@/lib/constants/documents";
 import { clampPageParams, type PaginatedResult } from "@/lib/db/queryHelpers";
 import type { PaymentMode } from "@/lib/constants/payments";
 
 export async function listPaymentsForDocument(
-  linkedDocumentType: "invoice",
+  linkedDocumentType: "invoice" | "purchase" | "expense" | "indirect_income",
   linkedDocumentId: string,
   businessId: string,
 ) {
@@ -17,14 +20,14 @@ export async function listPaymentsForDocument(
 
 export type CreatePaymentInput = {
   businessId: string;
-  partyType: "customer" | "vendor";
-  partyId: string;
+  partyType?: "customer" | "vendor";
+  partyId?: string;
   direction: "in" | "out";
   amountMinor: number;
   mode: PaymentMode;
   bankAccountId: string;
   paymentDate: Date;
-  linkedDocumentType: "invoice";
+  linkedDocumentType: "invoice" | "purchase" | "expense" | "indirect_income";
   linkedDocumentId: string;
   referenceNote?: string;
   createdByUserId: string;
@@ -46,8 +49,8 @@ export type PaymentWriteResult =
 
 /**
  * Money movement is voided, never hard-deleted. Transactional because it must atomically
- * decrement the linked Invoice's amountPaidMinor and re-derive its status alongside marking the
- * payment voided — a lost-update race here would silently corrupt the invoice's paid amount.
+ * decrement the linked Invoice/Purchase's amountPaidMinor and re-derive its status alongside
+ * marking the payment voided — a lost-update race here would silently corrupt the paid amount.
  */
 export async function voidPayment(paymentId: string, businessId: string): Promise<PaymentWriteResult> {
   await connectToDatabase();
@@ -73,9 +76,19 @@ export async function voidPayment(paymentId: string, businessId: string): Promis
           // A manual "cancelled" status is never overwritten by the automatic pending/
           // partially_paid/paid derivation.
           if ((invoice.status as InvoiceStatus) !== "cancelled") {
-            invoice.status = deriveInvoiceStatus(invoice.grandTotalMinor, invoice.amountPaidMinor);
+            invoice.status = derivePaymentStatus(invoice.grandTotalMinor, invoice.amountPaidMinor);
           }
           await invoice.save({ session });
+        } else if (payment.linkedDocumentType === "purchase") {
+          const purchase = await Purchase.findOne({ _id: payment.linkedDocumentId, businessId }).session(
+            session,
+          );
+          if (!purchase) throw new LinkedInvoiceNotFoundError();
+          purchase.amountPaidMinor = Math.max(0, purchase.amountPaidMinor - payment.amountMinor);
+          if ((purchase.status as DocumentStatus) !== "cancelled") {
+            purchase.status = derivePaymentStatus(purchase.grandTotalMinor, purchase.amountPaidMinor);
+          }
+          await purchase.save({ session });
         }
 
         result = { ok: true, payment };
@@ -93,7 +106,7 @@ export async function voidPayment(paymentId: string, businessId: string): Promis
 
 export type LedgerEntry = {
   date: Date;
-  type: "invoice" | "payment";
+  type: "invoice" | "purchase" | "payment" | "debit_note";
   description: string;
   debitMinor: number;
   creditMinor: number;
@@ -102,10 +115,19 @@ export type LedgerEntry = {
 };
 
 /**
- * Merges Invoice + Payment into a single running-balance ledger. Fetches the full (typically
- * modest-sized) history for the party and paginates in memory — simpler than a cross-collection
- * paginated aggregation, and fine at the data volumes this app targets; revisit with a real
- * aggregation pipeline if a single party ever accumulates an unusually large history.
+ * Merges Invoice/Purchase + Payment + DebitNote into a single running-balance ledger. Fetches
+ * the full (typically modest-sized) history for the party and
+ * paginates in memory — simpler than a cross-collection paginated aggregation, and fine at the
+ * data volumes this app targets; revisit with a real aggregation pipeline if a single party ever
+ * accumulates an unusually large history.
+ *
+ * Debit/credit polarity depends on partyType, since a receivable and a payable move opposite
+ * directions for the same kind of event:
+ * - Customer ledger (receivable): Invoice increases what they owe us -> debit. A Payment "in"
+ *   reduces it -> credit.
+ * - Vendor ledger (payable): Purchase increases what we owe them -> debit, same polarity
+ *   treatment as Invoice does for customers. A Payment "out" reduces it -> credit. A Debit Note
+ *   (purchase return) also reduces it -> credit, same polarity as a payment.
  */
 export async function getPartyLedger(
   partyType: "customer" | "vendor",
@@ -115,7 +137,6 @@ export async function getPartyLedger(
 ): Promise<PaginatedResult<LedgerEntry>> {
   await connectToDatabase();
 
-  // Vendor-side ledger entries come from Purchases, which land in Phase 4.
   const invoices =
     partyType === "customer"
       ? await Invoice.find({
@@ -126,6 +147,32 @@ export async function getPartyLedger(
         })
           .select("docNumber invoiceDate grandTotalMinor")
           .sort({ invoiceDate: 1, _id: 1 })
+          .lean()
+      : [];
+
+  const purchases =
+    partyType === "vendor"
+      ? await Purchase.find({
+          businessId,
+          vendorId: partyId,
+          deletedAt: { $exists: false },
+          status: { $ne: "draft" },
+        })
+          .select("docNumber purchaseDate grandTotalMinor")
+          .sort({ purchaseDate: 1, _id: 1 })
+          .lean()
+      : [];
+
+  const debitNotes =
+    partyType === "vendor"
+      ? await DebitNote.find({
+          businessId,
+          vendorId: partyId,
+          deletedAt: { $exists: false },
+          status: "issued",
+        })
+          .select("docNumber debitNoteDate grandTotalMinor")
+          .sort({ debitNoteDate: 1, _id: 1 })
           .lean()
       : [];
 
@@ -147,14 +194,36 @@ export async function getPartyLedger(
       creditMinor: 0,
       linkedDocumentId: String(inv._id),
     })),
-    ...payments.map((p) => ({
-      date: p.paymentDate,
-      type: "payment" as const,
-      description: "Payment",
-      debitMinor: p.direction === "out" ? p.amountMinor : 0,
-      creditMinor: p.direction === "in" ? p.amountMinor : 0,
-      linkedDocumentId: String(p.linkedDocumentId),
+    ...purchases.map((p) => ({
+      date: p.purchaseDate,
+      type: "purchase" as const,
+      description: p.docNumber ? `Purchase ${p.docNumber}` : "Purchase (draft number pending)",
+      debitMinor: p.grandTotalMinor,
+      creditMinor: 0,
+      linkedDocumentId: String(p._id),
     })),
+    ...debitNotes.map((dn) => ({
+      date: dn.debitNoteDate,
+      type: "debit_note" as const,
+      description: dn.docNumber ? `Debit Note ${dn.docNumber}` : "Debit Note",
+      debitMinor: 0,
+      creditMinor: dn.grandTotalMinor,
+      linkedDocumentId: String(dn._id),
+    })),
+    ...payments.map((p) => {
+      // Customer ledger: the normal flow is direction "in" (customer pays us) -> credit; an "out"
+      // (a refund to the customer) -> debit. Vendor ledger is the mirror image: "out" (we pay the
+      // vendor) -> credit; "in" (a refund from the vendor) -> debit.
+      const reducesBalance = partyType === "customer" ? p.direction === "in" : p.direction === "out";
+      return {
+        date: p.paymentDate,
+        type: "payment" as const,
+        description: "Payment",
+        debitMinor: reducesBalance ? 0 : p.amountMinor,
+        creditMinor: reducesBalance ? p.amountMinor : 0,
+        linkedDocumentId: String(p.linkedDocumentId),
+      };
+    }),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   let runningBalance = 0;
@@ -176,13 +245,13 @@ export async function getPartyLedger(
 }
 
 export type BillWiseEntry = {
-  invoiceId: string;
+  documentId: string;
   docNumber?: string;
-  invoiceDate: Date;
+  date: Date;
   grandTotalMinor: number;
   amountPaidMinor: number;
   balanceMinor: number;
-  status: InvoiceStatus;
+  status: DocumentStatus;
   payments: { paymentId: string; date: Date; amountMinor: number; mode: PaymentMode }[];
 };
 
@@ -192,44 +261,55 @@ export async function getBillWiseForParty(
   businessId: string,
 ): Promise<BillWiseEntry[]> {
   await connectToDatabase();
-  if (partyType !== "customer") return []; // Vendor-side (Purchases) lands in Phase 4.
 
-  const invoices = await Invoice.find({
-    businessId,
-    customerId: partyId,
-    deletedAt: { $exists: false },
-    status: { $ne: "draft" },
-  })
-    .sort({ invoiceDate: -1 })
-    .lean();
-  if (invoices.length === 0) return [];
+  const documents =
+    partyType === "customer"
+      ? await Invoice.find({
+          businessId,
+          customerId: partyId,
+          deletedAt: { $exists: false },
+          status: { $ne: "draft" },
+        })
+          .sort({ invoiceDate: -1 })
+          .lean()
+          .then((rows) => rows.map((inv) => ({ ...inv, date: inv.invoiceDate })))
+      : await Purchase.find({
+          businessId,
+          vendorId: partyId,
+          deletedAt: { $exists: false },
+          status: { $ne: "draft" },
+        })
+          .sort({ purchaseDate: -1 })
+          .lean()
+          .then((rows) => rows.map((p) => ({ ...p, date: p.purchaseDate })));
+  if (documents.length === 0) return [];
 
-  const invoiceIds = invoices.map((inv) => inv._id);
+  const documentIds = documents.map((d) => d._id);
   const payments = await Payment.find({
     businessId,
-    linkedDocumentType: "invoice",
-    linkedDocumentId: { $in: invoiceIds },
+    linkedDocumentType: partyType === "customer" ? "invoice" : "purchase",
+    linkedDocumentId: { $in: documentIds },
     voidedAt: { $exists: false },
   })
     .sort({ paymentDate: 1 })
     .lean();
 
-  const paymentsByInvoice = new Map<string, typeof payments>();
+  const paymentsByDocument = new Map<string, typeof payments>();
   for (const p of payments) {
     const key = String(p.linkedDocumentId);
-    if (!paymentsByInvoice.has(key)) paymentsByInvoice.set(key, []);
-    paymentsByInvoice.get(key)!.push(p);
+    if (!paymentsByDocument.has(key)) paymentsByDocument.set(key, []);
+    paymentsByDocument.get(key)!.push(p);
   }
 
-  return invoices.map((inv) => ({
-    invoiceId: String(inv._id),
-    docNumber: inv.docNumber,
-    invoiceDate: inv.invoiceDate,
-    grandTotalMinor: inv.grandTotalMinor,
-    amountPaidMinor: inv.amountPaidMinor,
-    balanceMinor: inv.grandTotalMinor - inv.amountPaidMinor,
-    status: inv.status,
-    payments: (paymentsByInvoice.get(String(inv._id)) ?? []).map((p) => ({
+  return documents.map((doc) => ({
+    documentId: String(doc._id),
+    docNumber: doc.docNumber,
+    date: doc.date,
+    grandTotalMinor: doc.grandTotalMinor,
+    amountPaidMinor: doc.amountPaidMinor,
+    balanceMinor: doc.grandTotalMinor - doc.amountPaidMinor,
+    status: doc.status,
+    payments: (paymentsByDocument.get(String(doc._id)) ?? []).map((p) => ({
       paymentId: String(p._id),
       date: p.paymentDate,
       amountMinor: p.amountMinor,

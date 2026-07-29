@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import { computeLineItem } from "@/lib/invoices/calc";
+import { computeLineItem } from "@/lib/documents/calc";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { Button } from "@/components/ui/button";
 
@@ -17,6 +17,8 @@ export type LineItemRow = {
   discountType: "amount" | "percentage";
   discountValue: string;
   taxRatePercent: string;
+  /** Purchases-only, gated by the business's trackItcEligibility preference; unused by Invoice. */
+  itcEligible?: boolean;
 };
 
 export const BLANK_LINE_ITEM: LineItemRow = {
@@ -30,6 +32,7 @@ export const BLANK_LINE_ITEM: LineItemRow = {
   discountType: "percentage",
   discountValue: "0",
   taxRatePercent: "0",
+  itcEligible: true,
 };
 
 type ProductSearchResult = {
@@ -121,10 +124,13 @@ export function LineItemsEditor({
   defaultRows,
   businessState,
   placeOfSupplyState,
+  trackItcEligibility = false,
 }: {
   defaultRows: LineItemRow[];
   businessState: string;
   placeOfSupplyState: string;
+  /** Purchases-only: shows a per-line ITC-eligible checkbox (default checked) when true. */
+  trackItcEligibility?: boolean;
 }) {
   const [rows, setRows] = useState<LineItemRow[]>(
     defaultRows.length > 0 ? defaultRows : [{ ...BLANK_LINE_ITEM }],
@@ -240,6 +246,18 @@ export function LineItemsEditor({
               <div className="col-span-8 flex items-center text-sm text-muted-foreground sm:col-span-4">
                 Line total: ₹{rowPreviewTotal(row, businessState, placeOfSupplyState)}
               </div>
+              {trackItcEligibility ? (
+                <label className="col-span-12 flex items-center gap-1.5 text-sm sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    name={`lineItem__${i}__itcEligible`}
+                    checked={row.itcEligible ?? true}
+                    onChange={(e) => update(i, { itcEligible: e.target.checked })}
+                    className="size-4 rounded border-input"
+                  />
+                  ITC eligible
+                </label>
+              ) : null}
               <Button
                 type="button"
                 variant="ghost"

@@ -35,6 +35,7 @@ function docPrefsFromForm(formData: FormData, category: "sales" | "purchases" | 
     defaultDiscountType: String(formData.get(`${category}__defaultDiscountType`) ?? "percentage"),
     showHeaderFieldSuggestions: parseCheckbox(formData, `${category}__showHeaderFieldSuggestions`),
     defaultDueDateDays: formData.get(`${category}__defaultDueDateDays`),
+    trackItcEligibility: parseCheckbox(formData, `${category}__trackItcEligibility`),
   };
 }
 

@@ -13,8 +13,8 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { FormError } from "@/components/auth/AuthCard";
 import { DISCOUNT_TARGETS, DISCOUNT_TARGET_LABELS } from "@/lib/constants/invoices";
 import type { CustomFieldType } from "@/lib/validation/shared";
-import { LineItemsEditor, BLANK_LINE_ITEM, type LineItemRow } from "./LineItemsEditor";
-import { PaymentSplitsEditor } from "./PaymentSplitsEditor";
+import { LineItemsEditor, BLANK_LINE_ITEM, type LineItemRow } from "@/components/documents/LineItemsEditor";
+import { PaymentSplitsEditor } from "@/components/documents/PaymentSplitsEditor";
 import { saveInvoiceAction, type InvoiceFormState } from "./actions";
 
 const initialState: InvoiceFormState = {};

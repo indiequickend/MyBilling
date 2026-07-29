@@ -7,6 +7,8 @@ import type { ModuleKey, ActionKey } from "@/lib/rbac/permissions";
 export type NavIconKey =
   | "dashboard"
   | "invoices"
+  | "purchases"
+  | "expenses"
   | "customers"
   | "vendors"
   | "products"
@@ -39,6 +41,52 @@ const MAIN_GROUPS: NavGroup[] = [
     label: "Invoices",
     icon: "invoices",
     moduleKey: "sales_invoices",
+    action: "view",
+  },
+  {
+    href: "/purchases",
+    label: "Purchases",
+    icon: "purchases",
+    moduleKey: "purchases",
+    action: "view",
+    children: [
+      {
+        href: "/purchases/orders",
+        label: "Purchase Orders",
+        icon: "purchases",
+        moduleKey: "purchase_orders",
+        action: "view",
+      },
+      {
+        href: "/purchases/debit-notes",
+        label: "Debit Notes",
+        icon: "purchases",
+        moduleKey: "debit_notes",
+        action: "view",
+      },
+    ],
+  },
+  {
+    href: "/expenses",
+    label: "Expenses",
+    icon: "expenses",
+    moduleKey: "expenses",
+    action: "view",
+    children: [
+      {
+        href: "/expenses/categories",
+        label: "Categories",
+        icon: "expenses",
+        moduleKey: "expenses",
+        action: "view",
+      },
+    ],
+  },
+  {
+    href: "/indirect-income",
+    label: "Indirect Income",
+    icon: "expenses",
+    moduleKey: "indirect_income",
     action: "view",
   },
   {
