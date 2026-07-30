@@ -14,6 +14,7 @@ export type NavIconKey =
   | "vendors"
   | "products"
   | "warehouses"
+  | "payments"
   | "settings"
   | "profile"
   | "company"
@@ -177,6 +178,25 @@ const MAIN_GROUPS: NavGroup[] = [
       { href: "/inventory/warehouses", label: "Warehouses", icon: "warehouses", moduleKey: "inventory", action: "view" },
       { href: "/inventory/stock", label: "Stock In / Out", icon: "warehouses", moduleKey: "inventory", action: "edit" },
       { href: "/inventory/timeline", label: "Timeline", icon: "warehouses", moduleKey: "inventory", action: "view" },
+    ],
+  },
+  {
+    href: "/payments",
+    label: "Payments",
+    icon: "payments",
+    moduleKey: "payments",
+    action: "view",
+    children: [
+      { href: "/payments", label: "Timeline", icon: "payments", moduleKey: "payments", action: "view" },
+      { href: "/payments/links", label: "Payment Links", icon: "payments", moduleKey: "payments", action: "view" },
+      { href: "/payments/journals", label: "Journals", icon: "payments", moduleKey: "payments", action: "view" },
+      {
+        href: "/payments/reconciliation",
+        label: "Bank Reconciliation",
+        icon: "payments",
+        moduleKey: "payments",
+        action: "view",
+      },
     ],
   },
 ];

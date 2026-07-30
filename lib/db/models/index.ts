@@ -35,3 +35,6 @@ export * from "./Quotation";
 export * from "./SalesOrder";
 export * from "./ProformaInvoice";
 export * from "./StockLedgerEntry";
+export * from "./PaymentLink";
+export * from "./Journal";
+export * from "./BankStatementLine";

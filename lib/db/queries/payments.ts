@@ -1,14 +1,159 @@
-import type { ClientSession } from "mongoose";
+import mongoose, { type ClientSession } from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Payment } from "@/lib/db/models/Payment";
 import { Invoice, type InvoiceStatus } from "@/lib/db/models/Invoice";
 import { Purchase } from "@/lib/db/models/Purchase";
 import { DebitNote } from "@/lib/db/models/DebitNote";
 import { CreditNote } from "@/lib/db/models/CreditNote";
+import { BankAccount } from "@/lib/db/models/BankAccount";
+import { Customer } from "@/lib/db/models/Customer";
+import { Vendor } from "@/lib/db/models/Vendor";
 import { derivePaymentStatus } from "@/lib/documents/calc";
 import type { DocumentStatus } from "@/lib/constants/documents";
-import { clampPageParams, type PaginatedResult } from "@/lib/db/queryHelpers";
+import { clampPageParams, paginate, type PaginatedResult } from "@/lib/db/queryHelpers";
 import type { PaymentMode } from "@/lib/constants/payments";
+
+export type PaymentsTimelineParams = {
+  bankAccountId?: string;
+  direction?: "in" | "out";
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+function buildPaymentsTimelineFilter(
+  businessId: string,
+  params: Omit<PaymentsTimelineParams, "page" | "pageSize">,
+): Record<string, unknown> {
+  const filter: Record<string, unknown> = { businessId, voidedAt: { $exists: false } };
+  if (params.bankAccountId) filter.bankAccountId = params.bankAccountId;
+  if (params.direction) filter.direction = params.direction;
+  if (params.dateFrom || params.dateTo) {
+    const range: Record<string, Date> = {};
+    if (params.dateFrom) range.$gte = params.dateFrom;
+    if (params.dateTo) range.$lte = params.dateTo;
+    filter.paymentDate = range;
+  }
+  if (params.search) filter.referenceNote = { $regex: params.search.trim(), $options: "i" };
+  return filter;
+}
+
+export type PaymentTimelineEntry = {
+  _id: mongoose.Types.ObjectId;
+  direction: "in" | "out";
+  amountMinor: number;
+  mode: PaymentMode;
+  paymentDate: Date;
+  referenceNote?: string;
+  bankAccountId: mongoose.Types.ObjectId;
+  bankAccountName: string;
+  partyType?: "customer" | "vendor";
+  partyId?: mongoose.Types.ObjectId;
+  partyName?: string;
+  linkedDocumentType: string;
+  linkedDocumentId: mongoose.Types.ObjectId;
+  linkedDocumentNumber?: string;
+  createdByUserId: mongoose.Types.ObjectId;
+};
+
+/**
+ * Unified cross-account view (project_spec.md's Payments "Timeline") — unlike getPartyLedger
+ * (single party, merges in Invoice/Purchase/Note rows too), this is Payment rows only, across
+ * every bank/cash/personal account for the business. Party/bank-account/document names are
+ * resolved in one batched pass per page (not per row) to avoid N+1 queries.
+ */
+export async function listPaymentsTimeline(
+  businessId: string,
+  params: PaymentsTimelineParams = {},
+): Promise<PaginatedResult<PaymentTimelineEntry>> {
+  await connectToDatabase();
+  const filter = buildPaymentsTimelineFilter(businessId, params);
+  const result = await paginate(Payment, filter, {
+    page: params.page,
+    pageSize: params.pageSize,
+    sort: { paymentDate: -1, createdAt: -1 },
+  });
+
+  const bankAccountIds = [...new Set(result.items.map((p) => String(p.bankAccountId)))];
+  const customerIds = [...new Set(result.items.filter((p) => p.partyType === "customer").map((p) => String(p.partyId)))];
+  const vendorIds = [...new Set(result.items.filter((p) => p.partyType === "vendor").map((p) => String(p.partyId)))];
+  const invoiceIds = [
+    ...new Set(result.items.filter((p) => p.linkedDocumentType === "invoice").map((p) => String(p.linkedDocumentId))),
+  ];
+  const purchaseIds = [
+    ...new Set(result.items.filter((p) => p.linkedDocumentType === "purchase").map((p) => String(p.linkedDocumentId))),
+  ];
+
+  const [bankAccounts, customers, vendors, invoices, purchases] = await Promise.all([
+    bankAccountIds.length ? BankAccount.find({ _id: { $in: bankAccountIds } }).select("name").lean() : [],
+    customerIds.length ? Customer.find({ _id: { $in: customerIds } }).select("displayName").lean() : [],
+    vendorIds.length ? Vendor.find({ _id: { $in: vendorIds } }).select("displayName").lean() : [],
+    invoiceIds.length ? Invoice.find({ _id: { $in: invoiceIds } }).select("docNumber").lean() : [],
+    purchaseIds.length ? Purchase.find({ _id: { $in: purchaseIds } }).select("docNumber").lean() : [],
+  ]);
+
+  const bankAccountName = new Map(bankAccounts.map((a) => [String(a._id), a.name as string]));
+  const customerName = new Map(customers.map((c) => [String(c._id), (c as { displayName: string }).displayName]));
+  const vendorName = new Map(vendors.map((v) => [String(v._id), (v as { displayName: string }).displayName]));
+  const invoiceNumber = new Map(invoices.map((i) => [String(i._id), i.docNumber as string | undefined]));
+  const purchaseNumber = new Map(purchases.map((p) => [String(p._id), p.docNumber as string | undefined]));
+
+  const items: PaymentTimelineEntry[] = result.items.map((p) => {
+    const referenceNote = p.referenceNote ?? undefined;
+    const partyName =
+      p.partyType === "customer"
+        ? customerName.get(String(p.partyId))
+        : p.partyType === "vendor"
+          ? vendorName.get(String(p.partyId))
+          : undefined;
+    const linkedDocumentNumber =
+      p.linkedDocumentType === "invoice"
+        ? invoiceNumber.get(String(p.linkedDocumentId))
+        : p.linkedDocumentType === "purchase"
+          ? purchaseNumber.get(String(p.linkedDocumentId))
+          : undefined;
+    return {
+      _id: p._id,
+      direction: p.direction,
+      amountMinor: p.amountMinor,
+      mode: p.mode,
+      paymentDate: p.paymentDate,
+      referenceNote,
+      bankAccountId: p.bankAccountId,
+      bankAccountName: bankAccountName.get(String(p.bankAccountId)) ?? "—",
+      partyType: p.partyType ?? undefined,
+      partyId: p.partyId ?? undefined,
+      partyName,
+      linkedDocumentType: p.linkedDocumentType,
+      linkedDocumentId: p.linkedDocumentId,
+      linkedDocumentNumber,
+      createdByUserId: p.createdByUserId,
+    };
+  });
+
+  return { ...result, items };
+}
+
+export type PaymentsTimelineTotals = { netBalanceMinor: number; receivedMinor: number; givenMinor: number };
+
+/** Footer totals over the WHOLE filtered set, not just the current page — same pattern as
+ * sumInvoiceTotals/sumPurchaseTotals. */
+export async function sumPaymentsTimeline(
+  businessId: string,
+  params: Omit<PaymentsTimelineParams, "page" | "pageSize"> = {},
+): Promise<PaymentsTimelineTotals> {
+  await connectToDatabase();
+  const filter = buildPaymentsTimelineFilter(businessId, params);
+  const rows = await Payment.aggregate([
+    { $match: { ...filter, businessId: new mongoose.Types.ObjectId(businessId) } },
+    { $group: { _id: "$direction", total: { $sum: "$amountMinor" } } },
+  ]);
+  const receivedMinor = rows.find((r) => r._id === "in")?.total ?? 0;
+  const givenMinor = rows.find((r) => r._id === "out")?.total ?? 0;
+  return { netBalanceMinor: receivedMinor - givenMinor, receivedMinor, givenMinor };
+}
 
 export async function listPaymentsForDocument(
   linkedDocumentType: "invoice" | "purchase" | "expense" | "indirect_income",

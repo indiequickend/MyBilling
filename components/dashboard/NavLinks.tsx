@@ -23,6 +23,7 @@ import {
   Users,
   UsersRound,
   Warehouse,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import type { NavGroup, NavIconKey } from "@/lib/dashboard/navigation";
@@ -40,6 +41,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   vendors: Building2,
   products: Package,
   warehouses: Warehouse,
+  payments: Wallet,
   settings: SlidersHorizontal,
   profile: UserCircle,
   company: Building,

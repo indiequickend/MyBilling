@@ -1,0 +1,85 @@
+import { connectToDatabase } from "@/lib/db/connect";
+import { PaymentLink } from "@/lib/db/models/PaymentLink";
+import { Invoice } from "@/lib/db/models/Invoice";
+import { generateToken, hashToken } from "@/lib/auth/tokens";
+import { paginate } from "@/lib/db/queryHelpers";
+
+export type CreatePaymentLinkInput = {
+  businessId: string;
+  amountMinor: number;
+  linkedInvoiceId?: string;
+  note?: string;
+  expiresAt: Date;
+  createdByUserId: string;
+};
+
+export type CreatePaymentLinkResult =
+  | { ok: true; paymentLink: InstanceType<typeof PaymentLink>; token: string }
+  | { ok: false; reason: "invoice_not_found" };
+
+/** Returns the raw token exactly once — only its HMAC hash is ever persisted, mirroring
+ * invitations/verification tokens (lib/auth/tokens.ts). */
+export async function createPaymentLink(input: CreatePaymentLinkInput): Promise<CreatePaymentLinkResult> {
+  await connectToDatabase();
+
+  if (input.linkedInvoiceId) {
+    const invoice = await Invoice.findOne({
+      _id: input.linkedInvoiceId,
+      businessId: input.businessId,
+      deletedAt: { $exists: false },
+    });
+    if (!invoice) return { ok: false, reason: "invoice_not_found" };
+  }
+
+  const token = generateToken();
+  const paymentLink = await PaymentLink.create({
+    businessId: input.businessId,
+    tokenHash: hashToken(token),
+    amountMinor: input.amountMinor,
+    linkedInvoiceId: input.linkedInvoiceId,
+    note: input.note,
+    expiresAt: input.expiresAt,
+    createdByUserId: input.createdByUserId,
+  });
+  return { ok: true, paymentLink, token };
+}
+
+/** Public lookup — no businessId scoping possible/needed since the token itself is the secret
+ * that scopes access, same as findValidInvitationByTokenHash. */
+export async function findValidPaymentLinkByTokenHash(tokenHash: string) {
+  await connectToDatabase();
+  return PaymentLink.findOne({
+    tokenHash,
+    revokedAt: { $exists: false },
+    expiresAt: { $gt: new Date() },
+  });
+}
+
+export async function listPaymentLinks(
+  businessId: string,
+  params: { page?: number; pageSize?: number } = {},
+) {
+  await connectToDatabase();
+  return paginate(PaymentLink, { businessId }, { ...params, sort: { createdAt: -1 } });
+}
+
+export async function findPaymentLinkById(paymentLinkId: string, businessId: string) {
+  await connectToDatabase();
+  return PaymentLink.findOne({ _id: paymentLinkId, businessId });
+}
+
+export type RevokePaymentLinkResult = { ok: true } | { ok: false; reason: "not_found" };
+
+export async function revokePaymentLink(
+  paymentLinkId: string,
+  businessId: string,
+): Promise<RevokePaymentLinkResult> {
+  await connectToDatabase();
+  const updated = await PaymentLink.findOneAndUpdate(
+    { _id: paymentLinkId, businessId, revokedAt: { $exists: false } },
+    { $set: { revokedAt: new Date() } },
+    { returnDocument: "after" },
+  );
+  if (!updated) return { ok: false, reason: "not_found" };
+  return { ok: true };
+}
