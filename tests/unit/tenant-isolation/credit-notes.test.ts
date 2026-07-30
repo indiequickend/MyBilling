@@ -9,6 +9,7 @@ import {
   restoreCreditNote,
   findCreditNoteById,
   listCreditNotes,
+  sumCreditNoteTotals,
 } from "@/lib/db/queries/creditNotes";
 import { getPartyLedger } from "@/lib/db/queries/payments";
 import { CreditNote } from "@/lib/db/models/CreditNote";
@@ -203,5 +204,40 @@ describe("credit notes — tenant isolation", () => {
     for (const cn of list.items) {
       expect(String(cn.businessId)).toBe(tenants.businessAId);
     }
+  });
+
+  it("sumCreditNoteTotals only sums issued credit notes within its own business", async () => {
+    const before = await sumCreditNoteTotals(tenants.businessAId);
+
+    const issued = await createCreditNote({
+      businessId: tenants.businessAId,
+      linkedInvoiceId: invoiceAId,
+      creditNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 30_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+    });
+    const otherBusiness = await createCreditNote({
+      businessId: tenants.businessBId,
+      linkedInvoiceId: invoiceBId,
+      creditNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 90_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userBId,
+      finalize: true,
+    });
+    if (!issued.ok || !otherBusiness.ok) throw new Error("setup failed");
+
+    const after = await sumCreditNoteTotals(tenants.businessAId);
+    expect(after.totalMinor - before.totalMinor).toBe(30_000);
   });
 });

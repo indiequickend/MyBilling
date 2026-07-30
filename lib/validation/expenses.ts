@@ -1,10 +1,16 @@
 import { z } from "zod";
 import { PAYMENT_MODES } from "@/lib/constants/payments";
-import { objectId, optionalTrimmed, rupeesToMinorUnits, gstinSchema } from "@/lib/validation/shared";
+import {
+  objectId,
+  optionalTrimmed,
+  rupeesToMinorUnits,
+  optionalRupeesToMinorUnits,
+  gstinSchema,
+} from "@/lib/validation/shared";
 
 const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
 
-export const expenseHeaderSchema = z.object({
+const rawExpenseHeaderSchema = z.object({
   categoryId: objectId,
   amountMinor: rupeesToMinorUnits,
   mode: z.enum(PAYMENT_MODES),
@@ -14,6 +20,25 @@ export const expenseHeaderSchema = z.object({
   supplierGstin: gstinSchema,
   description: optionalTrimmed(500),
   expenseDate: z.string().trim().min(1, "Expense date is required"),
+  // TDS deducted from this supplier's payment, and TCS they collected on this expense — both
+  // payable-side, informational/report fields only. See Expense.ts's doc-comment.
+  tdsApplicable: z.boolean(),
+  tdsSectionCode: optionalTrimmed(30),
+  tdsRatePercent: z.coerce.number().min(0).max(100).optional(),
+  tdsAmountMinor: optionalRupeesToMinorUnits,
+  tcsApplicable: z.boolean(),
+  tcsSectionCode: optionalTrimmed(30),
+  tcsRatePercent: z.coerce.number().min(0).max(100).optional(),
+  tcsAmountMinor: optionalRupeesToMinorUnits,
+});
+
+export const expenseHeaderSchema = rawExpenseHeaderSchema.superRefine((val, ctx) => {
+  if (val.tdsApplicable && !val.tdsAmountMinor) {
+    ctx.addIssue({ code: "custom", message: "Enter the TDS amount deducted", path: ["tdsAmountMinor"] });
+  }
+  if (val.tcsApplicable && !val.tcsAmountMinor) {
+    ctx.addIssue({ code: "custom", message: "Enter the TCS amount collected", path: ["tcsAmountMinor"] });
+  }
 });
 export type ExpenseHeaderInput = z.infer<typeof expenseHeaderSchema>;
 

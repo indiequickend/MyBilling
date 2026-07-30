@@ -127,6 +127,10 @@ async function parseInvoiceForm(
     termTemplateId: formData.get("termTemplateId"),
     signatureId: formData.get("signatureId"),
     bankAccountId: formData.get("bankAccountId"),
+    tcsApplicable: parseCheckbox(formData, "tcsApplicable"),
+    tcsSectionCode: formData.get("tcsSectionCode"),
+    tcsRatePercent: formData.get("tcsRatePercent") || undefined,
+    tcsAmountMinor: formData.get("tcsAmountMinor") || "",
   });
   if (!headerParsed.success) {
     return {
@@ -195,6 +199,10 @@ async function parseInvoiceForm(
     bankAccountId: h.bankAccountId,
     sourceQuotationId,
     sourceSalesOrderId,
+    tcsApplicable: h.tcsApplicable,
+    tcsSectionCode: h.tcsSectionCode,
+    tcsRatePercent: h.tcsRatePercent,
+    tcsAmountMinor: h.tcsAmountMinor,
   };
 
   const payments: InvoicePaymentSplitWriteInput[] = paymentsParsed.data.map((p) => ({

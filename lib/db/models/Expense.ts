@@ -22,6 +22,19 @@ const expenseSchema = new Schema(
     supplierGstin: { type: String, trim: true, uppercase: true },
     description: { type: String, trim: true },
     expenseDate: { type: Date, required: true },
+
+    // TDS (deducted from this vendor/supplier's payment) and TCS (collected by them on this
+    // expense) — both payable-side, mirrors Purchase.ts. Informational/reporting only — never
+    // folded into amountMinor or the linked Payment. See lib/db/queries/reports.ts getTdsTcsReport.
+    tdsApplicable: { type: Boolean, required: true, default: false },
+    tdsSectionCode: { type: String, trim: true },
+    tdsRatePercent: { type: Number },
+    tdsAmountMinor: { type: Number, required: true, default: 0 },
+    tcsApplicable: { type: Boolean, required: true, default: false },
+    tcsSectionCode: { type: String, trim: true },
+    tcsRatePercent: { type: Number },
+    tcsAmountMinor: { type: Number, required: true, default: 0 },
+
     status: { type: String, enum: EXPENSE_STATUSES, required: true, default: "recorded", index: true },
     receiptAttachmentId: { type: Schema.Types.ObjectId, ref: "Attachment" },
     createdByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -44,6 +57,14 @@ export type ExpenseDoc = {
   supplierGstin?: string;
   description?: string;
   expenseDate: Date;
+  tdsApplicable: boolean;
+  tdsSectionCode?: string;
+  tdsRatePercent?: number;
+  tdsAmountMinor: number;
+  tcsApplicable: boolean;
+  tcsSectionCode?: string;
+  tcsRatePercent?: number;
+  tcsAmountMinor: number;
   status: ExpenseStatus;
   receiptAttachmentId?: mongoose.Types.ObjectId;
   createdByUserId: mongoose.Types.ObjectId;

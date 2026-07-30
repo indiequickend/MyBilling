@@ -58,32 +58,32 @@ export type PaymentTimelineEntry = {
   createdByUserId: mongoose.Types.ObjectId;
 };
 
-/**
- * Unified cross-account view (project_spec.md's Payments "Timeline") — unlike getPartyLedger
- * (single party, merges in Invoice/Purchase/Note rows too), this is Payment rows only, across
- * every bank/cash/personal account for the business. Party/bank-account/document names are
- * resolved in one batched pass per page (not per row) to avoid N+1 queries.
- */
-export async function listPaymentsTimeline(
-  businessId: string,
-  params: PaymentsTimelineParams = {},
-): Promise<PaginatedResult<PaymentTimelineEntry>> {
-  await connectToDatabase();
-  const filter = buildPaymentsTimelineFilter(businessId, params);
-  const result = await paginate(Payment, filter, {
-    page: params.page,
-    pageSize: params.pageSize,
-    sort: { paymentDate: -1, createdAt: -1 },
-  });
-
-  const bankAccountIds = [...new Set(result.items.map((p) => String(p.bankAccountId)))];
-  const customerIds = [...new Set(result.items.filter((p) => p.partyType === "customer").map((p) => String(p.partyId)))];
-  const vendorIds = [...new Set(result.items.filter((p) => p.partyType === "vendor").map((p) => String(p.partyId)))];
+/** Shared by listPaymentsTimeline/getPaymentsReport — resolves party/bank-account/document names
+ * in one batched pass (not per row) to avoid N+1 queries. */
+async function resolvePaymentTimelineNames(
+  items: Array<{
+    _id: mongoose.Types.ObjectId;
+    direction: "in" | "out";
+    amountMinor: number;
+    mode: PaymentMode;
+    paymentDate: Date;
+    referenceNote?: string | null;
+    bankAccountId: mongoose.Types.ObjectId;
+    partyType?: "customer" | "vendor" | null;
+    partyId?: mongoose.Types.ObjectId | null;
+    linkedDocumentType: string;
+    linkedDocumentId: mongoose.Types.ObjectId;
+    createdByUserId: mongoose.Types.ObjectId;
+  }>,
+): Promise<PaymentTimelineEntry[]> {
+  const bankAccountIds = [...new Set(items.map((p) => String(p.bankAccountId)))];
+  const customerIds = [...new Set(items.filter((p) => p.partyType === "customer").map((p) => String(p.partyId)))];
+  const vendorIds = [...new Set(items.filter((p) => p.partyType === "vendor").map((p) => String(p.partyId)))];
   const invoiceIds = [
-    ...new Set(result.items.filter((p) => p.linkedDocumentType === "invoice").map((p) => String(p.linkedDocumentId))),
+    ...new Set(items.filter((p) => p.linkedDocumentType === "invoice").map((p) => String(p.linkedDocumentId))),
   ];
   const purchaseIds = [
-    ...new Set(result.items.filter((p) => p.linkedDocumentType === "purchase").map((p) => String(p.linkedDocumentId))),
+    ...new Set(items.filter((p) => p.linkedDocumentType === "purchase").map((p) => String(p.linkedDocumentId))),
   ];
 
   const [bankAccounts, customers, vendors, invoices, purchases] = await Promise.all([
@@ -100,7 +100,7 @@ export async function listPaymentsTimeline(
   const invoiceNumber = new Map(invoices.map((i) => [String(i._id), i.docNumber as string | undefined]));
   const purchaseNumber = new Map(purchases.map((p) => [String(p._id), p.docNumber as string | undefined]));
 
-  const items: PaymentTimelineEntry[] = result.items.map((p) => {
+  return items.map((p) => {
     const referenceNote = p.referenceNote ?? undefined;
     const partyName =
       p.partyType === "customer"
@@ -132,8 +132,48 @@ export async function listPaymentsTimeline(
       createdByUserId: p.createdByUserId,
     };
   });
+}
 
+/**
+ * Unified cross-account view (project_spec.md's Payments "Timeline") — unlike getPartyLedger
+ * (single party, merges in Invoice/Purchase/Note rows too), this is Payment rows only, across
+ * every bank/cash/personal account for the business. Party/bank-account/document names are
+ * resolved in one batched pass per page (not per row) to avoid N+1 queries.
+ */
+export async function listPaymentsTimeline(
+  businessId: string,
+  params: PaymentsTimelineParams = {},
+): Promise<PaginatedResult<PaymentTimelineEntry>> {
+  await connectToDatabase();
+  const filter = buildPaymentsTimelineFilter(businessId, params);
+  const result = await paginate(Payment, filter, {
+    page: params.page,
+    pageSize: params.pageSize,
+    sort: { paymentDate: -1, createdAt: -1 },
+  });
+  const items = await resolvePaymentTimelineNames(result.items);
   return { ...result, items };
+}
+
+/** Documented ceiling for a single report fetch — this app has no background job
+ * infrastructure, so a report export is generated synchronously in one request (same posture as
+ * EXPENSE_BULK_UPLOAD_MAX_ROWS). */
+export const PAYMENTS_REPORT_MAX_ROWS = 5000;
+
+/** Unpaginated variant of listPaymentsTimeline for the Payments Report (project_spec.md's
+ * "Payments Reports") — the on-screen table and every export must show the full filtered set,
+ * not one page of it. */
+export async function getPaymentsReport(
+  businessId: string,
+  params: Omit<PaymentsTimelineParams, "page" | "pageSize"> = {},
+): Promise<PaymentTimelineEntry[]> {
+  await connectToDatabase();
+  const filter = buildPaymentsTimelineFilter(businessId, params);
+  const items = await Payment.find(filter)
+    .sort({ paymentDate: -1, createdAt: -1 })
+    .limit(PAYMENTS_REPORT_MAX_ROWS)
+    .lean();
+  return resolvePaymentTimelineNames(items);
 }
 
 export type PaymentsTimelineTotals = { netBalanceMinor: number; receivedMinor: number; givenMinor: number };
@@ -153,6 +193,55 @@ export async function sumPaymentsTimeline(
   const receivedMinor = rows.find((r) => r._id === "in")?.total ?? 0;
   const givenMinor = rows.find((r) => r._id === "out")?.total ?? 0;
   return { netBalanceMinor: receivedMinor - givenMinor, receivedMinor, givenMinor };
+}
+
+export type PaymentsByBankAccountRow = {
+  bankAccountId: string;
+  bankAccountName: string;
+  receivedMinor: number;
+  givenMinor: number;
+};
+
+/** Powers the Insights "Payments-by-bank breakdown" (incoming/outgoing per account) — same
+ * $group-by-direction shape as sumPaymentsTimeline, additionally grouped by bankAccountId. */
+export async function getPaymentsByBankAccount(
+  businessId: string,
+  params: Pick<PaymentsTimelineParams, "dateFrom" | "dateTo" | "search"> = {},
+): Promise<PaymentsByBankAccountRow[]> {
+  await connectToDatabase();
+  const filter = buildPaymentsTimelineFilter(businessId, params);
+  const rows = await Payment.aggregate([
+    { $match: { ...filter, businessId: new mongoose.Types.ObjectId(businessId) } },
+    {
+      $group: {
+        _id: { bankAccountId: "$bankAccountId", direction: "$direction" },
+        totalMinor: { $sum: "$amountMinor" },
+      },
+    },
+  ]);
+
+  const bankAccountIds = [...new Set(rows.map((r) => String(r._id.bankAccountId)))];
+  const bankAccounts = bankAccountIds.length
+    ? await BankAccount.find({ _id: { $in: bankAccountIds } }).select("name").lean()
+    : [];
+  const nameById = new Map(bankAccounts.map((a) => [String(a._id), a.name as string]));
+
+  const byAccount = new Map<string, PaymentsByBankAccountRow>();
+  for (const r of rows) {
+    const id = String(r._id.bankAccountId);
+    if (!byAccount.has(id)) {
+      byAccount.set(id, {
+        bankAccountId: id,
+        bankAccountName: nameById.get(id) ?? "—",
+        receivedMinor: 0,
+        givenMinor: 0,
+      });
+    }
+    const entry = byAccount.get(id)!;
+    if (r._id.direction === "in") entry.receivedMinor = r.totalMinor;
+    else entry.givenMinor = r.totalMinor;
+  }
+  return [...byAccount.values()];
 }
 
 export async function listPaymentsForDocument(

@@ -258,27 +258,63 @@ export type DebitNoteListParams = {
   search?: string;
   vendorId?: string;
   tab?: "all" | "draft" | "issued" | "cancelled" | "deleted";
+  dateFrom?: Date;
+  dateTo?: Date;
   page?: number;
   pageSize?: number;
 };
 
-export async function listDebitNotes(businessId: string, params: DebitNoteListParams = {}) {
-  await connectToDatabase();
+function buildDebitNoteFilter(
+  businessId: string,
+  params: Omit<DebitNoteListParams, "page" | "pageSize">,
+  options: { forAggregate?: boolean } = {},
+): Record<string, unknown> {
   const filter: Record<string, unknown> = {
-    businessId,
+    businessId: options.forAggregate ? new mongoose.Types.ObjectId(businessId) : businessId,
     deletedAt: params.tab === "deleted" ? { $exists: true } : { $exists: false },
   };
   if (params.tab && params.tab !== "all" && params.tab !== "deleted") {
     filter.status = params.tab;
   }
-  if (params.vendorId) filter.vendorId = params.vendorId;
+  if (params.vendorId) {
+    filter.vendorId = options.forAggregate ? new mongoose.Types.ObjectId(params.vendorId) : params.vendorId;
+  }
   if (params.search) {
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
     filter.$or = [{ docNumber: pattern }, { "vendorSnapshot.displayName": pattern }];
   }
+  if (params.dateFrom || params.dateTo) {
+    const range: Record<string, Date> = {};
+    if (params.dateFrom) range.$gte = params.dateFrom;
+    if (params.dateTo) range.$lte = params.dateTo;
+    filter.debitNoteDate = range;
+  }
+  return filter;
+}
+
+export async function listDebitNotes(businessId: string, params: DebitNoteListParams = {}) {
+  await connectToDatabase();
+  const filter = buildDebitNoteFilter(businessId, params);
   return paginate(DebitNote, filter, {
     page: params.page,
     pageSize: params.pageSize,
     sort: { debitNoteDate: -1, createdAt: -1 },
   });
+}
+
+export type DebitNoteTotalsSummary = { totalMinor: number };
+
+/** Footer/report total over the WHOLE filtered set — only "issued" debit notes reduce a
+ * vendor's balance (drafts haven't taken effect yet, cancelled ones never did). */
+export async function sumDebitNoteTotals(
+  businessId: string,
+  params: Omit<DebitNoteListParams, "page" | "pageSize" | "tab"> = {},
+): Promise<DebitNoteTotalsSummary> {
+  await connectToDatabase();
+  const filter = buildDebitNoteFilter(businessId, { ...params, tab: "issued" }, { forAggregate: true });
+  const [agg] = await DebitNote.aggregate([
+    { $match: filter },
+    { $group: { _id: null, totalMinor: { $sum: "$grandTotalMinor" } } },
+  ]);
+  return { totalMinor: agg?.totalMinor ?? 0 };
 }

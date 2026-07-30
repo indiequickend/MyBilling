@@ -24,7 +24,9 @@ export type NavIconKey =
   | "documentFields"
   | "banks"
   | "users"
-  | "roles";
+  | "roles"
+  | "insights"
+  | "reports";
 
 export type NavItem = {
   href: string;
@@ -38,6 +40,10 @@ export type NavGroup = NavItem & { children?: NavItem[] };
 
 const MAIN_GROUPS: NavGroup[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
+  // No moduleKey/action gate at the group level — Insights has no dedicated permission; each
+  // tile/chart on the page self-gates against its own underlying module's view permission, so
+  // the page itself never 403s, it just shows fewer tiles.
+  { href: "/insights", label: "Insights", icon: "insights" },
   {
     href: "/sales/invoices",
     label: "Invoices",
@@ -197,6 +203,57 @@ const MAIN_GROUPS: NavGroup[] = [
         moduleKey: "payments",
         action: "view",
       },
+    ],
+  },
+  {
+    href: "/reports",
+    label: "Reports",
+    icon: "reports",
+    moduleKey: "reports",
+    action: "view",
+    children: [
+      { href: "/reports/transactions", label: "Transactions", icon: "reports", moduleKey: "reports", action: "view" },
+      {
+        href: "/reports/bill-wise-items",
+        label: "Bill-wise Items",
+        icon: "reports",
+        moduleKey: "reports",
+        action: "view",
+      },
+      { href: "/reports/items", label: "Items", icon: "reports", moduleKey: "reports", action: "view" },
+      { href: "/reports/parties", label: "Parties", icon: "reports", moduleKey: "reports", action: "view" },
+      {
+        href: "/reports/profit-and-loss",
+        label: "Profit & Loss",
+        icon: "reports",
+        moduleKey: "reports",
+        action: "view",
+      },
+      { href: "/reports/payments", label: "Payments", icon: "reports", moduleKey: "reports", action: "view" },
+      { href: "/reports/summary", label: "Summary", icon: "reports", moduleKey: "reports", action: "view" },
+      { href: "/reports/day-book", label: "Day Book", icon: "reports", moduleKey: "reports", action: "view" },
+      {
+        href: "/reports/conversions",
+        label: "Document Conversions",
+        icon: "reports",
+        moduleKey: "reports",
+        action: "view",
+      },
+      {
+        href: "/reports/share-history",
+        label: "Share History",
+        icon: "reports",
+        moduleKey: "reports",
+        action: "view",
+      },
+      {
+        href: "/reports/hsn-summary",
+        label: "Sale Summary by HSN",
+        icon: "reports",
+        moduleKey: "reports",
+        action: "view",
+      },
+      { href: "/reports/tds-tcs", label: "TDS/TCS", icon: "reports", moduleKey: "reports", action: "view" },
     ],
   },
 ];

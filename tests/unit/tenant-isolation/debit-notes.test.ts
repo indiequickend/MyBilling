@@ -9,6 +9,7 @@ import {
   restoreDebitNote,
   findDebitNoteById,
   listDebitNotes,
+  sumDebitNoteTotals,
 } from "@/lib/db/queries/debitNotes";
 import { getPartyLedger } from "@/lib/db/queries/payments";
 import { DebitNote } from "@/lib/db/models/DebitNote";
@@ -199,5 +200,40 @@ describe("debit notes — tenant isolation", () => {
     for (const dn of list.items) {
       expect(String(dn.businessId)).toBe(tenants.businessAId);
     }
+  });
+
+  it("sumDebitNoteTotals only sums issued debit notes within its own business", async () => {
+    const before = await sumDebitNoteTotals(tenants.businessAId);
+
+    const issued = await createDebitNote({
+      businessId: tenants.businessAId,
+      linkedPurchaseId: purchaseAId,
+      debitNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 15_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+    });
+    const otherBusiness = await createDebitNote({
+      businessId: tenants.businessBId,
+      linkedPurchaseId: purchaseBId,
+      debitNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 60_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userBId,
+      finalize: true,
+    });
+    if (!issued.ok || !otherBusiness.ok) throw new Error("setup failed");
+
+    const after = await sumDebitNoteTotals(tenants.businessAId);
+    expect(after.totalMinor - before.totalMinor).toBe(15_000);
   });
 });

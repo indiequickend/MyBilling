@@ -43,6 +43,15 @@ const invoiceSchema = new Schema(
     eWayBillFlag: { type: Boolean, required: true, default: false },
     eInvoiceFlag: { type: Boolean, required: true, default: false },
 
+    // TCS (Tax Collected at Source, e.g. Section 206C) the business collects from this customer on
+    // top of the invoice value. Informational/reporting only — never folded into grandTotalMinor,
+    // amountPaidMinor, or payment-status derivation; those keep their existing meaning everywhere
+    // else in the app (payments, ledgers, PDFs). See lib/db/queries/reports.ts getTdsTcsReport.
+    tcsApplicable: { type: Boolean, required: true, default: false },
+    tcsSectionCode: { type: String, trim: true },
+    tcsRatePercent: { type: Number },
+    tcsAmountMinor: { type: Number, required: true, default: 0 },
+
     lineItems: {
       type: [documentLineItemSchema],
       required: true,
@@ -125,6 +134,10 @@ export type InvoiceDoc = {
   reverseCharge: boolean;
   eWayBillFlag: boolean;
   eInvoiceFlag: boolean;
+  tcsApplicable: boolean;
+  tcsSectionCode?: string;
+  tcsRatePercent?: number;
+  tcsAmountMinor: number;
   lineItems: InvoiceLineItemDoc[];
   discountType: "amount" | "percentage";
   discountValue: number;

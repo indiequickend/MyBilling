@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
+  BarChart3,
   Building,
   Building2,
   ChevronDown,
   ClipboardList,
+  FileBarChart2,
   FileStack,
   FileText,
   LandmarkIcon,
@@ -52,6 +54,8 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   banks: LandmarkIcon,
   users: UsersRound,
   roles: ShieldCheck,
+  insights: BarChart3,
+  reports: FileBarChart2,
 };
 
 function isActive(pathname: string, href: string) {

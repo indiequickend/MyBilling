@@ -116,6 +116,14 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
           discountTarget: purchase.discountTarget,
           customFieldValues: purchase.customFieldValues ?? {},
           lineItems,
+          tdsApplicable: purchase.tdsApplicable,
+          tdsSectionCode: purchase.tdsSectionCode ?? "",
+          tdsRatePercent: purchase.tdsRatePercent != null ? String(purchase.tdsRatePercent) : "",
+          tdsAmountMinor: purchase.tdsAmountMinor ? minorToRupeesString(purchase.tdsAmountMinor) : "",
+          tcsApplicable: purchase.tcsApplicable,
+          tcsSectionCode: purchase.tcsSectionCode ?? "",
+          tcsRatePercent: purchase.tcsRatePercent != null ? String(purchase.tcsRatePercent) : "",
+          tcsAmountMinor: purchase.tcsAmountMinor ? minorToRupeesString(purchase.tcsAmountMinor) : "",
         }}
       />
     </div>

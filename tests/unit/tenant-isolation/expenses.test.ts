@@ -9,6 +9,7 @@ import {
   restoreExpense,
   findExpenseById,
   listExpenses,
+  sumExpenseTotals,
 } from "@/lib/db/queries/expenses";
 import { listPaymentsForDocument } from "@/lib/db/queries/payments";
 import { Expense } from "@/lib/db/models/Expense";
@@ -148,5 +149,47 @@ describe("expenses — tenant isolation", () => {
     for (const e of list.items) {
       expect(String(e.businessId)).toBe(tenants.businessAId);
     }
+  });
+
+  it("sumExpenseTotals only sums recorded expenses within its own business and date range", async () => {
+    const dateFrom = new Date("2030-01-01");
+    const dateTo = new Date("2030-01-31");
+
+    const inRange = await createExpense({
+      businessId: tenants.businessAId,
+      categoryId: categoryAId,
+      amountMinor: 7_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      expenseDate: new Date("2030-01-15"),
+      createdByUserId: tenants.userAId,
+    });
+    const outOfRange = await createExpense({
+      businessId: tenants.businessAId,
+      categoryId: categoryAId,
+      amountMinor: 9_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      expenseDate: new Date("2030-02-15"),
+      createdByUserId: tenants.userAId,
+    });
+    const otherBusiness = await createExpense({
+      businessId: tenants.businessBId,
+      categoryId: categoryBId,
+      amountMinor: 50_000,
+      mode: "cash",
+      bankAccountId: bankBId,
+      expenseDate: new Date("2030-01-15"),
+      createdByUserId: tenants.userBId,
+    });
+    if (!inRange.ok || !outOfRange.ok || !otherBusiness.ok) throw new Error("setup failed");
+
+    const totals = await sumExpenseTotals(tenants.businessAId, { dateFrom, dateTo });
+    expect(totals.totalMinor).toBe(7_000);
+
+    const cancelled = await cancelExpense(String(inRange.expense._id), tenants.businessAId);
+    expect(cancelled.ok).toBe(true);
+    const totalsAfterCancel = await sumExpenseTotals(tenants.businessAId, { dateFrom, dateTo });
+    expect(totalsAfterCancel.totalMinor).toBe(0);
   });
 });

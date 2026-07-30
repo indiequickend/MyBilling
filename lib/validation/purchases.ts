@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { DISCOUNT_TARGETS } from "@/lib/constants/invoices";
 import { PAYMENT_MODES } from "@/lib/constants/payments";
-import { objectId, optionalTrimmed, rupeesToMinorUnits } from "@/lib/validation/shared";
+import { objectId, optionalTrimmed, rupeesToMinorUnits, optionalRupeesToMinorUnits } from "@/lib/validation/shared";
 import { parseSerialNumbersText } from "@/lib/validation/inventory";
 
 const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
@@ -82,7 +82,7 @@ export const purchaseDiscountSchema = rawPurchaseDiscountSchema.transform((val, 
 }));
 export type PurchaseDiscountInput = z.infer<typeof purchaseDiscountSchema>;
 
-export const purchaseHeaderSchema = z.object({
+const rawPurchaseHeaderSchema = z.object({
   vendorId: objectId,
   purchaseDate: z.string().trim().min(1, "Purchase date is required"),
   dueDate: optionalTrimmed(30),
@@ -96,6 +96,25 @@ export const purchaseHeaderSchema = z.object({
   noteTemplateId: optionalObjectId,
   termTemplateId: optionalObjectId,
   bankAccountId: optionalObjectId,
+  // TDS deducted from this vendor's payment, and TCS the vendor collected on this purchase — both
+  // payable-side, informational/report fields only. See Purchase.ts's doc-comment.
+  tdsApplicable: z.boolean(),
+  tdsSectionCode: optionalTrimmed(30),
+  tdsRatePercent: z.coerce.number().min(0).max(100).optional(),
+  tdsAmountMinor: optionalRupeesToMinorUnits,
+  tcsApplicable: z.boolean(),
+  tcsSectionCode: optionalTrimmed(30),
+  tcsRatePercent: z.coerce.number().min(0).max(100).optional(),
+  tcsAmountMinor: optionalRupeesToMinorUnits,
+});
+
+export const purchaseHeaderSchema = rawPurchaseHeaderSchema.superRefine((val, ctx) => {
+  if (val.tdsApplicable && !val.tdsAmountMinor) {
+    ctx.addIssue({ code: "custom", message: "Enter the TDS amount deducted", path: ["tdsAmountMinor"] });
+  }
+  if (val.tcsApplicable && !val.tcsAmountMinor) {
+    ctx.addIssue({ code: "custom", message: "Enter the TCS amount paid", path: ["tcsAmountMinor"] });
+  }
 });
 export type PurchaseHeaderInput = z.infer<typeof purchaseHeaderSchema>;
 

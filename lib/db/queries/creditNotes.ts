@@ -263,27 +263,65 @@ export type CreditNoteListParams = {
   search?: string;
   customerId?: string;
   tab?: "all" | "draft" | "issued" | "cancelled" | "deleted";
+  dateFrom?: Date;
+  dateTo?: Date;
   page?: number;
   pageSize?: number;
 };
 
-export async function listCreditNotes(businessId: string, params: CreditNoteListParams = {}) {
-  await connectToDatabase();
+function buildCreditNoteFilter(
+  businessId: string,
+  params: Omit<CreditNoteListParams, "page" | "pageSize">,
+  options: { forAggregate?: boolean } = {},
+): Record<string, unknown> {
   const filter: Record<string, unknown> = {
-    businessId,
+    businessId: options.forAggregate ? new mongoose.Types.ObjectId(businessId) : businessId,
     deletedAt: params.tab === "deleted" ? { $exists: true } : { $exists: false },
   };
   if (params.tab && params.tab !== "all" && params.tab !== "deleted") {
     filter.status = params.tab;
   }
-  if (params.customerId) filter.customerId = params.customerId;
+  if (params.customerId) {
+    filter.customerId = options.forAggregate
+      ? new mongoose.Types.ObjectId(params.customerId)
+      : params.customerId;
+  }
   if (params.search) {
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
     filter.$or = [{ docNumber: pattern }, { "customerSnapshot.displayName": pattern }];
   }
+  if (params.dateFrom || params.dateTo) {
+    const range: Record<string, Date> = {};
+    if (params.dateFrom) range.$gte = params.dateFrom;
+    if (params.dateTo) range.$lte = params.dateTo;
+    filter.creditNoteDate = range;
+  }
+  return filter;
+}
+
+export async function listCreditNotes(businessId: string, params: CreditNoteListParams = {}) {
+  await connectToDatabase();
+  const filter = buildCreditNoteFilter(businessId, params);
   return paginate(CreditNote, filter, {
     page: params.page,
     pageSize: params.pageSize,
     sort: { creditNoteDate: -1, createdAt: -1 },
   });
+}
+
+export type CreditNoteTotalsSummary = { totalMinor: number };
+
+/** Footer/report total over the WHOLE filtered set — only "issued" credit notes reduce a
+ * customer's balance (drafts haven't taken effect yet, cancelled ones never did). */
+export async function sumCreditNoteTotals(
+  businessId: string,
+  params: Omit<CreditNoteListParams, "page" | "pageSize" | "tab"> = {},
+): Promise<CreditNoteTotalsSummary> {
+  await connectToDatabase();
+  const filter = buildCreditNoteFilter(businessId, { ...params, tab: "issued" }, { forAggregate: true });
+  const [agg] = await CreditNote.aggregate([
+    { $match: filter },
+    { $group: { _id: null, totalMinor: { $sum: "$grandTotalMinor" } } },
+  ]);
+  return { totalMinor: agg?.totalMinor ?? 0 };
 }

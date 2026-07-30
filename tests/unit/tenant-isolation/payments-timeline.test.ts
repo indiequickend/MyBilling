@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupTwoTenants, teardownTwoTenants, type TwoTenants } from "../helpers/twoTenants";
 import { createBankAccount } from "@/lib/db/queries/bankAccounts";
-import { createPayment, listPaymentsTimeline, sumPaymentsTimeline } from "@/lib/db/queries/payments";
+import {
+  createPayment,
+  listPaymentsTimeline,
+  sumPaymentsTimeline,
+  getPaymentsByBankAccount,
+} from "@/lib/db/queries/payments";
 import { Payment } from "@/lib/db/models/Payment";
 import { BankAccount } from "@/lib/db/models/BankAccount";
 import mongoose from "mongoose";
@@ -97,5 +102,14 @@ describe("payments timeline — tenant isolation and totals", () => {
     const receivedOnly = await sumPaymentsTimeline(tenants.businessAId, { direction: "in" });
     expect(receivedOnly.receivedMinor).toBe(50_000);
     expect(receivedOnly.givenMinor).toBe(0);
+  });
+
+  it("getPaymentsByBankAccount groups received/given per account, scoped per business", async () => {
+    const rows = await getPaymentsByBankAccount(tenants.businessAId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].bankAccountId).toBe(bankAId);
+    expect(rows[0].bankAccountName).toBe("Bank A");
+    expect(rows[0].receivedMinor).toBe(50_000);
+    expect(rows[0].givenMinor).toBe(12_000);
   });
 });

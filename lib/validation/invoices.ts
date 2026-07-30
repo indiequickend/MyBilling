@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { DISCOUNT_TARGETS } from "@/lib/constants/invoices";
 import { PAYMENT_MODES } from "@/lib/constants/payments";
-import { objectId, optionalTrimmed, rupeesToMinorUnits, normalizeDiscountValue } from "@/lib/validation/shared";
+import {
+  objectId,
+  optionalTrimmed,
+  rupeesToMinorUnits,
+  optionalRupeesToMinorUnits,
+  normalizeDiscountValue,
+} from "@/lib/validation/shared";
 import { parseSerialNumbersText } from "@/lib/validation/inventory";
 
 const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
@@ -49,7 +55,7 @@ export const invoiceDiscountSchema = rawInvoiceDiscountSchema.transform((val, ct
 }));
 export type InvoiceDiscountInput = z.infer<typeof invoiceDiscountSchema>;
 
-export const invoiceHeaderSchema = z.object({
+const rawInvoiceHeaderSchema = z.object({
   customerId: objectId,
   invoiceDate: z.string().trim().min(1, "Invoice date is required"),
   dueDate: optionalTrimmed(30),
@@ -63,6 +69,18 @@ export const invoiceHeaderSchema = z.object({
   termTemplateId: optionalObjectId,
   signatureId: optionalObjectId,
   bankAccountId: optionalObjectId,
+  // TCS (Tax Collected at Source) this invoice collects from the customer — informational/report
+  // field only, never added into the invoice's grandTotalMinor. See Invoice.ts's doc-comment.
+  tcsApplicable: z.boolean(),
+  tcsSectionCode: optionalTrimmed(30),
+  tcsRatePercent: z.coerce.number().min(0).max(100).optional(),
+  tcsAmountMinor: optionalRupeesToMinorUnits,
+});
+
+export const invoiceHeaderSchema = rawInvoiceHeaderSchema.superRefine((val, ctx) => {
+  if (val.tcsApplicable && !val.tcsAmountMinor) {
+    ctx.addIssue({ code: "custom", message: "Enter the TCS amount collected", path: ["tcsAmountMinor"] });
+  }
 });
 export type InvoiceHeaderInput = z.infer<typeof invoiceHeaderSchema>;
 

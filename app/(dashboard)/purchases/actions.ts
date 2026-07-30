@@ -126,6 +126,14 @@ async function parsePurchaseForm(
     noteTemplateId: formData.get("noteTemplateId"),
     termTemplateId: formData.get("termTemplateId"),
     bankAccountId: formData.get("bankAccountId"),
+    tdsApplicable: parseCheckbox(formData, "tdsApplicable"),
+    tdsSectionCode: formData.get("tdsSectionCode"),
+    tdsRatePercent: formData.get("tdsRatePercent") || undefined,
+    tdsAmountMinor: formData.get("tdsAmountMinor") || "",
+    tcsApplicable: parseCheckbox(formData, "tcsApplicable"),
+    tcsSectionCode: formData.get("tcsSectionCode"),
+    tcsRatePercent: formData.get("tcsRatePercent") || undefined,
+    tcsAmountMinor: formData.get("tcsAmountMinor") || "",
   });
   if (!headerParsed.success) {
     return {
@@ -192,6 +200,14 @@ async function parsePurchaseForm(
     termTemplateId: h.termTemplateId,
     bankAccountId: h.bankAccountId,
     sourcePurchaseOrderId,
+    tdsApplicable: h.tdsApplicable,
+    tdsSectionCode: h.tdsSectionCode,
+    tdsRatePercent: h.tdsRatePercent,
+    tdsAmountMinor: h.tdsAmountMinor,
+    tcsApplicable: h.tcsApplicable,
+    tcsSectionCode: h.tcsSectionCode,
+    tcsRatePercent: h.tcsRatePercent,
+    tcsAmountMinor: h.tcsAmountMinor,
   };
 
   const payments: PurchasePaymentSplitWriteInput[] = paymentsParsed.data.map((p) => ({

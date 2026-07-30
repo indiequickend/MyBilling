@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Expense, type ExpenseStatus } from "@/lib/db/models/Expense";
 import { Vendor } from "@/lib/db/models/Vendor";
@@ -18,6 +19,14 @@ export type ExpenseWriteInput = {
   supplierGstin?: string;
   description?: string;
   expenseDate: Date;
+  tdsApplicable?: boolean;
+  tdsSectionCode?: string;
+  tdsRatePercent?: number;
+  tdsAmountMinor?: number;
+  tcsApplicable?: boolean;
+  tcsSectionCode?: string;
+  tcsRatePercent?: number;
+  tcsAmountMinor?: number;
 };
 
 export type CreateExpenseInput = ExpenseWriteInput & { createdByUserId: string };
@@ -79,6 +88,14 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
             supplierGstin: input.supplierGstin,
             description: input.description,
             expenseDate: input.expenseDate,
+            tdsApplicable: input.tdsApplicable ?? false,
+            tdsSectionCode: input.tdsSectionCode,
+            tdsRatePercent: input.tdsRatePercent,
+            tdsAmountMinor: input.tdsAmountMinor ?? 0,
+            tcsApplicable: input.tcsApplicable ?? false,
+            tcsSectionCode: input.tcsSectionCode,
+            tcsRatePercent: input.tcsRatePercent,
+            tcsAmountMinor: input.tcsAmountMinor ?? 0,
             status: "recorded",
             createdByUserId: input.createdByUserId,
           },
@@ -160,14 +177,19 @@ export type ExpenseListParams = {
   search?: string;
   categoryId?: string;
   tab?: "all" | "recorded" | "cancelled" | "deleted";
+  dateFrom?: Date;
+  dateTo?: Date;
   page?: number;
   pageSize?: number;
 };
 
-export async function listExpenses(businessId: string, params: ExpenseListParams = {}) {
-  await connectToDatabase();
+function buildExpenseFilter(
+  businessId: string,
+  params: Omit<ExpenseListParams, "page" | "pageSize">,
+  options: { forAggregate?: boolean } = {},
+): Record<string, unknown> {
   const filter: Record<string, unknown> = {
-    businessId,
+    businessId: options.forAggregate ? new mongoose.Types.ObjectId(businessId) : businessId,
     deletedAt: params.tab === "deleted" ? { $exists: true } : { $exists: false },
   };
   if (params.tab && params.tab !== "all" && params.tab !== "deleted") {
@@ -178,9 +200,38 @@ export async function listExpenses(businessId: string, params: ExpenseListParams
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
     filter.$or = [{ supplierName: pattern }, { description: pattern }];
   }
+  if (params.dateFrom || params.dateTo) {
+    const range: Record<string, Date> = {};
+    if (params.dateFrom) range.$gte = params.dateFrom;
+    if (params.dateTo) range.$lte = params.dateTo;
+    filter.expenseDate = range;
+  }
+  return filter;
+}
+
+export async function listExpenses(businessId: string, params: ExpenseListParams = {}) {
+  await connectToDatabase();
+  const filter = buildExpenseFilter(businessId, params);
   return paginate(Expense, filter, {
     page: params.page,
     pageSize: params.pageSize,
     sort: { expenseDate: -1, createdAt: -1 },
   });
+}
+
+export type ExpenseTotalsSummary = { totalMinor: number };
+
+/** Footer/report total over the WHOLE filtered set — only "recorded" expenses count (cancelled
+ * ones never moved money that's still outstanding). Same aggregate shape as sumInvoiceTotals. */
+export async function sumExpenseTotals(
+  businessId: string,
+  params: Omit<ExpenseListParams, "page" | "pageSize" | "tab"> = {},
+): Promise<ExpenseTotalsSummary> {
+  await connectToDatabase();
+  const filter = buildExpenseFilter(businessId, { ...params, tab: "recorded" }, { forAggregate: true });
+  const [agg] = await Expense.aggregate([
+    { $match: filter },
+    { $group: { _id: null, totalMinor: { $sum: "$amountMinor" } } },
+  ]);
+  return { totalMinor: agg?.totalMinor ?? 0 };
 }

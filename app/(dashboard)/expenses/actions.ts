@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { requirePermission } from "@/lib/rbac/can";
 import { expenseHeaderSchema } from "@/lib/validation/expenses";
+import { parseCheckbox } from "@/lib/validation/shared";
 import {
   createExpense,
   cancelExpense,
@@ -66,6 +67,14 @@ export async function saveExpenseAction(
     supplierGstin: formData.get("supplierGstin"),
     description: formData.get("description"),
     expenseDate: formData.get("expenseDate"),
+    tdsApplicable: parseCheckbox(formData, "tdsApplicable"),
+    tdsSectionCode: formData.get("tdsSectionCode"),
+    tdsRatePercent: formData.get("tdsRatePercent") || undefined,
+    tdsAmountMinor: formData.get("tdsAmountMinor") || "",
+    tcsApplicable: parseCheckbox(formData, "tcsApplicable"),
+    tcsSectionCode: formData.get("tcsSectionCode"),
+    tcsRatePercent: formData.get("tcsRatePercent") || undefined,
+    tcsAmountMinor: formData.get("tcsAmountMinor") || "",
   });
   if (!parsed.success) {
     return { error: "Fix the errors below and try again.", fieldErrors: fieldErrorsFrom(parsed.error) };
@@ -83,6 +92,14 @@ export async function saveExpenseAction(
     supplierGstin: h.supplierGstin,
     description: h.description,
     expenseDate: new Date(h.expenseDate),
+    tdsApplicable: h.tdsApplicable,
+    tdsSectionCode: h.tdsSectionCode,
+    tdsRatePercent: h.tdsRatePercent,
+    tdsAmountMinor: h.tdsAmountMinor,
+    tcsApplicable: h.tcsApplicable,
+    tcsSectionCode: h.tcsSectionCode,
+    tcsRatePercent: h.tcsRatePercent,
+    tcsAmountMinor: h.tcsAmountMinor,
     createdByUserId: context.membership.userId,
   });
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };

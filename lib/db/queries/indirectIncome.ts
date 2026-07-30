@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { IndirectIncome, type IndirectIncomeStatus } from "@/lib/db/models/IndirectIncome";
 import { Customer } from "@/lib/db/models/Customer";
@@ -158,14 +159,19 @@ export type IndirectIncomeListParams = {
   search?: string;
   categoryId?: string;
   tab?: "all" | "recorded" | "cancelled" | "deleted";
+  dateFrom?: Date;
+  dateTo?: Date;
   page?: number;
   pageSize?: number;
 };
 
-export async function listIndirectIncome(businessId: string, params: IndirectIncomeListParams = {}) {
-  await connectToDatabase();
+function buildIndirectIncomeFilter(
+  businessId: string,
+  params: Omit<IndirectIncomeListParams, "page" | "pageSize">,
+  options: { forAggregate?: boolean } = {},
+): Record<string, unknown> {
   const filter: Record<string, unknown> = {
-    businessId,
+    businessId: options.forAggregate ? new mongoose.Types.ObjectId(businessId) : businessId,
     deletedAt: params.tab === "deleted" ? { $exists: true } : { $exists: false },
   };
   if (params.tab && params.tab !== "all" && params.tab !== "deleted") {
@@ -176,9 +182,38 @@ export async function listIndirectIncome(businessId: string, params: IndirectInc
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
     filter.$or = [{ sourceName: pattern }, { description: pattern }];
   }
+  if (params.dateFrom || params.dateTo) {
+    const range: Record<string, Date> = {};
+    if (params.dateFrom) range.$gte = params.dateFrom;
+    if (params.dateTo) range.$lte = params.dateTo;
+    filter.incomeDate = range;
+  }
+  return filter;
+}
+
+export async function listIndirectIncome(businessId: string, params: IndirectIncomeListParams = {}) {
+  await connectToDatabase();
+  const filter = buildIndirectIncomeFilter(businessId, params);
   return paginate(IndirectIncome, filter, {
     page: params.page,
     pageSize: params.pageSize,
     sort: { incomeDate: -1, createdAt: -1 },
   });
+}
+
+export type IndirectIncomeTotalsSummary = { totalMinor: number };
+
+/** Footer/report total over the WHOLE filtered set — only "recorded" income counts. Same
+ * aggregate shape as sumExpenseTotals. */
+export async function sumIndirectIncomeTotals(
+  businessId: string,
+  params: Omit<IndirectIncomeListParams, "page" | "pageSize" | "tab"> = {},
+): Promise<IndirectIncomeTotalsSummary> {
+  await connectToDatabase();
+  const filter = buildIndirectIncomeFilter(businessId, { ...params, tab: "recorded" }, { forAggregate: true });
+  const [agg] = await IndirectIncome.aggregate([
+    { $match: filter },
+    { $group: { _id: null, totalMinor: { $sum: "$amountMinor" } } },
+  ]);
+  return { totalMinor: agg?.totalMinor ?? 0 };
 }

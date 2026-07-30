@@ -118,6 +118,10 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
           discountTarget: invoice.discountTarget,
           customFieldValues: invoice.customFieldValues ?? {},
           lineItems,
+          tcsApplicable: invoice.tcsApplicable,
+          tcsSectionCode: invoice.tcsSectionCode ?? "",
+          tcsRatePercent: invoice.tcsRatePercent != null ? String(invoice.tcsRatePercent) : "",
+          tcsAmountMinor: invoice.tcsAmountMinor ? minorToRupeesString(invoice.tcsAmountMinor) : "",
         }}
       />
     </div>

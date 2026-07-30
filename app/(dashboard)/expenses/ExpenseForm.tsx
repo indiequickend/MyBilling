@@ -5,8 +5,9 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { FormError } from "@/components/auth/AuthCard";
 import { PAYMENT_MODES, PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
@@ -126,6 +127,52 @@ export function ExpenseForm({
               />
             </Field>
           </FieldGroup>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tax Deduction / Collection (TDS / TCS)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Field orientation="horizontal">
+                <Checkbox id="tdsApplicable" name="tdsApplicable" />
+                <FieldLabel htmlFor="tdsApplicable" className="font-normal">
+                  TDS deducted from this supplier
+                </FieldLabel>
+              </Field>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <FormField label="Section code" name="tdsSectionCode" placeholder="e.g. 194C" />
+                <FormField label="Rate %" name="tdsRatePercent" type="number" />
+                <FormField
+                  label="TDS amount"
+                  name="tdsAmountMinor"
+                  type="number"
+                  error={state.fieldErrors?.tdsAmountMinor}
+                />
+              </div>
+            </div>
+            <div>
+              <Field orientation="horizontal">
+                <Checkbox id="tcsApplicable" name="tcsApplicable" />
+                <FieldLabel htmlFor="tcsApplicable" className="font-normal">
+                  TCS collected by this supplier
+                </FieldLabel>
+              </Field>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <FormField label="Section code" name="tcsSectionCode" placeholder="e.g. 206C(1H)" />
+                <FormField label="Rate %" name="tcsRatePercent" type="number" />
+                <FormField
+                  label="TCS amount"
+                  name="tcsAmountMinor"
+                  type="number"
+                  error={state.fieldErrors?.tcsAmountMinor}
+                />
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

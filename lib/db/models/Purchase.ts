@@ -47,6 +47,19 @@ const purchaseSchema = new Schema(
     // lib/db/queries/purchaseOrders.ts) — traceability only, never required.
     sourcePurchaseOrderId: { type: Schema.Types.ObjectId, ref: "PurchaseOrder" },
 
+    // TDS (deducted from this vendor's payment, e.g. Section 194Q/194C) and TCS (collected by the
+    // vendor on this purchase, e.g. Section 206C(1H)) — both payable-side. Informational/reporting
+    // only — never folded into grandTotalMinor, amountPaidMinor, or payment-status derivation. See
+    // lib/db/queries/reports.ts getTdsTcsReport.
+    tdsApplicable: { type: Boolean, required: true, default: false },
+    tdsSectionCode: { type: String, trim: true },
+    tdsRatePercent: { type: Number },
+    tdsAmountMinor: { type: Number, required: true, default: 0 },
+    tcsApplicable: { type: Boolean, required: true, default: false },
+    tcsSectionCode: { type: String, trim: true },
+    tcsRatePercent: { type: Number },
+    tcsAmountMinor: { type: Number, required: true, default: 0 },
+
     lineItems: {
       type: [documentLineItemSchema],
       required: true,
@@ -126,6 +139,14 @@ export type PurchaseDoc = {
   placeOfSupplyState: string;
   reverseCharge: boolean;
   sourcePurchaseOrderId?: mongoose.Types.ObjectId;
+  tdsApplicable: boolean;
+  tdsSectionCode?: string;
+  tdsRatePercent?: number;
+  tdsAmountMinor: number;
+  tcsApplicable: boolean;
+  tcsSectionCode?: string;
+  tcsRatePercent?: number;
+  tcsAmountMinor: number;
   lineItems: PurchaseLineItemDoc[];
   discountType: "amount" | "percentage";
   discountValue: number;

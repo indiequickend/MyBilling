@@ -59,6 +59,14 @@ export type PurchaseWriteInput = {
   vendorInvoiceNumber?: string;
   placeOfSupplyState: string;
   reverseCharge: boolean;
+  tdsApplicable?: boolean;
+  tdsSectionCode?: string;
+  tdsRatePercent?: number;
+  tdsAmountMinor?: number;
+  tcsApplicable?: boolean;
+  tcsSectionCode?: string;
+  tcsRatePercent?: number;
+  tcsAmountMinor?: number;
   lineItems: PurchaseLineItemWriteInput[];
   discountType: "amount" | "percentage";
   discountValue: number;
@@ -221,6 +229,14 @@ function buildPurchaseSetFields(input: PurchaseWriteInput, prepared: PreparedPur
     placeOfSupplyState: input.placeOfSupplyState,
     reverseCharge: input.reverseCharge,
     sourcePurchaseOrderId: input.sourcePurchaseOrderId,
+    tdsApplicable: input.tdsApplicable ?? false,
+    tdsSectionCode: input.tdsSectionCode,
+    tdsRatePercent: input.tdsRatePercent,
+    tdsAmountMinor: input.tdsAmountMinor ?? 0,
+    tcsApplicable: input.tcsApplicable ?? false,
+    tcsSectionCode: input.tcsSectionCode,
+    tcsRatePercent: input.tcsRatePercent,
+    tcsAmountMinor: input.tcsAmountMinor ?? 0,
     lineItems: prepared.lineItemDocs,
     discountType: input.discountType,
     discountValue: input.discountValue,

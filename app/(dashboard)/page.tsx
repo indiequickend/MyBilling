@@ -1,15 +1,18 @@
 import Link from "next/link";
-import { Building2, FileText, Users, Wallet, PackageCheck, PackageX, IndianRupee } from "lucide-react";
+import { Building2, FileText, Users, Wallet, PackageCheck, PackageX, IndianRupee, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { listInvoices, sumInvoiceTotals } from "@/lib/db/queries/invoices";
 import { listCustomers } from "@/lib/db/queries/customers";
 import { listVendors } from "@/lib/db/queries/vendors";
 import { getInventoryDashboardTiles } from "@/lib/db/queries/stockLedger";
+import { sumPaymentsTimeline } from "@/lib/db/queries/payments";
+import { getSalesTrend } from "@/lib/db/queries/reports";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { can } from "@/lib/rbac/can";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { SalesTrendChart } from "@/components/insights/InsightsCharts";
 
 export default async function DashboardHomePage() {
   const context = await getDashboardContext();
@@ -51,14 +54,18 @@ export default async function DashboardHomePage() {
   const canViewCustomers = can(context.membership, "customers", "view");
   const canViewVendors = can(context.membership, "vendors", "view");
   const canViewInventory = can(context.membership, "inventory", "view");
+  const canViewPayments = can(context.membership, "payments", "view");
 
-  const [invoiceCount, invoiceTotals, customerCount, vendorCount, inventoryTiles] = await Promise.all([
-    canViewInvoices ? listInvoices(context.activeBusinessId, { pageSize: 1 }) : null,
-    canViewInvoices ? sumInvoiceTotals(context.activeBusinessId, {}) : null,
-    canViewCustomers ? listCustomers(context.activeBusinessId, { pageSize: 1 }) : null,
-    canViewVendors ? listVendors(context.activeBusinessId, { pageSize: 1 }) : null,
-    canViewInventory ? getInventoryDashboardTiles(context.activeBusinessId) : null,
-  ]);
+  const [invoiceCount, invoiceTotals, customerCount, vendorCount, inventoryTiles, cashTotals, salesTrend] =
+    await Promise.all([
+      canViewInvoices ? listInvoices(context.activeBusinessId, { pageSize: 1 }) : null,
+      canViewInvoices ? sumInvoiceTotals(context.activeBusinessId, {}) : null,
+      canViewCustomers ? listCustomers(context.activeBusinessId, { pageSize: 1 }) : null,
+      canViewVendors ? listVendors(context.activeBusinessId, { pageSize: 1 }) : null,
+      canViewInventory ? getInventoryDashboardTiles(context.activeBusinessId) : null,
+      canViewPayments ? sumPaymentsTimeline(context.activeBusinessId, {}) : null,
+      canViewInvoices ? getSalesTrend(context.activeBusinessId, { bucket: "day" }) : null,
+    ]);
 
   const tiles = [
     canViewInvoices && invoiceCount
@@ -143,7 +150,48 @@ export default async function DashboardHomePage() {
         </p>
       )}
 
-      {/* TODO(reports-phase): full chart + stat-card row once Reports ships */}
+      {canViewPayments && cashTotals ? (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <Card>
+            <CardContent className="flex items-center gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <ArrowDownCircle className="size-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Cash In (all-time)</p>
+                <p className="text-lg font-semibold">₹{minorToRupeesString(cashTotals.receivedMinor)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <ArrowUpCircle className="size-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Cash Out (all-time)</p>
+                <p className="text-lg font-semibold">₹{minorToRupeesString(cashTotals.givenMinor)}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {canViewInvoices && salesTrend && salesTrend.length > 0 ? (
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Sales Trend</CardTitle>
+            <Link href="/insights" className="text-sm text-primary hover:underline">
+              View full Insights →
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <SalesTrendChart
+              data={salesTrend.map((p) => ({ periodStart: p.periodStart.toISOString(), totalMinor: p.totalMinor }))}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

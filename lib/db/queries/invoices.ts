@@ -56,6 +56,10 @@ export type InvoiceWriteInput = {
   referenceNumber?: string;
   placeOfSupplyState: string;
   reverseCharge: boolean;
+  tcsApplicable?: boolean;
+  tcsSectionCode?: string;
+  tcsRatePercent?: number;
+  tcsAmountMinor?: number;
   lineItems: InvoiceLineItemWriteInput[];
   discountType: "amount" | "percentage";
   discountValue: number;
@@ -222,6 +226,10 @@ function buildInvoiceSetFields(input: InvoiceWriteInput, prepared: PreparedInvoi
     referenceNumber: input.referenceNumber,
     placeOfSupplyState: input.placeOfSupplyState,
     reverseCharge: input.reverseCharge,
+    tcsApplicable: input.tcsApplicable ?? false,
+    tcsSectionCode: input.tcsSectionCode,
+    tcsRatePercent: input.tcsRatePercent,
+    tcsAmountMinor: input.tcsAmountMinor ?? 0,
     lineItems: prepared.lineItemDocs,
     discountType: input.discountType,
     discountValue: input.discountValue,

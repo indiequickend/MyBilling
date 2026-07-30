@@ -9,6 +9,7 @@ import {
   restoreIndirectIncome,
   findIndirectIncomeById,
   listIndirectIncome,
+  sumIndirectIncomeTotals,
 } from "@/lib/db/queries/indirectIncome";
 import { listPaymentsForDocument } from "@/lib/db/queries/payments";
 import { IndirectIncome } from "@/lib/db/models/IndirectIncome";
@@ -133,5 +134,42 @@ describe("indirect income — tenant isolation", () => {
     for (const e of list.items) {
       expect(String(e.businessId)).toBe(tenants.businessAId);
     }
+  });
+
+  it("sumIndirectIncomeTotals only sums recorded entries within its own business and date range", async () => {
+    const dateFrom = new Date("2030-01-01");
+    const dateTo = new Date("2030-01-31");
+
+    const inRange = await createIndirectIncome({
+      businessId: tenants.businessAId,
+      categoryId: categoryAId,
+      amountMinor: 6_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      incomeDate: new Date("2030-01-10"),
+      createdByUserId: tenants.userAId,
+    });
+    const outOfRange = await createIndirectIncome({
+      businessId: tenants.businessAId,
+      categoryId: categoryAId,
+      amountMinor: 8_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      incomeDate: new Date("2030-03-10"),
+      createdByUserId: tenants.userAId,
+    });
+    const otherBusiness = await createIndirectIncome({
+      businessId: tenants.businessBId,
+      categoryId: categoryBId,
+      amountMinor: 40_000,
+      mode: "cash",
+      bankAccountId: bankBId,
+      incomeDate: new Date("2030-01-10"),
+      createdByUserId: tenants.userBId,
+    });
+    if (!inRange.ok || !outOfRange.ok || !otherBusiness.ok) throw new Error("setup failed");
+
+    const totals = await sumIndirectIncomeTotals(tenants.businessAId, { dateFrom, dateTo });
+    expect(totals.totalMinor).toBe(6_000);
   });
 });

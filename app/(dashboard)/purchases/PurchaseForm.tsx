@@ -57,6 +57,14 @@ export type PurchaseFormDefaultValues = {
   customFieldValues: Record<string, unknown>;
   lineItems: LineItemRow[];
   sourcePurchaseOrderId?: string;
+  tdsApplicable?: boolean;
+  tdsSectionCode?: string;
+  tdsRatePercent?: string;
+  tdsAmountMinor?: string;
+  tcsApplicable?: boolean;
+  tcsSectionCode?: string;
+  tcsRatePercent?: string;
+  tcsAmountMinor?: string;
 };
 
 export function PurchaseForm({
@@ -278,6 +286,82 @@ export function PurchaseForm({
                 Round off total
               </FieldLabel>
             </Field>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tax Deduction / Collection (TDS / TCS)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="tdsApplicable"
+                  name="tdsApplicable"
+                  defaultChecked={defaultValues?.tdsApplicable}
+                />
+                <FieldLabel htmlFor="tdsApplicable" className="font-normal">
+                  TDS deducted from this vendor
+                </FieldLabel>
+              </Field>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <FormField
+                  label="Section code"
+                  name="tdsSectionCode"
+                  placeholder="e.g. 194Q"
+                  defaultValue={defaultValues?.tdsSectionCode}
+                />
+                <FormField
+                  label="Rate %"
+                  name="tdsRatePercent"
+                  type="number"
+                  defaultValue={defaultValues?.tdsRatePercent}
+                />
+                <FormField
+                  label="TDS amount"
+                  name="tdsAmountMinor"
+                  type="number"
+                  defaultValue={defaultValues?.tdsAmountMinor}
+                  error={state.fieldErrors?.tdsAmountMinor}
+                />
+              </div>
+            </div>
+            <div>
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="tcsApplicable"
+                  name="tcsApplicable"
+                  defaultChecked={defaultValues?.tcsApplicable}
+                />
+                <FieldLabel htmlFor="tcsApplicable" className="font-normal">
+                  TCS paid to this vendor
+                </FieldLabel>
+              </Field>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <FormField
+                  label="Section code"
+                  name="tcsSectionCode"
+                  placeholder="e.g. 206C(1H)"
+                  defaultValue={defaultValues?.tcsSectionCode}
+                />
+                <FormField
+                  label="Rate %"
+                  name="tcsRatePercent"
+                  type="number"
+                  defaultValue={defaultValues?.tcsRatePercent}
+                />
+                <FormField
+                  label="TCS amount"
+                  name="tcsAmountMinor"
+                  type="number"
+                  defaultValue={defaultValues?.tcsAmountMinor}
+                  error={state.fieldErrors?.tcsAmountMinor}
+                />
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

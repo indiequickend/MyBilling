@@ -58,6 +58,10 @@ export type InvoiceFormDefaultValues = {
   lineItems: LineItemRow[];
   sourceQuotationId?: string;
   sourceSalesOrderId?: string;
+  tcsApplicable?: boolean;
+  tcsSectionCode?: string;
+  tcsRatePercent?: string;
+  tcsAmountMinor?: string;
 };
 
 export function InvoiceForm({
@@ -273,6 +277,45 @@ export function InvoiceForm({
                 Round off total
               </FieldLabel>
             </Field>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tax Collection (TCS)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Field orientation="horizontal">
+            <Checkbox
+              id="tcsApplicable"
+              name="tcsApplicable"
+              defaultChecked={defaultValues?.tcsApplicable}
+            />
+            <FieldLabel htmlFor="tcsApplicable" className="font-normal">
+              TCS collected from this customer
+            </FieldLabel>
+          </Field>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <FormField
+              label="Section code"
+              name="tcsSectionCode"
+              placeholder="e.g. 206C(1H)"
+              defaultValue={defaultValues?.tcsSectionCode}
+            />
+            <FormField
+              label="Rate %"
+              name="tcsRatePercent"
+              type="number"
+              defaultValue={defaultValues?.tcsRatePercent}
+            />
+            <FormField
+              label="TCS amount"
+              name="tcsAmountMinor"
+              type="number"
+              defaultValue={defaultValues?.tcsAmountMinor}
+              error={state.fieldErrors?.tcsAmountMinor}
+            />
           </div>
         </CardContent>
       </Card>
