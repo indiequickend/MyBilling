@@ -38,3 +38,6 @@ export * from "./StockLedgerEntry";
 export * from "./PaymentLink";
 export * from "./Journal";
 export * from "./BankStatementLine";
+export * from "./EwayBillData";
+export * from "./EInvoiceData";
+export * from "./GstReportSnapshot";

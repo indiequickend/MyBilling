@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ClipboardList,
   FileBarChart2,
+  FileCheck2,
   FileStack,
   FileText,
   LandmarkIcon,
@@ -56,6 +57,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   roles: ShieldCheck,
   insights: BarChart3,
   reports: FileBarChart2,
+  gst: FileCheck2,
 };
 
 function isActive(pathname: string, href: string) {

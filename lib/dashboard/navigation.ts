@@ -26,7 +26,8 @@ export type NavIconKey =
   | "users"
   | "roles"
   | "insights"
-  | "reports";
+  | "reports"
+  | "gst";
 
 export type NavItem = {
   href: string;
@@ -254,6 +255,20 @@ const MAIN_GROUPS: NavGroup[] = [
         action: "view",
       },
       { href: "/reports/tds-tcs", label: "TDS/TCS", icon: "reports", moduleKey: "reports", action: "view" },
+    ],
+  },
+  {
+    href: "/gst",
+    label: "GST",
+    icon: "gst",
+    moduleKey: "gst",
+    action: "view",
+    children: [
+      { href: "/gst/gstr1", label: "GSTR-1", icon: "gst", moduleKey: "gst", action: "view" },
+      { href: "/gst/gstr3b", label: "GSTR-3B", icon: "gst", moduleKey: "gst", action: "view" },
+      { href: "/gst/gstr2b", label: "GSTR-2B Reconciliation", icon: "gst", moduleKey: "gst", action: "view" },
+      { href: "/gst/e-way-bills", label: "E-way Bills", icon: "gst", moduleKey: "gst", action: "view" },
+      { href: "/gst/e-invoices", label: "E-Invoices", icon: "gst", moduleKey: "gst", action: "view" },
     ],
   },
 ];

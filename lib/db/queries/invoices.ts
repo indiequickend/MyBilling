@@ -685,3 +685,39 @@ export async function sumInvoiceTotals(
   const paidMinor: number = agg?.paidMinor ?? 0;
   return { totalMinor, paidMinor, pendingMinor: totalMinor - paidMinor };
 }
+
+export type GstEligibleInvoiceRow = {
+  invoiceId: string;
+  docNumber?: string;
+  invoiceDate: Date;
+  status: InvoiceStatus;
+  customerDisplayName: string;
+  grandTotalMinor: number;
+};
+
+/** Finalized (non-draft) invoices flagged for e-way bill/e-invoice generation — feeds the GST
+ * module's e-way bill and e-invoice list pages. */
+export async function listGstFlaggedInvoices(
+  businessId: string,
+  flag: "eWayBillFlag" | "eInvoiceFlag",
+): Promise<GstEligibleInvoiceRow[]> {
+  await connectToDatabase();
+  const docs = await Invoice.find({
+    businessId,
+    [flag]: true,
+    status: { $ne: "draft" },
+    deletedAt: { $exists: false },
+  })
+    .select("docNumber invoiceDate status customerSnapshot grandTotalMinor")
+    .sort({ invoiceDate: -1 })
+    .lean();
+
+  return docs.map((inv) => ({
+    invoiceId: String(inv._id),
+    docNumber: inv.docNumber,
+    invoiceDate: inv.invoiceDate,
+    status: inv.status,
+    customerDisplayName: inv.customerSnapshot?.displayName ?? "—",
+    grandTotalMinor: inv.grandTotalMinor,
+  }));
+}
