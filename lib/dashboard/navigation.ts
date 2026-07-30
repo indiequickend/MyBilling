@@ -27,7 +27,10 @@ export type NavIconKey =
   | "roles"
   | "insights"
   | "reports"
-  | "gst";
+  | "gst"
+  | "apiKeys"
+  | "webhooks"
+  | "paymentGateway";
 
 export type NavItem = {
   href: string;
@@ -334,6 +337,27 @@ const SETTINGS_GROUP: NavGroup = {
       icon: "roles",
       moduleKey: "settings",
       action: "manage_roles",
+    },
+    {
+      href: "/settings/api-keys",
+      label: "API Keys",
+      icon: "apiKeys",
+      moduleKey: "settings",
+      action: "manage_integrations",
+    },
+    {
+      href: "/settings/webhooks",
+      label: "Webhooks",
+      icon: "webhooks",
+      moduleKey: "settings",
+      action: "manage_integrations",
+    },
+    {
+      href: "/settings/payment-gateway",
+      label: "Payment Gateway",
+      icon: "paymentGateway",
+      moduleKey: "settings",
+      action: "manage_integrations",
     },
   ],
 };

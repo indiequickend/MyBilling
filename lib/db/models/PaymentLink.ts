@@ -12,18 +12,25 @@ const paymentLinkSchema = new Schema(
     businessId: { type: Schema.Types.ObjectId, ref: "Business", required: true, index: true },
     tokenHash: { type: String, required: true, unique: true },
     amountMinor: { type: Number, required: true },
-    // Optional — "for a specific amount/invoice" (project_spec.md). No online collection happens
-    // yet (Payment Gateway integration is Phase 12); this is a read-only public view.
+    // Optional — "for a specific amount/invoice" (project_spec.md). Online collection via the
+    // Payment Gateway (see gatewayPaymentLinkId below) is only offered when this is set — a bare/
+    // unlinked link stays a read-only manual-bank-transfer view.
     linkedInvoiceId: { type: Schema.Types.ObjectId, ref: "Invoice" },
     note: { type: String, trim: true },
     expiresAt: { type: Date, required: true },
     revokedAt: { type: Date },
     createdByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    // Set once the payer starts an online (Razorpay) checkout for this link — correlates the
+    // gateway's inbound webhook back to this link (see app/api/webhooks/razorpay/route.ts).
+    // Online collection is only offered for links with a linkedInvoiceId (see project_spec.md's
+    // Payment Gateway wiring — Phase 12 scope decision).
+    gatewayPaymentLinkId: { type: String },
   },
   { timestamps: true },
 );
 
 paymentLinkSchema.index({ businessId: 1, createdAt: -1 });
+paymentLinkSchema.index({ gatewayPaymentLinkId: 1 }, { sparse: true });
 
 export type PaymentLinkDoc = InferSchemaType<typeof paymentLinkSchema>;
 

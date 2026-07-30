@@ -20,6 +20,20 @@ import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "
 import { computeDocumentTotals, derivePaymentStatus, type LineItemCalcInput } from "@/lib/documents/calc";
 import type { DiscountTarget, InvoiceStatus } from "@/lib/constants/invoices";
 import type { PaymentMode } from "@/lib/constants/payments";
+import { fireWebhookEvent } from "@/lib/webhooks/dispatch";
+
+/** Shared shape for every invoice.* webhook event's `data` field. */
+export function invoiceWebhookPayload(invoice: InstanceType<typeof Invoice>) {
+  return {
+    invoiceId: String(invoice._id),
+    docNumber: invoice.docNumber,
+    status: invoice.status,
+    customerId: String(invoice.customerId),
+    grandTotalMinor: invoice.grandTotalMinor,
+    amountPaidMinor: invoice.amountPaidMinor,
+    invoiceDate: invoice.invoiceDate,
+  };
+}
 
 export type InvoiceLineItemWriteInput = {
   productId?: string;
@@ -105,7 +119,7 @@ export type InvoiceWriteResult =
 const EDITABLE_STATUSES: InvoiceStatus[] = ["draft", "pending", "partially_paid"];
 const CANCELLABLE_STATUSES: InvoiceStatus[] = ["draft", "pending", "partially_paid"];
 const DELETABLE_STATUSES: InvoiceStatus[] = ["draft", "cancelled"];
-const PAYABLE_STATUSES: InvoiceStatus[] = ["pending", "partially_paid"];
+export const PAYABLE_STATUSES: InvoiceStatus[] = ["pending", "partially_paid"];
 
 function buildCustomerSnapshot(customer: InstanceType<typeof Customer>) {
   return {
@@ -305,8 +319,9 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
 
   const conn = await connectToDatabase();
   const session = await conn.startSession();
+  let result: InvoiceWriteResult;
   try {
-    let result!: InvoiceWriteResult;
+    let txResult!: InvoiceWriteResult;
     try {
       await session.withTransaction(async () => {
         let docNumber: string | undefined;
@@ -368,16 +383,31 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
           await invoiceDoc.save({ session });
         }
 
-        result = { ok: true, invoice: invoiceDoc, payments: createdPayments };
+        txResult = { ok: true, invoice: invoiceDoc, payments: createdPayments };
       });
+      result = txResult;
     } catch (err) {
-      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
-      throw err;
+      if (err instanceof InsufficientStockError) {
+        result = { ok: false, reason: "insufficient_stock" };
+      } else {
+        throw err;
+      }
     }
-    return result;
   } finally {
     await session.endSession();
   }
+
+  if (result.ok) {
+    await fireWebhookEvent(input.businessId, "invoice.created", invoiceWebhookPayload(result.invoice));
+    if (result.payments.length > 0) {
+      await fireWebhookEvent(
+        input.businessId,
+        "invoice.payment_received",
+        invoiceWebhookPayload(result.invoice),
+      );
+    }
+  }
+  return result;
 }
 
 /** Edits a draft/pending/partially_paid invoice's header and line items; paid/cancelled invoices
@@ -436,8 +466,9 @@ export async function finalizeInvoiceDraft(
 
   const conn = await connectToDatabase();
   const session = await conn.startSession();
+  let result: InvoiceWriteResult;
   try {
-    let result!: InvoiceWriteResult;
+    let txResult!: InvoiceWriteResult;
     try {
       await session.withTransaction(async () => {
         const numbering = prepared.business.preferences?.documentNumbering;
@@ -482,17 +513,29 @@ export async function finalizeInvoiceDraft(
           await updated.save({ session });
         }
 
-        result = { ok: true, invoice: updated, payments: createdPayments };
+        txResult = { ok: true, invoice: updated, payments: createdPayments };
       });
+      result = txResult;
     } catch (err) {
-      if (err instanceof InvoiceNoLongerDraftError) return { ok: false, reason: "not_editable" };
-      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
-      throw err;
+      if (err instanceof InvoiceNoLongerDraftError) {
+        result = { ok: false, reason: "not_editable" };
+      } else if (err instanceof InsufficientStockError) {
+        result = { ok: false, reason: "insufficient_stock" };
+      } else {
+        throw err;
+      }
     }
-    return result;
   } finally {
     await session.endSession();
   }
+
+  if (result.ok) {
+    await fireWebhookEvent(businessId, "invoice.status_changed", invoiceWebhookPayload(result.invoice));
+    if (result.payments.length > 0) {
+      await fireWebhookEvent(businessId, "invoice.payment_received", invoiceWebhookPayload(result.invoice));
+    }
+  }
+  return result;
 }
 
 /** Adds payment(s) to an already-finalized invoice (as opposed to inline recording at create/finalize time). */
@@ -510,27 +553,30 @@ export async function recordInvoicePayment(
 
   const conn = await connectToDatabase();
   const session = await conn.startSession();
+  let statusChanged = false;
+  let result: InvoiceWriteResult;
   try {
     // Reassigned fresh on every invocation of the withTransaction callback (including retries
     // after a transient error), so a stale value from an earlier attempt can never leak out.
-    let result: InvoiceWriteResult = { ok: false, reason: "not_found" };
+    let txResult!: InvoiceWriteResult;
     await session.withTransaction(async () => {
       const invoice = await Invoice.findOne({ _id: invoiceId, businessId, deletedAt: { $exists: false } }).session(
         session,
       );
       if (!invoice) {
-        result = { ok: false, reason: "not_found" };
+        txResult = { ok: false, reason: "not_found" };
         return;
       }
       if (!PAYABLE_STATUSES.includes(invoice.status)) {
-        result = { ok: false, reason: "not_payable" };
+        txResult = { ok: false, reason: "not_payable" };
         return;
       }
       const paidSum = payments.reduce((s, p) => s + p.amountMinor, 0);
       if (invoice.amountPaidMinor + paidSum > invoice.grandTotalMinor) {
-        result = { ok: false, reason: "payments_exceed_total" };
+        txResult = { ok: false, reason: "payments_exceed_total" };
         return;
       }
+      const statusBefore = invoice.status;
 
       const createdPayments = [];
       for (const split of payments) {
@@ -542,14 +588,133 @@ export async function recordInvoicePayment(
       }
       invoice.amountPaidMinor += paidSum;
       invoice.status = derivePaymentStatus(invoice.grandTotalMinor, invoice.amountPaidMinor);
+      statusChanged = invoice.status !== statusBefore;
       await invoice.save({ session });
 
-      result = { ok: true, invoice, payments: createdPayments };
+      txResult = { ok: true, invoice, payments: createdPayments };
     });
-    return result;
+    result = txResult;
   } finally {
     await session.endSession();
   }
+
+  if (result.ok) {
+    await fireWebhookEvent(businessId, "invoice.payment_received", invoiceWebhookPayload(result.invoice));
+    if (statusChanged) {
+      await fireWebhookEvent(businessId, "invoice.status_changed", invoiceWebhookPayload(result.invoice));
+    }
+  }
+  return result;
+}
+
+export type RecordGatewayPaymentInput = {
+  invoiceId: string;
+  businessId: string;
+  amountMinor: number;
+  /** The gateway account's settlementBankAccountId — trusted (chosen by the business itself when
+   * connecting the gateway), unlike recordInvoicePayment's user-supplied bankAccountId, so no
+   * assertOwnedPaymentBankAccounts check is needed here. */
+  bankAccountId: string;
+  /** Razorpay's own payment id — the idempotency key. Payment.gatewayPaymentId has a unique+sparse
+   * index as a race-safety backstop behind this pre-check. */
+  gatewayPaymentId: string;
+  paymentDate: Date;
+  createdByUserId: string;
+  referenceNote?: string;
+};
+
+export type RecordGatewayPaymentResult =
+  | { ok: true; alreadyRecorded: true }
+  | { ok: true; alreadyRecorded: false; invoice: InstanceType<typeof Invoice>; payment: InstanceType<typeof Payment> }
+  | { ok: false; reason: "not_found" | "not_payable" | "payments_exceed_total" };
+
+/** The Payment Gateway (Razorpay) webhook receiver's equivalent of recordInvoicePayment — see
+ * app/api/webhooks/razorpay/route.ts. Differs in that there's no session/user to attribute the
+ * write to (the Business's own createdByUserId is used) and it must be safe to call more than
+ * once with the same gatewayPaymentId (gateway webhook delivery is at-least-once, not exactly-once). */
+export async function recordGatewayPayment(input: RecordGatewayPaymentInput): Promise<RecordGatewayPaymentResult> {
+  await connectToDatabase();
+
+  const existing = await Payment.findOne({ businessId: input.businessId, gatewayPaymentId: input.gatewayPaymentId });
+  if (existing) return { ok: true, alreadyRecorded: true };
+
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  let statusChanged = false;
+  let result: RecordGatewayPaymentResult;
+  try {
+    let txResult!: RecordGatewayPaymentResult;
+    try {
+      await session.withTransaction(async () => {
+        const invoice = await Invoice.findOne({
+          _id: input.invoiceId,
+          businessId: input.businessId,
+          deletedAt: { $exists: false },
+        }).session(session);
+        if (!invoice) {
+          txResult = { ok: false, reason: "not_found" };
+          return;
+        }
+        if (!PAYABLE_STATUSES.includes(invoice.status)) {
+          txResult = { ok: false, reason: "not_payable" };
+          return;
+        }
+        if (invoice.amountPaidMinor + input.amountMinor > invoice.grandTotalMinor) {
+          txResult = { ok: false, reason: "payments_exceed_total" };
+          return;
+        }
+        const statusBefore = invoice.status;
+
+        const [payment] = await Payment.create(
+          [
+            {
+              businessId: input.businessId,
+              partyType: "customer",
+              partyId: invoice.customerId,
+              direction: "in",
+              amountMinor: input.amountMinor,
+              mode: "other",
+              bankAccountId: input.bankAccountId,
+              paymentDate: input.paymentDate,
+              linkedDocumentType: "invoice",
+              linkedDocumentId: invoice._id,
+              referenceNote: input.referenceNote,
+              createdByUserId: input.createdByUserId,
+              source: "gateway",
+              gatewayPaymentId: input.gatewayPaymentId,
+            },
+          ],
+          { session },
+        );
+
+        invoice.amountPaidMinor += input.amountMinor;
+        invoice.status = derivePaymentStatus(invoice.grandTotalMinor, invoice.amountPaidMinor);
+        statusChanged = invoice.status !== statusBefore;
+        await invoice.save({ session });
+
+        txResult = { ok: true, alreadyRecorded: false, invoice, payment };
+      });
+      result = txResult;
+    } catch (err) {
+      // A concurrent duplicate webhook delivery raced past the pre-check above and lost — treat
+      // it the same as the pre-check catching it, not as a failure.
+      if (err instanceof Error && "code" in err && (err as { code?: number }).code === 11000) {
+        result = { ok: true, alreadyRecorded: true };
+      } else {
+        throw err;
+      }
+    }
+  } finally {
+    await session.endSession();
+  }
+
+  if (result.ok && !result.alreadyRecorded) {
+    await fireWebhookEvent(input.businessId, "invoice.payment_received", invoiceWebhookPayload(result.invoice));
+    if (statusChanged) {
+      await fireWebhookEvent(input.businessId, "invoice.status_changed", invoiceWebhookPayload(result.invoice));
+    }
+  }
+  return result;
 }
 
 /** Cancelling reverses any stock the invoice originally moved (product line items only — service
@@ -559,8 +724,9 @@ export async function cancelInvoice(invoiceId: string, businessId: string): Prom
   await connectToDatabase();
   const conn = await connectToDatabase();
   const session = await conn.startSession();
+  let result: InvoiceWriteResult;
   try {
-    let result: InvoiceWriteResult = { ok: false, reason: "not_cancellable" };
+    let txResult!: InvoiceWriteResult;
     await session.withTransaction(async () => {
       const updated = await Invoice.findOneAndUpdate(
         { _id: invoiceId, businessId, deletedAt: { $exists: false }, status: { $in: CANCELLABLE_STATUSES } },
@@ -568,7 +734,7 @@ export async function cancelInvoice(invoiceId: string, businessId: string): Prom
         { returnDocument: "after", session },
       );
       if (!updated) {
-        result = { ok: false, reason: "not_cancellable" };
+        txResult = { ok: false, reason: "not_cancellable" };
         return;
       }
 
@@ -583,12 +749,17 @@ export async function cancelInvoice(invoiceId: string, businessId: string): Prom
         createdByUserId: String(updated.createdByUserId),
       });
 
-      result = { ok: true, invoice: updated, payments: [] };
+      txResult = { ok: true, invoice: updated, payments: [] };
     });
-    return result;
+    result = txResult;
   } finally {
     await session.endSession();
   }
+
+  if (result.ok) {
+    await fireWebhookEvent(businessId, "invoice.status_changed", invoiceWebhookPayload(result.invoice));
+  }
+  return result;
 }
 
 /** Deleting a pending/partially_paid/paid invoice would corrupt a legal financial record and its

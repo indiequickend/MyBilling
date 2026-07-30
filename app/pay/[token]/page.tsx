@@ -5,8 +5,11 @@ import { findValidPaymentLinkByTokenHash } from "@/lib/db/queries/paymentLinks";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findInvoiceById } from "@/lib/db/queries/invoices";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
+import { findPaymentGatewayAccount } from "@/lib/db/queries/paymentGateway";
+import { isGatewayEnabled } from "@/lib/paymentGateway/razorpay";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { Button } from "@/components/ui/button";
 
 // Never cache a page keyed by a secret token, and never let it participate in static generation.
 export const dynamic = "force-dynamic";
@@ -39,13 +42,16 @@ export default async function PaymentLinkPage({ params }: { params: Promise<{ to
   const business = await findBusinessById(String(paymentLink.businessId));
   if (!business) return <InvalidLinkCard />;
 
-  const [invoice, bankAccounts] = await Promise.all([
+  const [invoice, bankAccounts, gatewayAccount] = await Promise.all([
     paymentLink.linkedInvoiceId
       ? findInvoiceById(String(paymentLink.linkedInvoiceId), String(paymentLink.businessId))
       : null,
     listBankAccounts(String(paymentLink.businessId), "active"),
+    findPaymentGatewayAccount(String(paymentLink.businessId)),
   ]);
   const defaultBankAccount = bankAccounts.find((a) => a.isDefault) ?? bankAccounts[0];
+  // Online collection is only offered for invoice-linked links (see PaymentLink.ts's doc comment).
+  const canPayOnline = !!paymentLink.linkedInvoiceId && isGatewayEnabled(gatewayAccount);
 
   return (
     <AuthCard title={business.brandName || business.name} subtitle="Payment request">
@@ -63,9 +69,17 @@ export default async function PaymentLinkPage({ params }: { params: Promise<{ to
 
       {paymentLink.note ? <p className="text-sm text-muted-foreground">{paymentLink.note}</p> : null}
 
+      {canPayOnline ? (
+        <form action={`/api/pay/${token}/gateway-order`} method="post">
+          <Button type="submit" className="w-full">
+            Pay online
+          </Button>
+        </form>
+      ) : null}
+
       {defaultBankAccount ? (
         <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-          <p className="mb-2 font-medium">Pay via bank transfer</p>
+          <p className="mb-2 font-medium">{canPayOnline ? "Or pay via bank transfer" : "Pay via bank transfer"}</p>
           <dl className="space-y-1 text-muted-foreground">
             <div className="flex justify-between gap-4">
               <dt>Account name</dt>

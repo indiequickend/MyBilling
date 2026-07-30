@@ -266,6 +266,10 @@ export type CreatePaymentInput = {
   linkedDocumentId: string;
   referenceNote?: string;
   createdByUserId: string;
+  /** "gateway" for Razorpay-collected Payment Link payments (see recordGatewayPayment in
+   * invoices.ts); every other caller omits this and gets the schema default of "manual". */
+  source?: "manual" | "gateway";
+  gatewayPaymentId?: string;
 };
 
 /** Callable standalone (Phase 7) or inside another write's transaction by passing `session`. */

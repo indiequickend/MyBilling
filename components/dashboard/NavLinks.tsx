@@ -27,6 +27,9 @@ import {
   UsersRound,
   Warehouse,
   Wallet,
+  KeyRound,
+  Webhook,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import type { NavGroup, NavIconKey } from "@/lib/dashboard/navigation";
@@ -58,6 +61,9 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   insights: BarChart3,
   reports: FileBarChart2,
   gst: FileCheck2,
+  apiKeys: KeyRound,
+  webhooks: Webhook,
+  paymentGateway: CreditCard,
 };
 
 function isActive(pathname: string, href: string) {

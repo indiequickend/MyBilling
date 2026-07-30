@@ -26,6 +26,12 @@ const paymentSchema = new Schema(
     referenceNote: { type: String, trim: true },
     createdByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     voidedAt: { type: Date },
+    // "gateway" for Razorpay-collected Payment Link payments (see recordGatewayPayment); "manual"
+    // (the default) for every other creation path in this file.
+    source: { type: String, enum: ["manual", "gateway"], required: true, default: "manual" },
+    // The gateway's own payment id — unique+sparse so a duplicate inbound webhook delivery (which
+    // Razorpay's own docs say to expect) can never record the same payment twice.
+    gatewayPaymentId: { type: String },
   },
   { timestamps: true },
 );
@@ -33,6 +39,7 @@ const paymentSchema = new Schema(
 paymentSchema.index({ businessId: 1, linkedDocumentType: 1, linkedDocumentId: 1 });
 paymentSchema.index({ businessId: 1, partyType: 1, partyId: 1, paymentDate: -1 });
 paymentSchema.index({ businessId: 1, bankAccountId: 1 });
+paymentSchema.index({ gatewayPaymentId: 1 }, { unique: true, sparse: true });
 
 export type PaymentDoc = InferSchemaType<typeof paymentSchema>;
 
