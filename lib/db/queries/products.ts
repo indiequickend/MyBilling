@@ -58,6 +58,15 @@ export async function searchProductsForInvoice(businessId: string, query: string
   return Product.find(filter).sort({ name: 1 }).limit(limit).lean();
 }
 
+/** Batch lookup for hydrating a document's existing line items with stock-tracking metadata
+ * (warehouse/batch/serial pickers) when loading an edit form — e.g. Invoice/Purchase edit pages. */
+export async function findProductsByIds(productIds: string[], businessId: string) {
+  await connectToDatabase();
+  const unique = [...new Set(productIds)];
+  if (unique.length === 0) return [];
+  return Product.find({ _id: { $in: unique }, businessId }).lean();
+}
+
 /** Ownership check: is `productId` a non-deleted product belonging to `businessId`? */
 export async function isOwnedProduct(productId: string, businessId: string): Promise<boolean> {
   await connectToDatabase();
@@ -79,6 +88,15 @@ export type ProductVariantInput = {
 
 export type ProductPriceOverrideInput = { priceListId: string; priceMinor: number };
 
+export type ProductBatchInput = { batchNumber: string; expiryDate?: Date };
+
+export type ProductStockTrackingInput = {
+  enabled: boolean;
+  batchTracked: boolean;
+  serialTracked: boolean;
+  reorderLevel?: number;
+};
+
 export type ProductInput = {
   businessId: string;
   name: string;
@@ -95,6 +113,8 @@ export type ProductInput = {
   images?: Array<{ publicId: string; url: string }>;
   variants?: ProductVariantInput[];
   priceOverrides?: ProductPriceOverrideInput[];
+  stockTracking?: ProductStockTrackingInput;
+  batches?: ProductBatchInput[];
 };
 
 export type ProductWriteResult =
@@ -102,7 +122,33 @@ export type ProductWriteResult =
   | { ok: false; reason: "invalid_category" }
   | { ok: false; reason: "invalid_group" }
   | { ok: false; reason: "invalid_price_lists" }
+  | { ok: false; reason: "invalid_stock_tracking" }
   | { ok: false; reason: "not_found" };
+
+/**
+ * A product is either batch-tracked or serial-tracked, never both, and service items never track
+ * stock at all — enforced here (not in the schema) since it depends on the sibling `type` field,
+ * which a schema-level rule can't see during a partial `$set` update.
+ */
+function normalizeStockTracking(
+  type: "product" | "service",
+  stockTracking?: ProductStockTrackingInput,
+  batches?: ProductBatchInput[],
+): { ok: true; stockTracking?: ProductStockTrackingInput; batches?: ProductBatchInput[] } | { ok: false } {
+  if (type === "service") {
+    return { ok: true, stockTracking: { enabled: false, batchTracked: false, serialTracked: false }, batches: [] };
+  }
+  if (stockTracking?.batchTracked && stockTracking?.serialTracked) {
+    return { ok: false };
+  }
+  return {
+    ok: true,
+    stockTracking,
+    // Only force-clear batches when stockTracking was actually part of this write and says
+    // batch-tracking is off; if stockTracking wasn't touched at all, leave batches as given.
+    batches: stockTracking && !stockTracking.batchTracked ? [] : batches,
+  };
+}
 
 /**
  * Verifies categoryId/groupId/priceOverrides[].priceListId all belong to this
@@ -142,7 +188,14 @@ export async function createProduct(input: ProductInput): Promise<ProductWriteRe
   const check = await assertOwnedReferences(input);
   if (!check.ok) return check;
 
-  const product = await Product.create(input);
+  const normalized = normalizeStockTracking(input.type, input.stockTracking, input.batches);
+  if (!normalized.ok) return { ok: false, reason: "invalid_stock_tracking" };
+
+  const product = await Product.create({
+    ...input,
+    stockTracking: normalized.stockTracking,
+    batches: normalized.batches,
+  });
   return { ok: true, product };
 }
 
@@ -155,9 +208,19 @@ export async function updateProduct(
   const check = await assertOwnedReferences({ businessId, ...updates });
   if (!check.ok) return check;
 
+  let normalizedUpdates: Partial<Omit<ProductInput, "businessId">> = updates;
+  if (updates.type || updates.stockTracking || updates.batches) {
+    const existing = await Product.findOne({ _id: productId, businessId }).lean();
+    if (!existing) return { ok: false, reason: "not_found" };
+    const type = updates.type ?? existing.type;
+    const normalized = normalizeStockTracking(type, updates.stockTracking, updates.batches);
+    if (!normalized.ok) return { ok: false, reason: "invalid_stock_tracking" };
+    normalizedUpdates = { ...updates, stockTracking: normalized.stockTracking, batches: normalized.batches };
+  }
+
   const product = await Product.findOneAndUpdate(
     { _id: productId, businessId },
-    { $set: updates },
+    { $set: normalizedUpdates },
     { returnDocument: "after" },
   );
   if (!product) return { ok: false, reason: "not_found" };

@@ -22,6 +22,32 @@ export const priceOverrideSchema = z.object({
 
 export const productVariantsSchema = z.array(productVariantSchema).max(200);
 
+export const productBatchSchema = z.object({
+  batchNumber: z.string().trim().min(1, "Batch number is required").max(100),
+  expiryDate: optionalTrimmed(30),
+});
+export type ProductBatchInput = z.infer<typeof productBatchSchema>;
+
+export const productBatchesSchema = z.array(productBatchSchema).max(500);
+
+export const productStockTrackingSchema = z
+  .object({
+    enabled: z.boolean(),
+    batchTracked: z.boolean(),
+    serialTracked: z.boolean(),
+    reorderLevel: z.coerce.number().min(0).optional().or(z.literal("").transform(() => undefined)),
+  })
+  .superRefine((data, ctx) => {
+    if (data.batchTracked && data.serialTracked) {
+      ctx.addIssue({
+        code: "custom",
+        message: "A product can be batch-tracked or serial-tracked, not both",
+        path: ["batchTracked"],
+      });
+    }
+  });
+export type ProductStockTrackingInput = z.infer<typeof productStockTrackingSchema>;
+
 export const priceOverridesSchema = z.array(priceOverrideSchema).superRefine((overrides, ctx) => {
   const seen = new Set<string>();
   for (const [i, o] of overrides.entries()) {
@@ -50,6 +76,8 @@ export const productSchema = z.object({
   barcode: optionalTrimmed(100),
   variants: productVariantsSchema.default([]),
   priceOverrides: priceOverridesSchema.default([]),
+  stockTracking: productStockTrackingSchema.default({ enabled: false, batchTracked: false, serialTracked: false }),
+  batches: productBatchesSchema.default([]),
 }).superRefine((data, ctx) => {
   // Selling price is only optional when variants supply their own prices instead.
   if (data.variants.length === 0 && data.sellingPriceMinor === undefined) {

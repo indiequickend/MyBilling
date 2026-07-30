@@ -58,6 +58,7 @@ const REASON_MESSAGES: Record<InvoiceWriteFailureReason, string> = {
   not_deletable: "Only draft or cancelled invoices can be deleted.",
   not_payable: "This invoice isn't awaiting payment.",
   no_payments: "Enter at least one payment.",
+  insufficient_stock: "One of the line items doesn't have enough stock available.",
 };
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -82,6 +83,9 @@ function parseLineItemRows(formData: FormData) {
     discountType: row.discountType,
     discountValue: row.discountValue,
     taxRatePercent: row.taxRatePercent,
+    warehouseId: row.warehouseId || undefined,
+    batchId: row.batchId || undefined,
+    serialNumbersText: row.serialNumbersText || undefined,
   }));
 }
 

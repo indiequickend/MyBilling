@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DISCOUNT_TARGETS } from "@/lib/constants/invoices";
 import { PAYMENT_MODES } from "@/lib/constants/payments";
 import { objectId, optionalTrimmed, rupeesToMinorUnits } from "@/lib/validation/shared";
+import { parseSerialNumbersText } from "@/lib/validation/inventory";
 
 const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
 
@@ -50,12 +51,21 @@ const rawPurchaseLineItemSchema = z.object({
   discountValue: z.union([z.string(), z.number()]),
   taxRatePercent: z.coerce.number().min(0).max(100),
   itcEligible: z.boolean().default(true),
+  // Stock-tracked products only — see lib/db/queries/stockLedger.ts's writeDocumentStockMovements.
+  warehouseId: optionalObjectId,
+  batchId: optionalObjectId,
+  serialNumbersText: optionalTrimmed(5000),
 });
 
-export const purchaseLineItemSchema = rawPurchaseLineItemSchema.transform((val, ctx) => ({
-  ...val,
-  discountValue: normalizeDiscountValue(val.discountType, val.discountValue, ctx),
-}));
+export const purchaseLineItemSchema = rawPurchaseLineItemSchema.transform((val, ctx) => {
+  const { serialNumbersText, ...rest } = val;
+  const serialNumbers = serialNumbersText ? parseSerialNumbersText(serialNumbersText) : undefined;
+  return {
+    ...rest,
+    discountValue: normalizeDiscountValue(val.discountType, val.discountValue, ctx),
+    serialNumbers,
+  };
+});
 export type PurchaseLineItemInput = z.infer<typeof purchaseLineItemSchema>;
 
 export const purchaseLineItemsSchema = z.array(purchaseLineItemSchema).min(1, "Add at least one line item");

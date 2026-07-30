@@ -5,8 +5,11 @@ import { findPurchaseById } from "@/lib/db/queries/purchases";
 import { listVendors } from "@/lib/db/queries/vendors";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
+import { listWarehouses } from "@/lib/db/queries/warehouses";
 import { findBusinessById } from "@/lib/db/queries/businesses";
+import { findProductsByIds } from "@/lib/db/queries/products";
 import { minorToRupeesString } from "@/lib/utils/money";
+import { hydrateLineItemsStockInfo } from "@/lib/documents/stockLineItems";
 import { PurchaseForm } from "../../PurchaseForm";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
 
@@ -28,11 +31,12 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
     redirect(`/purchases/${id}`);
   }
 
-  const [vendors, bankAccounts, noteTemplates, termTemplates, business] = await Promise.all([
+  const [vendors, bankAccounts, noteTemplates, termTemplates, warehouses, business] = await Promise.all([
     listVendors(context.activeBusinessId, { pageSize: 500 }),
     listBankAccounts(context.activeBusinessId, "active"),
     listNoteTermTemplates(context.activeBusinessId, { docType: "purchase", kind: "note", tab: "active" }),
     listNoteTermTemplates(context.activeBusinessId, { docType: "purchase", kind: "term", tab: "active" }),
+    listWarehouses(context.activeBusinessId, "active"),
     findBusinessById(context.activeBusinessId),
   ]);
   if (!business) redirect("/");
@@ -46,7 +50,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
     required: d.required,
   }));
 
-  const lineItems: LineItemRow[] = purchase.lineItems.map((li) => ({
+  const rawLineItems: LineItemRow[] = purchase.lineItems.map((li) => ({
     productId: li.productId ? String(li.productId) : "",
     variantId: li.variantId ? String(li.variantId) : "",
     description: li.description,
@@ -61,6 +65,11 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
     taxRatePercent: String(li.taxRatePercent),
     itcEligible: li.itcEligible,
   }));
+  const lineItemProducts = await findProductsByIds(
+    purchase.lineItems.filter((li) => li.productId).map((li) => String(li.productId)),
+    context.activeBusinessId,
+  );
+  const lineItems = hydrateLineItemsStockInfo(rawLineItems, purchase.lineItems, lineItemProducts);
 
   return (
     <div>
@@ -76,6 +85,12 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
         bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}
+        defaultWarehouseId={
+          business.preferences.productsInventory.inventory.defaultWarehouseId
+            ? String(business.preferences.productsInventory.inventory.defaultWarehouseId)
+            : undefined
+        }
         customFieldDefs={fieldDefs}
         businessState={businessState}
         trackItcEligibility={business.preferences.document.purchases.trackItcEligibility}

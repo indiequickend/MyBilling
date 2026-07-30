@@ -18,18 +18,34 @@ export async function GET(request: Request) {
       // "Darjeeling Homestay MAP") instead of one result for the bare product, since
       // the bare product has no sellable price/HSN of its own in that case.
       products: products.flatMap((p) => {
+        const stockTracking = {
+          enabled: p.stockTracking?.enabled ?? false,
+          batchTracked: p.stockTracking?.batchTracked ?? false,
+          serialTracked: p.stockTracking?.serialTracked ?? false,
+        };
+        const batches = (p.batches ?? [])
+          .filter((b) => !b.deletedAt)
+          .map((b) => ({
+            id: String(b._id),
+            label: b.expiryDate
+              ? `${b.batchNumber} (exp. ${new Date(b.expiryDate).toLocaleDateString()})`
+              : b.batchNumber,
+          }));
         if (p.variants.length === 0) {
           return [
             {
               id: String(p._id),
               variantId: "",
               name: p.name,
+              type: p.type,
               hsnOrSac: p.hsnOrSac ?? "",
               unit: p.unit ?? "PCS",
               sellingPriceMinor: p.sellingPriceMinor ?? 0,
               priceIsTaxInclusive: p.priceIsTaxInclusive,
               taxRatePercent: p.taxRatePercent,
               barcode: p.barcode ?? "",
+              stockTracking,
+              batches,
             },
           ];
         }
@@ -37,12 +53,15 @@ export async function GET(request: Request) {
           id: String(p._id),
           variantId: String(v._id),
           name: `${p.name} ${v.name}`,
+          type: p.type,
           hsnOrSac: p.hsnOrSac ?? "",
           unit: p.unit ?? "PCS",
           sellingPriceMinor: v.sellingPriceOverrideMinor ?? p.sellingPriceMinor ?? 0,
           priceIsTaxInclusive: p.priceIsTaxInclusive,
           taxRatePercent: p.taxRatePercent,
           barcode: v.barcode ?? p.barcode ?? "",
+          stockTracking,
+          batches,
         }));
       }),
     });

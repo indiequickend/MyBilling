@@ -4,6 +4,7 @@ import { can } from "@/lib/rbac/can";
 import { listVendors } from "@/lib/db/queries/vendors";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
+import { listWarehouses } from "@/lib/db/queries/warehouses";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findPurchaseOrderById } from "@/lib/db/queries/purchaseOrders";
 import { mapLineItemsForConversion, extractConvertibleHeader } from "@/lib/documents/conversion";
@@ -24,11 +25,12 @@ export default async function NewPurchasePage({
     return <p className="text-sm text-destructive">You don&apos;t have permission to create purchases.</p>;
   }
 
-  const [vendors, bankAccounts, noteTemplates, termTemplates, business] = await Promise.all([
+  const [vendors, bankAccounts, noteTemplates, termTemplates, warehouses, business] = await Promise.all([
     listVendors(context.activeBusinessId, { pageSize: 500 }),
     listBankAccounts(context.activeBusinessId, "active"),
     listNoteTermTemplates(context.activeBusinessId, { docType: "purchase", kind: "note", tab: "active" }),
     listNoteTermTemplates(context.activeBusinessId, { docType: "purchase", kind: "term", tab: "active" }),
+    listWarehouses(context.activeBusinessId, "active"),
     findBusinessById(context.activeBusinessId),
   ]);
   if (!business) redirect("/");
@@ -78,6 +80,12 @@ export default async function NewPurchasePage({
         bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}
+        defaultWarehouseId={
+          business.preferences.productsInventory.inventory.defaultWarehouseId
+            ? String(business.preferences.productsInventory.inventory.defaultWarehouseId)
+            : undefined
+        }
         customFieldDefs={fieldDefs}
         businessState={businessState}
         trackItcEligibility={purchasePrefs.trackItcEligibility}

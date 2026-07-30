@@ -67,6 +67,8 @@ export function PurchaseForm({
   bankAccounts,
   noteTemplates,
   termTemplates,
+  warehouses,
+  defaultWarehouseId,
   customFieldDefs,
   businessState,
   trackItcEligibility,
@@ -79,6 +81,8 @@ export function PurchaseForm({
   bankAccounts: Array<{ id: string; name: string }>;
   noteTemplates: Array<{ id: string; label: string }>;
   termTemplates: Array<{ id: string; label: string }>;
+  warehouses: Array<{ id: string; name: string }>;
+  defaultWarehouseId?: string;
   customFieldDefs: Array<{
     key: string;
     label: string;
@@ -229,6 +233,8 @@ export function PurchaseForm({
             businessState={businessState}
             placeOfSupplyState={placeOfSupplyState}
             trackItcEligibility={trackItcEligibility}
+            warehouses={warehouses}
+            defaultWarehouseId={defaultWarehouseId}
           />
         </CardContent>
       </Card>

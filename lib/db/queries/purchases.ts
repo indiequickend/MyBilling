@@ -9,6 +9,11 @@ import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
 import { createPayment, type CreatePaymentInput } from "@/lib/db/queries/payments";
+import {
+  writeDocumentStockMovements,
+  InsufficientStockError,
+  type DocumentStockLineItem,
+} from "@/lib/db/queries/stockLedger";
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, derivePaymentStatus, type LineItemCalcInput } from "@/lib/documents/calc";
@@ -30,6 +35,11 @@ export type PurchaseLineItemWriteInput = {
   taxRatePercent: number;
   /** Only honored when the business's trackItcEligibility preference is on; forced false otherwise. */
   itcEligible?: boolean;
+  /** Only meaningful (and required by the API boundary) when productId resolves to a
+   * stock-tracked product — see writeDocumentStockMovements. */
+  warehouseId?: string;
+  batchId?: string;
+  serialNumbers?: string[];
 };
 
 export type PurchasePaymentSplitWriteInput = {
@@ -82,7 +92,8 @@ export type PurchaseWriteFailureReason =
   | "not_cancellable"
   | "not_deletable"
   | "not_payable"
-  | "no_payments";
+  | "no_payments"
+  | "insufficient_stock";
 
 export type PurchaseWriteResult =
   | { ok: true; purchase: InstanceType<typeof Purchase>; payments: InstanceType<typeof Payment>[] }
@@ -191,6 +202,9 @@ async function preparePurchaseWrite(
     taxableAmountMinor: totals.lineItems[i].taxableAmountMinor,
     totalMinor: totals.lineItems[i].totalMinor,
     itcEligible: trackItcEligibility ? (li.itcEligible ?? true) : false,
+    warehouseId: li.warehouseId ? new mongoose.Types.ObjectId(li.warehouseId) : undefined,
+    batchId: li.batchId ? new mongoose.Types.ObjectId(li.batchId) : undefined,
+    serialNumbers: li.serialNumbers,
   })) as PurchaseLineItemDoc[];
 
   return { ok: true, vendor: ownership.vendor, business, totals, lineItemDocs };
@@ -283,55 +297,73 @@ export async function createPurchase(input: CreatePurchaseInput): Promise<Purcha
   const session = await conn.startSession();
   try {
     let result!: PurchaseWriteResult;
-    await session.withTransaction(async () => {
-      let docNumber: string | undefined;
-      let seriesKey: string | undefined;
-      if (input.finalize) {
-        const numbering = prepared.business.preferences?.documentNumbering;
-        const config = resolveNumberingConfig(numbering, "purchase");
-        seriesKey = resolveSeriesKey(input.purchaseDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
-        const number = await reserveNextDocumentNumber(input.businessId, "purchase", seriesKey, session);
-        docNumber = formatDocumentNumber(config, seriesKey, number);
-      }
-
-      const [purchaseDoc] = await Purchase.create(
-        [
-          {
-            businessId: input.businessId,
-            ...buildPurchaseSetFields(input, prepared),
-            docNumber,
-            seriesKey,
-            status: input.finalize ? "pending" : "draft",
-            amountPaidMinor: 0,
-            createdByUserId: input.createdByUserId,
-          },
-        ],
-        { session },
-      );
-
-      const createdPayments = [];
-      if (input.finalize && input.payments?.length) {
-        for (const split of input.payments) {
-          const payment = await createPayment(
-            toCreatePaymentInput(
-              input.businessId,
-              prepared.vendor._id,
-              purchaseDoc._id,
-              split,
-              input.createdByUserId,
-            ),
-            session,
-          );
-          createdPayments.push(payment);
+    try {
+      await session.withTransaction(async () => {
+        let docNumber: string | undefined;
+        let seriesKey: string | undefined;
+        if (input.finalize) {
+          const numbering = prepared.business.preferences?.documentNumbering;
+          const config = resolveNumberingConfig(numbering, "purchase");
+          seriesKey = resolveSeriesKey(input.purchaseDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+          const number = await reserveNextDocumentNumber(input.businessId, "purchase", seriesKey, session);
+          docNumber = formatDocumentNumber(config, seriesKey, number);
         }
-        const paidMinor = createdPayments.reduce((s, p) => s + p.amountMinor, 0);
-        purchaseDoc.amountPaidMinor = paidMinor;
-        purchaseDoc.status = derivePaymentStatus(purchaseDoc.grandTotalMinor, paidMinor);
-        await purchaseDoc.save({ session });
-      }
 
-      result = { ok: true, purchase: purchaseDoc, payments: createdPayments };
-    });
+        const [purchaseDoc] = await Purchase.create(
+          [
+            {
+              businessId: input.businessId,
+              ...buildPurchaseSetFields(input, prepared),
+              docNumber,
+              seriesKey,
+              status: input.finalize ? "pending" : "draft",
+              amountPaidMinor: 0,
+              createdByUserId: input.createdByUserId,
+            },
+          ],
+          { session },
+        );
+
+        if (input.finalize) {
+          await writeDocumentStockMovements(session, {
+            businessId: input.businessId,
+            lineItems: purchaseDoc.lineItems as DocumentStockLineItem[],
+            direction: "in",
+            reason: "purchase",
+            refDocumentType: "purchase",
+            refDocumentId: String(purchaseDoc._id),
+            refDocumentNumber: docNumber,
+            createdByUserId: input.createdByUserId,
+          });
+        }
+
+        const createdPayments = [];
+        if (input.finalize && input.payments?.length) {
+          for (const split of input.payments) {
+            const payment = await createPayment(
+              toCreatePaymentInput(
+                input.businessId,
+                prepared.vendor._id,
+                purchaseDoc._id,
+                split,
+                input.createdByUserId,
+              ),
+              session,
+            );
+            createdPayments.push(payment);
+          }
+          const paidMinor = createdPayments.reduce((s, p) => s + p.amountMinor, 0);
+          purchaseDoc.amountPaidMinor = paidMinor;
+          purchaseDoc.status = derivePaymentStatus(purchaseDoc.grandTotalMinor, paidMinor);
+          await purchaseDoc.save({ session });
+        }
+
+        result = { ok: true, purchase: purchaseDoc, payments: createdPayments };
+      });
+    } catch (err) {
+      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
+      throw err;
+    }
     return result;
   } finally {
     await session.endSession();
@@ -414,6 +446,17 @@ export async function finalizePurchaseDraft(
         // rather than being silently burned.
         if (!updated) throw new PurchaseNoLongerDraftError();
 
+        await writeDocumentStockMovements(session, {
+          businessId,
+          lineItems: updated.lineItems as DocumentStockLineItem[],
+          direction: "in",
+          reason: "purchase",
+          refDocumentType: "purchase",
+          refDocumentId: String(updated._id),
+          refDocumentNumber: docNumber,
+          createdByUserId,
+        });
+
         const createdPayments = [];
         if (payments?.length) {
           for (const split of payments) {
@@ -433,6 +476,7 @@ export async function finalizePurchaseDraft(
       });
     } catch (err) {
       if (err instanceof PurchaseNoLongerDraftError) return { ok: false, reason: "not_editable" };
+      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
       throw err;
     }
     return result;
@@ -498,15 +542,49 @@ export async function recordPurchasePayment(
   }
 }
 
+/** Cancelling reverses any stock the purchase originally moved in (product line items only). If
+ * that stock has already been partly sold/moved elsewhere, the reversal would drive a balance
+ * negative and is rejected with "insufficient_stock" — cancelling a purchase can't retroactively
+ * claw back stock that's already gone. Transactional so the status flip and reversal land together. */
 export async function cancelPurchase(purchaseId: string, businessId: string): Promise<PurchaseWriteResult> {
   await connectToDatabase();
-  const updated = await Purchase.findOneAndUpdate(
-    { _id: purchaseId, businessId, deletedAt: { $exists: false }, status: { $in: CANCELLABLE_STATUSES } },
-    { $set: { status: "cancelled" } },
-    { returnDocument: "after" },
-  );
-  if (!updated) return { ok: false, reason: "not_cancellable" };
-  return { ok: true, purchase: updated, payments: [] };
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  try {
+    let result: PurchaseWriteResult = { ok: false, reason: "not_cancellable" };
+    try {
+      await session.withTransaction(async () => {
+        const updated = await Purchase.findOneAndUpdate(
+          { _id: purchaseId, businessId, deletedAt: { $exists: false }, status: { $in: CANCELLABLE_STATUSES } },
+          { $set: { status: "cancelled" } },
+          { returnDocument: "after", session },
+        );
+        if (!updated) {
+          result = { ok: false, reason: "not_cancellable" };
+          return;
+        }
+
+        await writeDocumentStockMovements(session, {
+          businessId,
+          lineItems: updated.lineItems as DocumentStockLineItem[],
+          direction: "out",
+          reason: "purchase_cancelled",
+          refDocumentType: "purchase",
+          refDocumentId: String(updated._id),
+          refDocumentNumber: updated.docNumber,
+          createdByUserId: String(updated.createdByUserId),
+        });
+
+        result = { ok: true, purchase: updated, payments: [] };
+      });
+    } catch (err) {
+      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
+      throw err;
+    }
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }
 
 /** Deleting a pending/partially_paid/paid purchase would corrupt a legal financial record and its

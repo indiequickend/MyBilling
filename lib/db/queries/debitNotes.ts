@@ -9,6 +9,11 @@ import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, type LineItemCalcInput } from "@/lib/documents/calc";
+import {
+  writeDocumentStockMovements,
+  InsufficientStockError,
+  type DocumentStockLineItem,
+} from "@/lib/db/queries/stockLedger";
 import type { DiscountTarget } from "@/lib/constants/invoices";
 
 export type DebitNoteLineItemWriteInput = {
@@ -23,6 +28,11 @@ export type DebitNoteLineItemWriteInput = {
   discountType: "amount" | "percentage";
   discountValue: number;
   taxRatePercent: number;
+  /** Only meaningful (and required by the API boundary) when productId resolves to a
+   * stock-tracked product, and only actually written when the header's restockItems is on. */
+  warehouseId?: string;
+  batchId?: string;
+  serialNumbers?: string[];
 };
 
 export type DebitNoteWriteInput = {
@@ -30,6 +40,9 @@ export type DebitNoteWriteInput = {
   linkedPurchaseId: string;
   debitNoteDate: Date;
   reason?: string;
+  /** Opt-in: removes product line items from stock when true. A debit note doesn't always
+   * represent a physical return to the vendor (e.g. a price-only adjustment), so this defaults off. */
+  restockItems?: boolean;
   placeOfSupplyState: string;
   lineItems: DebitNoteLineItemWriteInput[];
   discountType: "amount" | "percentage";
@@ -48,7 +61,8 @@ export type DebitNoteWriteFailureReason =
   | "business_not_found"
   | "not_found"
   | "not_cancellable"
-  | "not_deletable";
+  | "not_deletable"
+  | "insufficient_stock";
 
 export type DebitNoteWriteResult =
   | { ok: true; debitNote: InstanceType<typeof DebitNote> }
@@ -122,57 +136,79 @@ export async function createDebitNote(input: CreateDebitNoteInput): Promise<Debi
     igstMinor: totals.lineItems[i].igstMinor,
     taxableAmountMinor: totals.lineItems[i].taxableAmountMinor,
     totalMinor: totals.lineItems[i].totalMinor,
+    warehouseId: li.warehouseId ? new mongoose.Types.ObjectId(li.warehouseId) : undefined,
+    batchId: li.batchId ? new mongoose.Types.ObjectId(li.batchId) : undefined,
+    serialNumbers: li.serialNumbers,
   })) as DebitNoteLineItemDoc[];
 
   const conn = await connectToDatabase();
   const session = await conn.startSession();
   try {
     let result!: DebitNoteWriteResult;
-    await session.withTransaction(async () => {
-      let docNumber: string | undefined;
-      let seriesKey: string | undefined;
-      if (input.finalize) {
-        const numbering = business.preferences?.documentNumbering;
-        const config = resolveNumberingConfig(numbering, "debit_note");
-        seriesKey = resolveSeriesKey(input.debitNoteDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
-        const number = await reserveNextDocumentNumber(input.businessId, "debit_note", seriesKey, session);
-        docNumber = formatDocumentNumber(config, seriesKey, number);
-      }
+    try {
+      await session.withTransaction(async () => {
+        let docNumber: string | undefined;
+        let seriesKey: string | undefined;
+        if (input.finalize) {
+          const numbering = business.preferences?.documentNumbering;
+          const config = resolveNumberingConfig(numbering, "debit_note");
+          seriesKey = resolveSeriesKey(input.debitNoteDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+          const number = await reserveNextDocumentNumber(input.businessId, "debit_note", seriesKey, session);
+          docNumber = formatDocumentNumber(config, seriesKey, number);
+        }
 
-      const [debitNoteDoc] = await DebitNote.create(
-        [
-          {
+        const [debitNoteDoc] = await DebitNote.create(
+          [
+            {
+              businessId: input.businessId,
+              vendorId: vendor._id,
+              vendorSnapshot: buildVendorSnapshot(vendor),
+              linkedPurchaseId: purchase._id,
+              docNumber,
+              seriesKey,
+              status: input.finalize ? "issued" : "draft",
+              debitNoteDate: input.debitNoteDate,
+              reason: input.reason,
+              restockItems: input.restockItems ?? false,
+              placeOfSupplyState: input.placeOfSupplyState,
+              lineItems: lineItemDocs,
+              discountType: input.discountType,
+              discountValue: input.discountValue,
+              discountTarget: input.discountTarget,
+              discountAmountMinor: totals.discountAmountMinor,
+              roundOff: input.roundOff,
+              roundOffAmountMinor: totals.roundOffAmountMinor,
+              subtotalMinor: totals.subtotalMinor,
+              totalTaxMinor: totals.totalTaxMinor,
+              totalCgstMinor: totals.totalCgstMinor,
+              totalSgstMinor: totals.totalSgstMinor,
+              totalIgstMinor: totals.totalIgstMinor,
+              grandTotalMinor: totals.grandTotalMinor,
+              createdByUserId: input.createdByUserId,
+            },
+          ],
+          { session },
+        );
+
+        if (input.finalize && input.restockItems) {
+          await writeDocumentStockMovements(session, {
             businessId: input.businessId,
-            vendorId: vendor._id,
-            vendorSnapshot: buildVendorSnapshot(vendor),
-            linkedPurchaseId: purchase._id,
-            docNumber,
-            seriesKey,
-            status: input.finalize ? "issued" : "draft",
-            debitNoteDate: input.debitNoteDate,
-            reason: input.reason,
-            placeOfSupplyState: input.placeOfSupplyState,
-            lineItems: lineItemDocs,
-            discountType: input.discountType,
-            discountValue: input.discountValue,
-            discountTarget: input.discountTarget,
-            discountAmountMinor: totals.discountAmountMinor,
-            roundOff: input.roundOff,
-            roundOffAmountMinor: totals.roundOffAmountMinor,
-            subtotalMinor: totals.subtotalMinor,
-            totalTaxMinor: totals.totalTaxMinor,
-            totalCgstMinor: totals.totalCgstMinor,
-            totalSgstMinor: totals.totalSgstMinor,
-            totalIgstMinor: totals.totalIgstMinor,
-            grandTotalMinor: totals.grandTotalMinor,
+            lineItems: debitNoteDoc.lineItems as DocumentStockLineItem[],
+            direction: "out",
+            reason: "debit_note",
+            refDocumentType: "debit_note",
+            refDocumentId: String(debitNoteDoc._id),
+            refDocumentNumber: docNumber,
             createdByUserId: input.createdByUserId,
-          },
-        ],
-        { session },
-      );
+          });
+        }
 
-      result = { ok: true, debitNote: debitNoteDoc };
-    });
+        result = { ok: true, debitNote: debitNoteDoc };
+      });
+    } catch (err) {
+      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
+      throw err;
+    }
     return result;
   } finally {
     await session.endSession();

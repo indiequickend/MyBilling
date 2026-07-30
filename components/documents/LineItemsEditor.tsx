@@ -22,6 +22,16 @@ export type LineItemRow = {
   taxRatePercent: string;
   /** Purchases-only, gated by the business's trackItcEligibility preference; unused by Invoice. */
   itcEligible?: boolean;
+  /** Stock fields — only meaningful (and only rendered) when the row's product is stock-tracked.
+   * warehouseId/batchId/serialNumbersText are the actual submitted values; the rest are
+   * client-only display metadata copied from the product search result, never submitted. */
+  warehouseId?: string;
+  batchId?: string;
+  serialNumbersText?: string;
+  stockTrackingEnabled?: boolean;
+  batchTracked?: boolean;
+  serialTracked?: boolean;
+  availableBatches?: Array<{ id: string; label: string }>;
 };
 
 export const BLANK_LINE_ITEM: LineItemRow = {
@@ -37,18 +47,28 @@ export const BLANK_LINE_ITEM: LineItemRow = {
   discountValue: "0",
   taxRatePercent: "0",
   itcEligible: true,
+  warehouseId: "",
+  batchId: "",
+  serialNumbersText: "",
+  stockTrackingEnabled: false,
+  batchTracked: false,
+  serialTracked: false,
+  availableBatches: [],
 };
 
 type ProductSearchResult = {
   id: string;
   variantId: string;
   name: string;
+  type: "product" | "service";
   hsnOrSac: string;
   unit: string;
   sellingPriceMinor: number;
   priceIsTaxInclusive: boolean;
   taxRatePercent: number;
   barcode: string;
+  stockTracking: { enabled: boolean; batchTracked: boolean; serialTracked: boolean };
+  batches: Array<{ id: string; label: string }>;
 };
 
 const fieldClass =
@@ -71,7 +91,11 @@ function rowPreviewTotal(row: LineItemRow, businessState: string, placeOfSupplyS
   return minorToRupeesString(result.totalMinor);
 }
 
-function productToLineItem(product: ProductSearchResult, quantity: string): LineItemRow {
+function productToLineItem(
+  product: ProductSearchResult,
+  quantity: string,
+  defaultWarehouseId?: string,
+): LineItemRow {
   return {
     ...BLANK_LINE_ITEM,
     productId: product.id,
@@ -86,6 +110,11 @@ function productToLineItem(product: ProductSearchResult, quantity: string): Line
         ? Math.round((product.sellingPriceMinor * 100) / (100 + product.taxRatePercent))
         : product.sellingPriceMinor,
     ),
+    warehouseId: product.stockTracking.enabled ? (defaultWarehouseId ?? "") : "",
+    stockTrackingEnabled: product.stockTracking.enabled,
+    batchTracked: product.stockTracking.batchTracked,
+    serialTracked: product.stockTracking.serialTracked,
+    availableBatches: product.batches,
   };
 }
 
@@ -162,12 +191,17 @@ export function LineItemsEditor({
   businessState,
   placeOfSupplyState,
   trackItcEligibility = false,
+  warehouses = [],
+  defaultWarehouseId,
 }: {
   defaultRows: LineItemRow[];
   businessState: string;
   placeOfSupplyState: string;
   /** Purchases-only: shows a per-line ITC-eligible checkbox (default checked) when true. */
   trackItcEligibility?: boolean;
+  /** When empty, no stock-tracked product can be added yet — the business has no warehouse. */
+  warehouses?: Array<{ id: string; name: string }>;
+  defaultWarehouseId?: string;
 }) {
   const [rows, setRows] = useState<LineItemRow[]>(defaultRows);
   const [stagingProduct, setStagingProduct] = useState<ProductSearchResult | null>(null);
@@ -184,7 +218,7 @@ export function LineItemsEditor({
     const trimmedText = stagingText.trim();
     if (!stagingProduct && !trimmedText) return;
     const newRow = stagingProduct
-      ? productToLineItem(stagingProduct, stagingQuantity || "1")
+      ? productToLineItem(stagingProduct, stagingQuantity || "1", defaultWarehouseId)
       : { ...BLANK_LINE_ITEM, description: trimmedText, quantity: stagingQuantity || "1" };
     setRows((prev) => [...prev, newRow]);
     setStagingProduct(null);
@@ -407,6 +441,75 @@ export function LineItemsEditor({
                     <tr className="hidden">
                       <td>
                         <input type="hidden" name={`lineItem__${i}__notes`} value={row.notes} />
+                      </td>
+                    </tr>
+                  )}
+                  {row.stockTrackingEnabled ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={columnCount} className="whitespace-normal bg-accent-mint/20">
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <div>
+                            <label className="mb-1 block text-xs text-muted-foreground">Warehouse</label>
+                            <select
+                              name={`lineItem__${i}__warehouseId`}
+                              value={row.warehouseId}
+                              onChange={(e) => update(i, { warehouseId: e.target.value })}
+                              required
+                              className={fieldClass}
+                            >
+                              <option value="">Select warehouse…</option>
+                              {warehouses.map((w) => (
+                                <option key={w.id} value={w.id}>
+                                  {w.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {row.batchTracked ? (
+                            <div>
+                              <label className="mb-1 block text-xs text-muted-foreground">Batch</label>
+                              <select
+                                name={`lineItem__${i}__batchId`}
+                                value={row.batchId}
+                                onChange={(e) => update(i, { batchId: e.target.value })}
+                                required
+                                className={fieldClass}
+                              >
+                                <option value="">Select batch…</option>
+                                {(row.availableBatches ?? []).map((b) => (
+                                  <option key={b.id} value={b.id}>
+                                    {b.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <input type="hidden" name={`lineItem__${i}__batchId`} value="" />
+                          )}
+                          {row.serialTracked ? (
+                            <div>
+                              <label className="mb-1 block text-xs text-muted-foreground">
+                                Serial numbers (one per line, {row.quantity || 0} needed)
+                              </label>
+                              <Textarea
+                                name={`lineItem__${i}__serialNumbersText`}
+                                value={row.serialNumbersText}
+                                onChange={(e) => update(i, { serialNumbersText: e.target.value })}
+                                className="min-h-8 text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <input type="hidden" name={`lineItem__${i}__serialNumbersText`} value="" />
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <tr className="hidden">
+                      <td>
+                        <input type="hidden" name={`lineItem__${i}__warehouseId`} value="" />
+                        <input type="hidden" name={`lineItem__${i}__batchId`} value="" />
+                        <input type="hidden" name={`lineItem__${i}__serialNumbersText`} value="" />
                       </td>
                     </tr>
                   )}

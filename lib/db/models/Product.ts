@@ -34,6 +34,36 @@ const productImageSchema = new Schema(
   { _id: false },
 );
 
+// Batches are metadata only (number + expiry) — a real subdoc `_id` since StockLedgerEntry.batchId
+// references it the same way variantId references productVariantSchema above. Current on-hand
+// quantity per batch is never stored here; it's derived from the latest matching StockLedgerEntry
+// (see lib/db/queries/stockLedger.ts), keeping the ledger the single source of truth for stock.
+const productBatchSchema = new Schema(
+  {
+    batchNumber: { type: String, required: true, trim: true },
+    expiryDate: { type: Date },
+    // Retires a batch from create-time pickers (e.g. once fully sold) without losing its ledger
+    // history — same soft-delete convention as every other collection, just on a subdocument.
+    deletedAt: { type: Date },
+  },
+  { timestamps: true },
+);
+
+const stockTrackingSchema = new Schema(
+  {
+    // Always false for type: "service" — enforced in lib/db/queries/products.ts, not here, since
+    // a schema-level conditional-required rule can't see sibling fields during $set updates.
+    enabled: { type: Boolean, required: true, default: false },
+    // Mutually exclusive (enforced in the query layer): a product is either batch-tracked or
+    // serial-tracked, never both.
+    batchTracked: { type: Boolean, required: true, default: false },
+    serialTracked: { type: Boolean, required: true, default: false },
+    // Low-stock dashboard tile threshold; undefined means "never flag this product as low stock".
+    reorderLevel: { type: Number },
+  },
+  { _id: false },
+);
+
 const productSchema = new Schema(
   {
     businessId: { type: Schema.Types.ObjectId, ref: "Business", required: true, index: true },
@@ -54,6 +84,9 @@ const productSchema = new Schema(
     images: { type: [productImageSchema], default: [] },
     variants: { type: [productVariantSchema], default: [] },
     priceOverrides: { type: [priceOverrideSchema], default: [] },
+    stockTracking: { type: stockTrackingSchema, default: () => ({}) },
+    // Only populated/meaningful when stockTracking.batchTracked is true.
+    batches: { type: [productBatchSchema], default: [] },
     deletedAt: { type: Date },
   },
   { timestamps: true },
@@ -65,6 +98,8 @@ productSchema.index({ businessId: 1, barcode: 1 });
 export type ProductDoc = InferSchemaType<typeof productSchema>;
 export type ProductVariantDoc = ProductDoc["variants"][number];
 export type ProductPriceOverrideDoc = ProductDoc["priceOverrides"][number];
+export type ProductBatchDoc = ProductDoc["batches"][number];
+export type ProductStockTrackingDoc = ProductDoc["stockTracking"];
 
 export const Product =
   (mongoose.models.Product as Model<ProductDoc>) ??

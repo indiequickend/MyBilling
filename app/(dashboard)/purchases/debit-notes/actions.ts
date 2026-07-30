@@ -38,6 +38,7 @@ const REASON_MESSAGES: Record<DebitNoteWriteFailureReason, string> = {
   not_found: "Debit note not found.",
   not_cancellable: "This debit note can't be cancelled.",
   not_deletable: "Only draft or cancelled debit notes can be deleted.",
+  insufficient_stock: "One of the line items doesn't have enough stock available to remove.",
 };
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -62,6 +63,9 @@ function parseLineItemRows(formData: FormData) {
     discountType: row.discountType,
     discountValue: row.discountValue,
     taxRatePercent: row.taxRatePercent,
+    warehouseId: row.warehouseId || undefined,
+    batchId: row.batchId || undefined,
+    serialNumbersText: row.serialNumbersText || undefined,
   }));
 }
 
@@ -77,6 +81,7 @@ export async function saveDebitNoteAction(
     linkedPurchaseId: formData.get("linkedPurchaseId"),
     debitNoteDate: formData.get("debitNoteDate"),
     reason: formData.get("reason"),
+    restockItems: parseCheckbox(formData, "restockItems"),
     placeOfSupplyState: formData.get("placeOfSupplyState"),
     roundOff: parseCheckbox(formData, "roundOff"),
   });
@@ -107,6 +112,7 @@ export async function saveDebitNoteAction(
     linkedPurchaseId: h.linkedPurchaseId,
     debitNoteDate: new Date(h.debitNoteDate),
     reason: h.reason,
+    restockItems: h.restockItems,
     placeOfSupplyState: h.placeOfSupplyState,
     lineItems: lineItemsParsed.data,
     discountType: discountParsed.data.discountType,

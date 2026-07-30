@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { DISCOUNT_TARGETS } from "@/lib/constants/invoices";
 import { objectId, optionalTrimmed, rupeesToMinorUnits, normalizeDiscountValue } from "@/lib/validation/shared";
+import { parseSerialNumbersText } from "@/lib/validation/inventory";
+
+const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
 
 const rawCreditNoteLineItemSchema = z.object({
-  productId: objectId.optional().or(z.literal("").transform(() => undefined)),
-  variantId: objectId.optional().or(z.literal("").transform(() => undefined)),
+  productId: optionalObjectId,
+  variantId: optionalObjectId,
   description: z.string().trim().min(1, "Description is required").max(500),
   notes: optionalTrimmed(2000),
   hsnOrSac: optionalTrimmed(20),
@@ -14,12 +17,21 @@ const rawCreditNoteLineItemSchema = z.object({
   discountType: z.enum(["amount", "percentage"]),
   discountValue: z.union([z.string(), z.number()]),
   taxRatePercent: z.coerce.number().min(0).max(100),
+  // Only actually written to the stock ledger when the header's restockItems is on.
+  warehouseId: optionalObjectId,
+  batchId: optionalObjectId,
+  serialNumbersText: optionalTrimmed(5000),
 });
 
-export const creditNoteLineItemSchema = rawCreditNoteLineItemSchema.transform((val, ctx) => ({
-  ...val,
-  discountValue: normalizeDiscountValue(val.discountType, val.discountValue, ctx),
-}));
+export const creditNoteLineItemSchema = rawCreditNoteLineItemSchema.transform((val, ctx) => {
+  const { serialNumbersText, ...rest } = val;
+  const serialNumbers = serialNumbersText ? parseSerialNumbersText(serialNumbersText) : undefined;
+  return {
+    ...rest,
+    discountValue: normalizeDiscountValue(val.discountType, val.discountValue, ctx),
+    serialNumbers,
+  };
+});
 export type CreditNoteLineItemInput = z.infer<typeof creditNoteLineItemSchema>;
 
 export const creditNoteLineItemsSchema = z
@@ -42,6 +54,9 @@ export const creditNoteHeaderSchema = z.object({
   linkedInvoiceId: objectId,
   creditNoteDate: z.string().trim().min(1, "Credit note date is required"),
   reason: optionalTrimmed(500),
+  // Opt-in: adds product line items back to stock when true — off by default since a credit note
+  // doesn't always represent a physical return (e.g. a price-only adjustment).
+  restockItems: z.boolean(),
   placeOfSupplyState: z.string().trim().min(1, "Place of supply is required").max(100),
   roundOff: z.boolean(),
 });

@@ -69,6 +69,8 @@ export function InvoiceForm({
   bankAccounts,
   noteTemplates,
   termTemplates,
+  warehouses,
+  defaultWarehouseId,
   customFieldDefs,
   businessState,
   defaultValues,
@@ -81,6 +83,8 @@ export function InvoiceForm({
   bankAccounts: Array<{ id: string; name: string }>;
   noteTemplates: Array<{ id: string; label: string }>;
   termTemplates: Array<{ id: string; label: string }>;
+  warehouses: Array<{ id: string; name: string }>;
+  defaultWarehouseId?: string;
   customFieldDefs: Array<{
     key: string;
     label: string;
@@ -224,6 +228,8 @@ export function InvoiceForm({
             defaultRows={defaultValues?.lineItems ?? []}
             businessState={businessState}
             placeOfSupplyState={placeOfSupplyState}
+            warehouses={warehouses}
+            defaultWarehouseId={defaultWarehouseId}
           />
         </CardContent>
       </Card>

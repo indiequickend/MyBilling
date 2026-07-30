@@ -39,6 +39,7 @@ const REASON_MESSAGES: Record<CreditNoteWriteFailureReason, string> = {
   not_found: "Credit note not found.",
   not_cancellable: "This credit note can't be cancelled.",
   not_deletable: "Only draft or cancelled credit notes can be deleted.",
+  insufficient_stock: "One of the line items doesn't have enough stock available to restock.",
 };
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -63,6 +64,9 @@ function parseLineItemRows(formData: FormData) {
     discountType: row.discountType,
     discountValue: row.discountValue,
     taxRatePercent: row.taxRatePercent,
+    warehouseId: row.warehouseId || undefined,
+    batchId: row.batchId || undefined,
+    serialNumbersText: row.serialNumbersText || undefined,
   }));
 }
 
@@ -78,6 +82,7 @@ export async function saveCreditNoteAction(
     linkedInvoiceId: formData.get("linkedInvoiceId"),
     creditNoteDate: formData.get("creditNoteDate"),
     reason: formData.get("reason"),
+    restockItems: parseCheckbox(formData, "restockItems"),
     placeOfSupplyState: formData.get("placeOfSupplyState"),
     roundOff: parseCheckbox(formData, "roundOff"),
   });
@@ -108,6 +113,7 @@ export async function saveCreditNoteAction(
     linkedInvoiceId: h.linkedInvoiceId,
     creditNoteDate: new Date(h.creditNoteDate),
     reason: h.reason,
+    restockItems: h.restockItems,
     placeOfSupplyState: h.placeOfSupplyState,
     lineItems: lineItemsParsed.data,
     discountType: discountParsed.data.discountType,

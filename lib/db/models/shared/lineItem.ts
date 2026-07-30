@@ -33,6 +33,16 @@ export const documentLineItemSchema = new Schema({
   // trackItcEligibility preference is on (see Business.preferences.document.purchases); Invoice
   // lines simply never read it. Defaults true so a line is ITC-eligible unless marked otherwise.
   itcEligible: { type: Boolean, required: true, default: true },
+  // Stock fields below are only meaningful when productId resolves to a `type: "product"` Product
+  // with stockTracking.enabled — service lines and non-stock-tracked products simply never set
+  // them, and no ledger entry is ever written for a line that lacks a warehouseId. Required (by
+  // the query layer, not this schema) only for stock-tracked product lines.
+  warehouseId: { type: Schema.Types.ObjectId, ref: "Warehouse" },
+  // No ref — references Product.batches[]._id, dereferenced by loading the product (same
+  // convention as variantId above). Batch-tracked products only.
+  batchId: { type: Schema.Types.ObjectId },
+  // Serial-tracked products only; length must equal `quantity` when present.
+  serialNumbers: { type: [String], default: undefined },
 });
 
 export type DocumentLineItemDoc = InferSchemaType<typeof documentLineItemSchema>;

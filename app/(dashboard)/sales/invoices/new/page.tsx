@@ -5,6 +5,7 @@ import { listCustomers } from "@/lib/db/queries/customers";
 import { listSignatures } from "@/lib/db/queries/signatures";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
+import { listWarehouses } from "@/lib/db/queries/warehouses";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findQuotationById } from "@/lib/db/queries/quotations";
 import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
@@ -26,14 +27,16 @@ export default async function NewInvoicePage({
     return <p className="text-sm text-destructive">You don&apos;t have permission to create invoices.</p>;
   }
 
-  const [customers, signatures, bankAccounts, noteTemplates, termTemplates, business] = await Promise.all([
-    listCustomers(context.activeBusinessId, { pageSize: 500 }),
-    listSignatures(context.activeBusinessId, "active"),
-    listBankAccounts(context.activeBusinessId, "active"),
-    listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "note", tab: "active" }),
-    listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "term", tab: "active" }),
-    findBusinessById(context.activeBusinessId),
-  ]);
+  const [customers, signatures, bankAccounts, noteTemplates, termTemplates, warehouses, business] =
+    await Promise.all([
+      listCustomers(context.activeBusinessId, { pageSize: 500 }),
+      listSignatures(context.activeBusinessId, "active"),
+      listBankAccounts(context.activeBusinessId, "active"),
+      listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "note", tab: "active" }),
+      listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "term", tab: "active" }),
+      listWarehouses(context.activeBusinessId, "active"),
+      findBusinessById(context.activeBusinessId),
+    ]);
   if (!business) redirect("/");
 
   const salesPrefs = business.preferences.document.sales;
@@ -91,6 +94,12 @@ export default async function NewInvoicePage({
         bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}
+        defaultWarehouseId={
+          business.preferences.productsInventory.inventory.defaultWarehouseId
+            ? String(business.preferences.productsInventory.inventory.defaultWarehouseId)
+            : undefined
+        }
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{

@@ -10,6 +10,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { VariantsEditor, type VariantRow } from "./VariantsEditor";
 import { PriceOverridesEditor, type PriceOverrideRow } from "./PriceOverridesEditor";
+import { BatchesEditor, type BatchRow } from "./BatchesEditor";
 import { createProductAction, updateProductAction, type ProductFormState } from "./actions";
 
 const initialState: ProductFormState = {};
@@ -42,11 +43,21 @@ export function ProductForm({
     variants: VariantRow[];
     priceOverrides: PriceOverrideRow[];
     images: Array<{ url: string }>;
+    stockTrackingEnabled: boolean;
+    stockTrackingMode: "none" | "batch" | "serial";
+    reorderLevel: string;
+    batches: BatchRow[];
   };
 }) {
   const action = mode === "create" ? createProductAction : updateProductAction;
   const [state, formAction] = useActionState(action, initialState);
   const [variants, setVariants] = useState<VariantRow[]>(defaultValues?.variants ?? []);
+  const [productType, setProductType] = useState<"product" | "service">(defaultValues?.type ?? "product");
+  const [stockTrackingEnabled, setStockTrackingEnabled] = useState(defaultValues?.stockTrackingEnabled ?? false);
+  const [trackingMode, setTrackingMode] = useState<"none" | "batch" | "serial">(
+    defaultValues?.stockTrackingMode ?? "none",
+  );
+  const [batches, setBatches] = useState<BatchRow[]>(defaultValues?.batches ?? []);
 
   return (
     <form action={formAction} className="max-w-3xl space-y-6">
@@ -70,6 +81,7 @@ export function ProductForm({
                   name="type"
                   defaultValue={defaultValues?.type ?? "product"}
                   placeholder="Type"
+                  onValueChange={(v) => setProductType(v as "product" | "service")}
                   options={[
                     { value: "product", label: "Product" },
                     { value: "service", label: "Service" },
@@ -190,6 +202,60 @@ export function ProductForm({
           <VariantsEditor rows={variants} onChange={setVariants} />
         </CardContent>
       </Card>
+
+      {productType === "product" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock tracking</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="stockTrackingEnabled"
+                  name="stockTrackingEnabled"
+                  checked={stockTrackingEnabled}
+                  onCheckedChange={(checked) => setStockTrackingEnabled(checked === true)}
+                />
+                <FieldLabel htmlFor="stockTrackingEnabled" className="font-normal">
+                  Track stock for this product
+                </FieldLabel>
+              </Field>
+
+              {stockTrackingEnabled ? (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="stockTrackingMode">Tracking mode</FieldLabel>
+                      <SelectField
+                        name="stockTrackingMode"
+                        defaultValue={trackingMode}
+                        placeholder="Tracking mode"
+                        onValueChange={(v) => setTrackingMode(v as "none" | "batch" | "serial")}
+                        options={[
+                          { value: "none", label: "Simple quantity" },
+                          { value: "batch", label: "Batches & expiry" },
+                          { value: "serial", label: "Serial numbers" },
+                        ]}
+                      />
+                    </Field>
+                    <FormField
+                      label="Low-stock reorder level"
+                      name="reorderLevel"
+                      defaultValue={defaultValues?.reorderLevel}
+                      error={state.fieldErrors?.reorderLevel}
+                    />
+                  </div>
+
+                  {trackingMode === "batch" ? (
+                    <BatchesEditor rows={batches} onChange={setBatches} />
+                  ) : null}
+                </>
+              ) : null}
+            </FieldGroup>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {priceLists.length > 0 ? (
         <Card>

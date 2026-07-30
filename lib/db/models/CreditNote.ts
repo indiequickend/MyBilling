@@ -37,6 +37,11 @@ const creditNoteSchema = new Schema(
     creditNoteDate: { type: Date, required: true },
     reason: { type: String, trim: true },
 
+    // Opt-in: a credit note doesn't always represent a physical return (e.g. a price-only
+    // adjustment), so stock is only restocked for product line items when this is explicitly on
+    // (see lib/db/queries/creditNotes.ts). Off by default to avoid silently corrupting stock counts.
+    restockItems: { type: Boolean, required: true, default: false },
+
     placeOfSupplyState: { type: String, required: true, trim: true },
 
     lineItems: {
@@ -98,6 +103,7 @@ export type CreditNoteDoc = {
   status: CreditNoteStatus;
   creditNoteDate: Date;
   reason?: string;
+  restockItems: boolean;
   placeOfSupplyState: string;
   lineItems: CreditNoteLineItemDoc[];
   discountType: "amount" | "percentage";

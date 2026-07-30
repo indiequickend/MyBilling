@@ -3,7 +3,10 @@ import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listPurchases, findPurchaseById } from "@/lib/db/queries/purchases";
 import { findBusinessById } from "@/lib/db/queries/businesses";
+import { listWarehouses } from "@/lib/db/queries/warehouses";
+import { findProductsByIds } from "@/lib/db/queries/products";
 import { minorToRupeesString } from "@/lib/utils/money";
+import { hydrateLineItemsStockInfo } from "@/lib/documents/stockLineItems";
 import { SelectField } from "@/components/ui/SelectField";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
@@ -71,7 +74,9 @@ export default async function NewDebitNotePage({
   const business = await findBusinessById(context.activeBusinessId);
   if (!business) redirect("/");
 
-  const lineItems: LineItemRow[] = purchase.lineItems.map((li) => ({
+  const warehouses = await listWarehouses(context.activeBusinessId, "active");
+
+  const rawLineItems: LineItemRow[] = purchase.lineItems.map((li) => ({
     productId: li.productId ? String(li.productId) : "",
     variantId: li.variantId ? String(li.variantId) : "",
     description: li.description,
@@ -85,6 +90,11 @@ export default async function NewDebitNotePage({
       li.discountType === "percentage" ? String(li.discountValue) : minorToRupeesString(li.discountValue),
     taxRatePercent: String(li.taxRatePercent),
   }));
+  const lineItemProducts = await findProductsByIds(
+    purchase.lineItems.filter((li) => li.productId).map((li) => String(li.productId)),
+    context.activeBusinessId,
+  );
+  const lineItems = hydrateLineItemsStockInfo(rawLineItems, purchase.lineItems, lineItemProducts);
 
   return (
     <div>
@@ -94,9 +104,16 @@ export default async function NewDebitNotePage({
         vendorLabel={purchase.vendorSnapshot.displayName}
         purchaseDocNumber={purchase.docNumber ?? "Draft"}
         businessState={business.addresses?.billing?.state ?? ""}
+        warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}
+        defaultWarehouseId={
+          business.preferences.productsInventory.inventory.defaultWarehouseId
+            ? String(business.preferences.productsInventory.inventory.defaultWarehouseId)
+            : undefined
+        }
         defaultValues={{
           debitNoteDate: new Date().toISOString().slice(0, 10),
           reason: "",
+          restockItems: false,
           placeOfSupplyState: purchase.placeOfSupplyState,
           roundOff: purchase.roundOff,
           discountType: "percentage",

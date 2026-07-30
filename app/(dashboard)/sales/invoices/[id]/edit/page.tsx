@@ -6,8 +6,11 @@ import { listCustomers } from "@/lib/db/queries/customers";
 import { listSignatures } from "@/lib/db/queries/signatures";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
+import { listWarehouses } from "@/lib/db/queries/warehouses";
 import { findBusinessById } from "@/lib/db/queries/businesses";
+import { findProductsByIds } from "@/lib/db/queries/products";
 import { minorToRupeesString } from "@/lib/utils/money";
+import { hydrateLineItemsStockInfo } from "@/lib/documents/stockLineItems";
 import { InvoiceForm } from "../../InvoiceForm";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
 
@@ -29,14 +32,16 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
     redirect(`/sales/invoices/${id}`);
   }
 
-  const [customers, signatures, bankAccounts, noteTemplates, termTemplates, business] = await Promise.all([
-    listCustomers(context.activeBusinessId, { pageSize: 500 }),
-    listSignatures(context.activeBusinessId, "active"),
-    listBankAccounts(context.activeBusinessId, "active"),
-    listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "note", tab: "active" }),
-    listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "term", tab: "active" }),
-    findBusinessById(context.activeBusinessId),
-  ]);
+  const [customers, signatures, bankAccounts, noteTemplates, termTemplates, warehouses, business] =
+    await Promise.all([
+      listCustomers(context.activeBusinessId, { pageSize: 500 }),
+      listSignatures(context.activeBusinessId, "active"),
+      listBankAccounts(context.activeBusinessId, "active"),
+      listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "note", tab: "active" }),
+      listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "term", tab: "active" }),
+      listWarehouses(context.activeBusinessId, "active"),
+      findBusinessById(context.activeBusinessId),
+    ]);
   if (!business) redirect("/");
 
   const businessState = business.addresses?.billing?.state ?? "";
@@ -48,7 +53,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
     required: d.required,
   }));
 
-  const lineItems: LineItemRow[] = invoice.lineItems.map((li) => ({
+  const rawLineItems: LineItemRow[] = invoice.lineItems.map((li) => ({
     productId: li.productId ? String(li.productId) : "",
     variantId: li.variantId ? String(li.variantId) : "",
     description: li.description,
@@ -62,6 +67,11 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
       li.discountType === "percentage" ? String(li.discountValue) : minorToRupeesString(li.discountValue),
     taxRatePercent: String(li.taxRatePercent),
   }));
+  const lineItemProducts = await findProductsByIds(
+    invoice.lineItems.filter((li) => li.productId).map((li) => String(li.productId)),
+    context.activeBusinessId,
+  );
+  const lineItems = hydrateLineItemsStockInfo(rawLineItems, invoice.lineItems, lineItemProducts);
 
   return (
     <div>
@@ -78,6 +88,12 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
         bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}
+        defaultWarehouseId={
+          business.preferences.productsInventory.inventory.defaultWarehouseId
+            ? String(business.preferences.productsInventory.inventory.defaultWarehouseId)
+            : undefined
+        }
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{

@@ -37,6 +37,11 @@ const debitNoteSchema = new Schema(
     debitNoteDate: { type: Date, required: true },
     reason: { type: String, trim: true },
 
+    // Opt-in: a debit note doesn't always represent a physical return to the vendor (e.g. a
+    // price-only adjustment), so stock is only removed for product line items when this is
+    // explicitly on (see lib/db/queries/debitNotes.ts). Off by default.
+    restockItems: { type: Boolean, required: true, default: false },
+
     placeOfSupplyState: { type: String, required: true, trim: true },
 
     lineItems: {
@@ -98,6 +103,7 @@ export type DebitNoteDoc = {
   status: DebitNoteStatus;
   debitNoteDate: Date;
   reason?: string;
+  restockItems: boolean;
   placeOfSupplyState: string;
   lineItems: DebitNoteLineItemDoc[];
   discountType: "amount" | "percentage";

@@ -56,6 +56,7 @@ const REASON_MESSAGES: Record<PurchaseWriteFailureReason, string> = {
   not_deletable: "Only draft or cancelled purchases can be deleted.",
   not_payable: "This purchase isn't awaiting payment.",
   no_payments: "Enter at least one payment.",
+  insufficient_stock: "Cancelling this purchase would take stock below zero — some of it has already been used.",
 };
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -81,6 +82,9 @@ function parseLineItemRows(formData: FormData) {
     discountValue: row.discountValue,
     taxRatePercent: row.taxRatePercent,
     itcEligible: row.itcEligible === "on",
+    warehouseId: row.warehouseId || undefined,
+    batchId: row.batchId || undefined,
+    serialNumbersText: row.serialNumbersText || undefined,
   }));
 }
 

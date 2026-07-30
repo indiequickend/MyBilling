@@ -169,10 +169,15 @@ const MAIN_GROUPS: NavGroup[] = [
   },
   {
     href: "/inventory/warehouses",
-    label: "Warehouses",
+    label: "Inventory",
     icon: "warehouses",
     moduleKey: "inventory",
     action: "view",
+    children: [
+      { href: "/inventory/warehouses", label: "Warehouses", icon: "warehouses", moduleKey: "inventory", action: "view" },
+      { href: "/inventory/stock", label: "Stock In / Out", icon: "warehouses", moduleKey: "inventory", action: "edit" },
+      { href: "/inventory/timeline", label: "Timeline", icon: "warehouses", moduleKey: "inventory", action: "view" },
+    ],
   },
 ];
 

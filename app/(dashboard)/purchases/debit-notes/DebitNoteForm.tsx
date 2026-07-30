@@ -31,15 +31,20 @@ export function DebitNoteForm({
   vendorLabel,
   purchaseDocNumber,
   businessState,
+  warehouses,
+  defaultWarehouseId,
   defaultValues,
 }: {
   linkedPurchaseId: string;
   vendorLabel: string;
   purchaseDocNumber: string;
   businessState: string;
+  warehouses: Array<{ id: string; name: string }>;
+  defaultWarehouseId?: string;
   defaultValues: {
     debitNoteDate: string;
     reason: string;
+    restockItems: boolean;
     placeOfSupplyState: string;
     roundOff: boolean;
     discountType: "amount" | "percentage";
@@ -91,6 +96,13 @@ export function DebitNoteForm({
               defaultValue={defaultValues.reason}
               error={state.fieldErrors?.reason}
             />
+            <Field orientation="horizontal">
+              <Checkbox id="restockItems" name="restockItems" defaultChecked={defaultValues.restockItems} />
+              <FieldLabel htmlFor="restockItems" className="font-normal">
+                Remove these items from inventory (only for a physical return to the vendor — leave
+                off for a price-only adjustment)
+              </FieldLabel>
+            </Field>
           </FieldGroup>
         </CardContent>
       </Card>
@@ -104,6 +116,8 @@ export function DebitNoteForm({
             defaultRows={defaultValues.lineItems}
             businessState={businessState}
             placeOfSupplyState={defaultValues.placeOfSupplyState}
+            warehouses={warehouses}
+            defaultWarehouseId={defaultWarehouseId}
           />
         </CardContent>
       </Card>

@@ -31,15 +31,20 @@ export function CreditNoteForm({
   customerLabel,
   invoiceDocNumber,
   businessState,
+  warehouses,
+  defaultWarehouseId,
   defaultValues,
 }: {
   linkedInvoiceId: string;
   customerLabel: string;
   invoiceDocNumber: string;
   businessState: string;
+  warehouses: Array<{ id: string; name: string }>;
+  defaultWarehouseId?: string;
   defaultValues: {
     creditNoteDate: string;
     reason: string;
+    restockItems: boolean;
     placeOfSupplyState: string;
     roundOff: boolean;
     discountType: "amount" | "percentage";
@@ -91,6 +96,13 @@ export function CreditNoteForm({
               defaultValue={defaultValues.reason}
               error={state.fieldErrors?.reason}
             />
+            <Field orientation="horizontal">
+              <Checkbox id="restockItems" name="restockItems" defaultChecked={defaultValues.restockItems} />
+              <FieldLabel htmlFor="restockItems" className="font-normal">
+                Add these items back to inventory (only for a physical return — leave off for a
+                price-only adjustment)
+              </FieldLabel>
+            </Field>
           </FieldGroup>
         </CardContent>
       </Card>
@@ -104,6 +116,8 @@ export function CreditNoteForm({
             defaultRows={defaultValues.lineItems}
             businessState={businessState}
             placeOfSupplyState={defaultValues.placeOfSupplyState}
+            warehouses={warehouses}
+            defaultWarehouseId={defaultWarehouseId}
           />
         </CardContent>
       </Card>

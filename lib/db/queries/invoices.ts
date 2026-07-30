@@ -10,6 +10,11 @@ import { isOwnedSignature } from "@/lib/db/queries/signatures";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
 import { createPayment, type CreatePaymentInput } from "@/lib/db/queries/payments";
+import {
+  writeDocumentStockMovements,
+  InsufficientStockError,
+  type DocumentStockLineItem,
+} from "@/lib/db/queries/stockLedger";
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, derivePaymentStatus, type LineItemCalcInput } from "@/lib/documents/calc";
@@ -28,6 +33,11 @@ export type InvoiceLineItemWriteInput = {
   discountType: "amount" | "percentage";
   discountValue: number;
   taxRatePercent: number;
+  /** Only meaningful (and required by the API boundary) when productId resolves to a
+   * stock-tracked product — see writeDocumentStockMovements. */
+  warehouseId?: string;
+  batchId?: string;
+  serialNumbers?: string[];
 };
 
 export type InvoicePaymentSplitWriteInput = {
@@ -81,7 +91,8 @@ export type InvoiceWriteFailureReason =
   | "not_cancellable"
   | "not_deletable"
   | "not_payable"
-  | "no_payments";
+  | "no_payments"
+  | "insufficient_stock";
 
 export type InvoiceWriteResult =
   | { ok: true; invoice: InstanceType<typeof Invoice>; payments: InstanceType<typeof Payment>[] }
@@ -192,6 +203,9 @@ async function prepareInvoiceWrite(
     igstMinor: totals.lineItems[i].igstMinor,
     taxableAmountMinor: totals.lineItems[i].taxableAmountMinor,
     totalMinor: totals.lineItems[i].totalMinor,
+    warehouseId: li.warehouseId ? new mongoose.Types.ObjectId(li.warehouseId) : undefined,
+    batchId: li.batchId ? new mongoose.Types.ObjectId(li.batchId) : undefined,
+    serialNumbers: li.serialNumbers,
   })) as InvoiceLineItemDoc[];
 
   return { ok: true, customer: ownership.customer, business, totals, lineItemDocs };
@@ -285,55 +299,73 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
   const session = await conn.startSession();
   try {
     let result!: InvoiceWriteResult;
-    await session.withTransaction(async () => {
-      let docNumber: string | undefined;
-      let seriesKey: string | undefined;
-      if (input.finalize) {
-        const numbering = prepared.business.preferences?.documentNumbering;
-        const config = resolveNumberingConfig(numbering, "invoice");
-        seriesKey = resolveSeriesKey(input.invoiceDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
-        const number = await reserveNextDocumentNumber(input.businessId, "invoice", seriesKey, session);
-        docNumber = formatDocumentNumber(config, seriesKey, number);
-      }
-
-      const [invoiceDoc] = await Invoice.create(
-        [
-          {
-            businessId: input.businessId,
-            ...buildInvoiceSetFields(input, prepared),
-            docNumber,
-            seriesKey,
-            status: input.finalize ? "pending" : "draft",
-            amountPaidMinor: 0,
-            createdByUserId: input.createdByUserId,
-          },
-        ],
-        { session },
-      );
-
-      const createdPayments = [];
-      if (input.finalize && input.payments?.length) {
-        for (const split of input.payments) {
-          const payment = await createPayment(
-            toCreatePaymentInput(
-              input.businessId,
-              prepared.customer._id,
-              invoiceDoc._id,
-              split,
-              input.createdByUserId,
-            ),
-            session,
-          );
-          createdPayments.push(payment);
+    try {
+      await session.withTransaction(async () => {
+        let docNumber: string | undefined;
+        let seriesKey: string | undefined;
+        if (input.finalize) {
+          const numbering = prepared.business.preferences?.documentNumbering;
+          const config = resolveNumberingConfig(numbering, "invoice");
+          seriesKey = resolveSeriesKey(input.invoiceDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+          const number = await reserveNextDocumentNumber(input.businessId, "invoice", seriesKey, session);
+          docNumber = formatDocumentNumber(config, seriesKey, number);
         }
-        const paidMinor = createdPayments.reduce((s, p) => s + p.amountMinor, 0);
-        invoiceDoc.amountPaidMinor = paidMinor;
-        invoiceDoc.status = derivePaymentStatus(invoiceDoc.grandTotalMinor, paidMinor);
-        await invoiceDoc.save({ session });
-      }
 
-      result = { ok: true, invoice: invoiceDoc, payments: createdPayments };
-    });
+        const [invoiceDoc] = await Invoice.create(
+          [
+            {
+              businessId: input.businessId,
+              ...buildInvoiceSetFields(input, prepared),
+              docNumber,
+              seriesKey,
+              status: input.finalize ? "pending" : "draft",
+              amountPaidMinor: 0,
+              createdByUserId: input.createdByUserId,
+            },
+          ],
+          { session },
+        );
+
+        if (input.finalize) {
+          await writeDocumentStockMovements(session, {
+            businessId: input.businessId,
+            lineItems: invoiceDoc.lineItems as DocumentStockLineItem[],
+            direction: "out",
+            reason: "invoice",
+            refDocumentType: "invoice",
+            refDocumentId: String(invoiceDoc._id),
+            refDocumentNumber: docNumber,
+            createdByUserId: input.createdByUserId,
+          });
+        }
+
+        const createdPayments = [];
+        if (input.finalize && input.payments?.length) {
+          for (const split of input.payments) {
+            const payment = await createPayment(
+              toCreatePaymentInput(
+                input.businessId,
+                prepared.customer._id,
+                invoiceDoc._id,
+                split,
+                input.createdByUserId,
+              ),
+              session,
+            );
+            createdPayments.push(payment);
+          }
+          const paidMinor = createdPayments.reduce((s, p) => s + p.amountMinor, 0);
+          invoiceDoc.amountPaidMinor = paidMinor;
+          invoiceDoc.status = derivePaymentStatus(invoiceDoc.grandTotalMinor, paidMinor);
+          await invoiceDoc.save({ session });
+        }
+
+        result = { ok: true, invoice: invoiceDoc, payments: createdPayments };
+      });
+    } catch (err) {
+      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
+      throw err;
+    }
     return result;
   } finally {
     await session.endSession();
@@ -416,6 +448,17 @@ export async function finalizeInvoiceDraft(
         // rather than being silently burned.
         if (!updated) throw new InvoiceNoLongerDraftError();
 
+        await writeDocumentStockMovements(session, {
+          businessId,
+          lineItems: updated.lineItems as DocumentStockLineItem[],
+          direction: "out",
+          reason: "invoice",
+          refDocumentType: "invoice",
+          refDocumentId: String(updated._id),
+          refDocumentNumber: docNumber,
+          createdByUserId,
+        });
+
         const createdPayments = [];
         if (payments?.length) {
           for (const split of payments) {
@@ -435,6 +478,7 @@ export async function finalizeInvoiceDraft(
       });
     } catch (err) {
       if (err instanceof InvoiceNoLongerDraftError) return { ok: false, reason: "not_editable" };
+      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
       throw err;
     }
     return result;
@@ -500,15 +544,43 @@ export async function recordInvoicePayment(
   }
 }
 
+/** Cancelling reverses any stock the invoice originally moved (product line items only — service
+ * lines never moved stock in the first place) so a mistaken invoice doesn't permanently corrupt
+ * on-hand counts. Transactional so the status flip and the reversal always land together. */
 export async function cancelInvoice(invoiceId: string, businessId: string): Promise<InvoiceWriteResult> {
   await connectToDatabase();
-  const updated = await Invoice.findOneAndUpdate(
-    { _id: invoiceId, businessId, deletedAt: { $exists: false }, status: { $in: CANCELLABLE_STATUSES } },
-    { $set: { status: "cancelled" } },
-    { returnDocument: "after" },
-  );
-  if (!updated) return { ok: false, reason: "not_cancellable" };
-  return { ok: true, invoice: updated, payments: [] };
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  try {
+    let result: InvoiceWriteResult = { ok: false, reason: "not_cancellable" };
+    await session.withTransaction(async () => {
+      const updated = await Invoice.findOneAndUpdate(
+        { _id: invoiceId, businessId, deletedAt: { $exists: false }, status: { $in: CANCELLABLE_STATUSES } },
+        { $set: { status: "cancelled" } },
+        { returnDocument: "after", session },
+      );
+      if (!updated) {
+        result = { ok: false, reason: "not_cancellable" };
+        return;
+      }
+
+      await writeDocumentStockMovements(session, {
+        businessId,
+        lineItems: updated.lineItems as DocumentStockLineItem[],
+        direction: "in",
+        reason: "invoice_cancelled",
+        refDocumentType: "invoice",
+        refDocumentId: String(updated._id),
+        refDocumentNumber: updated.docNumber,
+        createdByUserId: String(updated.createdByUserId),
+      });
+
+      result = { ok: true, invoice: updated, payments: [] };
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }
 
 /** Deleting a pending/partially_paid/paid invoice would corrupt a legal financial record and its

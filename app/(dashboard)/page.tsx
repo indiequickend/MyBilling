@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Building2, FileText, Users, Wallet } from "lucide-react";
+import { Building2, FileText, Users, Wallet, PackageCheck, PackageX, IndianRupee } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { listInvoices, sumInvoiceTotals } from "@/lib/db/queries/invoices";
 import { listCustomers } from "@/lib/db/queries/customers";
 import { listVendors } from "@/lib/db/queries/vendors";
+import { getInventoryDashboardTiles } from "@/lib/db/queries/stockLedger";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { can } from "@/lib/rbac/can";
 import { Button } from "@/components/ui/button";
@@ -49,12 +50,14 @@ export default async function DashboardHomePage() {
   const canViewInvoices = can(context.membership, "sales_invoices", "view");
   const canViewCustomers = can(context.membership, "customers", "view");
   const canViewVendors = can(context.membership, "vendors", "view");
+  const canViewInventory = can(context.membership, "inventory", "view");
 
-  const [invoiceCount, invoiceTotals, customerCount, vendorCount] = await Promise.all([
+  const [invoiceCount, invoiceTotals, customerCount, vendorCount, inventoryTiles] = await Promise.all([
     canViewInvoices ? listInvoices(context.activeBusinessId, { pageSize: 1 }) : null,
     canViewInvoices ? sumInvoiceTotals(context.activeBusinessId, {}) : null,
     canViewCustomers ? listCustomers(context.activeBusinessId, { pageSize: 1 }) : null,
     canViewVendors ? listVendors(context.activeBusinessId, { pageSize: 1 }) : null,
+    canViewInventory ? getInventoryDashboardTiles(context.activeBusinessId) : null,
   ]);
 
   const tiles = [
@@ -74,6 +77,38 @@ export default async function DashboardHomePage() {
       : null,
     canViewVendors && vendorCount
       ? { label: "Vendors", value: String(vendorCount.total), icon: Building2, href: "/vendors" }
+      : null,
+    canViewInventory && inventoryTiles
+      ? {
+          label: "Low Stock",
+          value: String(inventoryTiles.lowStockCount),
+          icon: PackageX,
+          href: "/inventory/timeline",
+        }
+      : null,
+    canViewInventory && inventoryTiles
+      ? {
+          label: "Positive Stock",
+          value: String(inventoryTiles.positiveStockCount),
+          icon: PackageCheck,
+          href: "/inventory/timeline",
+        }
+      : null,
+    canViewInventory && inventoryTiles
+      ? {
+          label: "Stock Value (Sale)",
+          value: `₹${minorToRupeesString(inventoryTiles.stockValueAtSaleMinor)}`,
+          icon: IndianRupee,
+          href: "/inventory/timeline",
+        }
+      : null,
+    canViewInventory && inventoryTiles
+      ? {
+          label: "Stock Value (Purchase)",
+          value: `₹${minorToRupeesString(inventoryTiles.stockValueAtPurchaseMinor)}`,
+          icon: IndianRupee,
+          href: "/inventory/timeline",
+        }
       : null,
   ].filter((t): t is NonNullable<typeof t> => t !== null);
 

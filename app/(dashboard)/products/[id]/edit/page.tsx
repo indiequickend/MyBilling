@@ -59,6 +59,22 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
             priceMinor: minorToRupeesString(p.priceMinor),
           })),
           images: product.images.map((img) => ({ url: img.url })),
+          stockTrackingEnabled: product.stockTracking?.enabled ?? false,
+          stockTrackingMode: product.stockTracking?.batchTracked
+            ? "batch"
+            : product.stockTracking?.serialTracked
+              ? "serial"
+              : "none",
+          reorderLevel:
+            typeof product.stockTracking?.reorderLevel === "number"
+              ? String(product.stockTracking.reorderLevel)
+              : "",
+          batches: (product.batches ?? [])
+            .filter((b) => !b.deletedAt)
+            .map((b) => ({
+              batchNumber: b.batchNumber,
+              expiryDate: b.expiryDate ? new Date(b.expiryDate).toISOString().slice(0, 10) : "",
+            })),
         }}
       />
     </div>

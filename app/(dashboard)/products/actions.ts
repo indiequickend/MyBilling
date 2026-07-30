@@ -41,7 +41,7 @@ function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
 }
 
 function productErrorMessage(
-  reason: "invalid_category" | "invalid_group" | "invalid_price_lists" | "not_found",
+  reason: "invalid_category" | "invalid_group" | "invalid_price_lists" | "invalid_stock_tracking" | "not_found",
 ): string {
   switch (reason) {
     case "invalid_category":
@@ -50,6 +50,8 @@ function productErrorMessage(
       return "Selected group belongs to a different business.";
     case "invalid_price_lists":
       return "One or more selected price lists are invalid.";
+    case "invalid_stock_tracking":
+      return "A product can be batch-tracked or serial-tracked, not both.";
     case "not_found":
       return "Product not found.";
   }
@@ -67,6 +69,11 @@ function productInputFromFormData(formData: FormData) {
     priceListId: row.priceListId,
     priceMinor: row.priceMinor,
   }));
+  const batches = parseIndexedRows(formData, "batch").map((row) => ({
+    batchNumber: row.batchNumber,
+    expiryDate: row.expiryDate || undefined,
+  }));
+  const trackingMode = formData.get("stockTrackingMode"); // "none" | "batch" | "serial"
 
   return {
     name: formData.get("name"),
@@ -82,7 +89,23 @@ function productInputFromFormData(formData: FormData) {
     barcode: formData.get("barcode"),
     variants,
     priceOverrides,
+    stockTracking: {
+      enabled: formData.get("stockTrackingEnabled") != null,
+      batchTracked: trackingMode === "batch",
+      serialTracked: trackingMode === "serial",
+      reorderLevel: formData.get("reorderLevel") || undefined,
+    },
+    batches,
   };
+}
+
+/** productSchema's batches carry expiryDate as a raw date string (from a form input); the query
+ * layer stores it as a real Date. */
+function batchesWithDates(batches: { batchNumber: string; expiryDate?: string }[]) {
+  return batches.map((b) => ({
+    batchNumber: b.batchNumber,
+    expiryDate: b.expiryDate ? new Date(b.expiryDate) : undefined,
+  }));
 }
 
 async function uploadProductImages(formData: FormData, businessId: string) {
@@ -119,6 +142,7 @@ export async function createProductAction(
   const result = await createProduct({
     businessId: context.activeBusinessId,
     ...parsed.data,
+    batches: batchesWithDates(parsed.data.batches),
     images,
   });
   if (!result.ok) {
@@ -153,6 +177,7 @@ export async function updateProductAction(
 
   const result = await updateProduct(productId, context.activeBusinessId, {
     ...parsed.data,
+    batches: batchesWithDates(parsed.data.batches),
     ...(images ? { images } : {}),
   });
   if (!result.ok) {

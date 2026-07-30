@@ -9,6 +9,11 @@ import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, type LineItemCalcInput } from "@/lib/documents/calc";
+import {
+  writeDocumentStockMovements,
+  InsufficientStockError,
+  type DocumentStockLineItem,
+} from "@/lib/db/queries/stockLedger";
 import type { DiscountTarget } from "@/lib/constants/invoices";
 
 export type CreditNoteLineItemWriteInput = {
@@ -23,6 +28,11 @@ export type CreditNoteLineItemWriteInput = {
   discountType: "amount" | "percentage";
   discountValue: number;
   taxRatePercent: number;
+  /** Only meaningful (and required by the API boundary) when productId resolves to a
+   * stock-tracked product, and only actually written when the header's restockItems is on. */
+  warehouseId?: string;
+  batchId?: string;
+  serialNumbers?: string[];
 };
 
 export type CreditNoteWriteInput = {
@@ -30,6 +40,9 @@ export type CreditNoteWriteInput = {
   linkedInvoiceId: string;
   creditNoteDate: Date;
   reason?: string;
+  /** Opt-in: adds product line items back to stock when true. A credit note doesn't always
+   * represent a physical return (e.g. a price-only adjustment), so this defaults off. */
+  restockItems?: boolean;
   placeOfSupplyState: string;
   lineItems: CreditNoteLineItemWriteInput[];
   discountType: "amount" | "percentage";
@@ -49,7 +62,8 @@ export type CreditNoteWriteFailureReason =
   | "business_not_found"
   | "not_found"
   | "not_cancellable"
-  | "not_deletable";
+  | "not_deletable"
+  | "insufficient_stock";
 
 export type CreditNoteWriteResult =
   | { ok: true; creditNote: InstanceType<typeof CreditNote> }
@@ -127,57 +141,79 @@ export async function createCreditNote(input: CreateCreditNoteInput): Promise<Cr
     igstMinor: totals.lineItems[i].igstMinor,
     taxableAmountMinor: totals.lineItems[i].taxableAmountMinor,
     totalMinor: totals.lineItems[i].totalMinor,
+    warehouseId: li.warehouseId ? new mongoose.Types.ObjectId(li.warehouseId) : undefined,
+    batchId: li.batchId ? new mongoose.Types.ObjectId(li.batchId) : undefined,
+    serialNumbers: li.serialNumbers,
   })) as CreditNoteLineItemDoc[];
 
   const conn = await connectToDatabase();
   const session = await conn.startSession();
   try {
     let result!: CreditNoteWriteResult;
-    await session.withTransaction(async () => {
-      let docNumber: string | undefined;
-      let seriesKey: string | undefined;
-      if (input.finalize) {
-        const numbering = business.preferences?.documentNumbering;
-        const config = resolveNumberingConfig(numbering, "credit_note");
-        seriesKey = resolveSeriesKey(input.creditNoteDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
-        const number = await reserveNextDocumentNumber(input.businessId, "credit_note", seriesKey, session);
-        docNumber = formatDocumentNumber(config, seriesKey, number);
-      }
+    try {
+      await session.withTransaction(async () => {
+        let docNumber: string | undefined;
+        let seriesKey: string | undefined;
+        if (input.finalize) {
+          const numbering = business.preferences?.documentNumbering;
+          const config = resolveNumberingConfig(numbering, "credit_note");
+          seriesKey = resolveSeriesKey(input.creditNoteDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+          const number = await reserveNextDocumentNumber(input.businessId, "credit_note", seriesKey, session);
+          docNumber = formatDocumentNumber(config, seriesKey, number);
+        }
 
-      const [creditNoteDoc] = await CreditNote.create(
-        [
-          {
+        const [creditNoteDoc] = await CreditNote.create(
+          [
+            {
+              businessId: input.businessId,
+              customerId: customer._id,
+              customerSnapshot: buildCustomerSnapshot(customer),
+              linkedInvoiceId: invoice._id,
+              docNumber,
+              seriesKey,
+              status: input.finalize ? "issued" : "draft",
+              creditNoteDate: input.creditNoteDate,
+              reason: input.reason,
+              restockItems: input.restockItems ?? false,
+              placeOfSupplyState: input.placeOfSupplyState,
+              lineItems: lineItemDocs,
+              discountType: input.discountType,
+              discountValue: input.discountValue,
+              discountTarget: input.discountTarget,
+              discountAmountMinor: totals.discountAmountMinor,
+              roundOff: input.roundOff,
+              roundOffAmountMinor: totals.roundOffAmountMinor,
+              subtotalMinor: totals.subtotalMinor,
+              totalTaxMinor: totals.totalTaxMinor,
+              totalCgstMinor: totals.totalCgstMinor,
+              totalSgstMinor: totals.totalSgstMinor,
+              totalIgstMinor: totals.totalIgstMinor,
+              grandTotalMinor: totals.grandTotalMinor,
+              createdByUserId: input.createdByUserId,
+            },
+          ],
+          { session },
+        );
+
+        if (input.finalize && input.restockItems) {
+          await writeDocumentStockMovements(session, {
             businessId: input.businessId,
-            customerId: customer._id,
-            customerSnapshot: buildCustomerSnapshot(customer),
-            linkedInvoiceId: invoice._id,
-            docNumber,
-            seriesKey,
-            status: input.finalize ? "issued" : "draft",
-            creditNoteDate: input.creditNoteDate,
-            reason: input.reason,
-            placeOfSupplyState: input.placeOfSupplyState,
-            lineItems: lineItemDocs,
-            discountType: input.discountType,
-            discountValue: input.discountValue,
-            discountTarget: input.discountTarget,
-            discountAmountMinor: totals.discountAmountMinor,
-            roundOff: input.roundOff,
-            roundOffAmountMinor: totals.roundOffAmountMinor,
-            subtotalMinor: totals.subtotalMinor,
-            totalTaxMinor: totals.totalTaxMinor,
-            totalCgstMinor: totals.totalCgstMinor,
-            totalSgstMinor: totals.totalSgstMinor,
-            totalIgstMinor: totals.totalIgstMinor,
-            grandTotalMinor: totals.grandTotalMinor,
+            lineItems: creditNoteDoc.lineItems as DocumentStockLineItem[],
+            direction: "in",
+            reason: "credit_note",
+            refDocumentType: "credit_note",
+            refDocumentId: String(creditNoteDoc._id),
+            refDocumentNumber: docNumber,
             createdByUserId: input.createdByUserId,
-          },
-        ],
-        { session },
-      );
+          });
+        }
 
-      result = { ok: true, creditNote: creditNoteDoc };
-    });
+        result = { ok: true, creditNote: creditNoteDoc };
+      });
+    } catch (err) {
+      if (err instanceof InsufficientStockError) return { ok: false, reason: "insufficient_stock" };
+      throw err;
+    }
     return result;
   } finally {
     await session.endSession();
