@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { Download } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findDebitNoteById } from "@/lib/db/queries/debitNotes";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CancelDebitNoteButton, DeleteDebitNoteButton } from "./DebitNoteActionButtons";
 
 const CANCELLABLE_STATUSES = ["draft", "issued"];
@@ -56,6 +58,14 @@ export default async function DebitNoteDetailPage({ params }: { params: Promise<
           </Link>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {debitNote.docNumber ? (
+            <Button variant="outline" asChild>
+              <a href={`/api/purchases/debit-notes/${id}/pdf`}>
+                <Download data-icon="inline-start" />
+                Download PDF
+              </a>
+            </Button>
+          ) : null}
           {canCancel ? <CancelDebitNoteButton debitNoteId={id} /> : null}
           {canDelete ? <DeleteDebitNoteButton debitNoteId={id} /> : null}
         </div>

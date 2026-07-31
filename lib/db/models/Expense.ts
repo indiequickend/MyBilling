@@ -20,6 +20,8 @@ const expenseSchema = new Schema(
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor" },
     supplierName: { type: String, trim: true },
     supplierGstin: { type: String, trim: true, uppercase: true },
+    // Optional Project bucket (project_spec.md Projects) — see lib/db/queries/projects.ts.
+    projectId: { type: Schema.Types.ObjectId, ref: "Project" },
     description: { type: String, trim: true },
     expenseDate: { type: Date, required: true },
 
@@ -45,6 +47,7 @@ const expenseSchema = new Schema(
 
 expenseSchema.index({ businessId: 1, status: 1, expenseDate: -1 });
 expenseSchema.index({ businessId: 1, categoryId: 1 });
+expenseSchema.index({ businessId: 1, projectId: 1 });
 
 export type ExpenseDoc = {
   businessId: mongoose.Types.ObjectId;
@@ -55,6 +58,7 @@ export type ExpenseDoc = {
   vendorId?: mongoose.Types.ObjectId;
   supplierName?: string;
   supplierGstin?: string;
+  projectId?: mongoose.Types.ObjectId;
   description?: string;
   expenseDate: Date;
   tdsApplicable: boolean;

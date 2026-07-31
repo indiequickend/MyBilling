@@ -51,6 +51,7 @@ export type InvoiceFormDefaultValues = {
   termTemplateId: string;
   signatureId: string;
   bankAccountId: string;
+  projectId?: string;
   discountType: "amount" | "percentage";
   discountValue: string;
   discountTarget: (typeof DISCOUNT_TARGETS)[number];
@@ -75,6 +76,7 @@ export function InvoiceForm({
   termTemplates,
   warehouses,
   defaultWarehouseId,
+  projects,
   customFieldDefs,
   businessState,
   defaultValues,
@@ -89,6 +91,9 @@ export function InvoiceForm({
   termTemplates: Array<{ id: string; label: string }>;
   warehouses: Array<{ id: string; name: string }>;
   defaultWarehouseId?: string;
+  /** Only passed when the current user can view Projects — absent (not just empty) means the
+   * picker shouldn't render at all for them. */
+  projects?: Array<{ id: string; name: string }>;
   customFieldDefs: Array<{
     key: string;
     label: string;
@@ -368,6 +373,22 @@ export function InvoiceForm({
           </Field>
         </CardContent>
       </Card>
+
+      {projects ? (
+        <Card>
+          <CardContent>
+            <Field>
+              <FieldLabel htmlFor="projectId">Project (optional)</FieldLabel>
+              <SelectField
+                name="projectId"
+                defaultValue={defaultValues?.projectId}
+                placeholder="None"
+                options={[{ value: "", label: "None" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+              />
+            </Field>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="bg-accent-pink text-accent-pink-foreground ring-0">
         <CardHeader>

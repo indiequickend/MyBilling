@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { getItemSalesReport, getItemPurchaseReport, type ItemReportRow } from "@/lib/db/queries/itemReports";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -22,6 +22,7 @@ export default async function ItemReportPage({
   }
 
   const docType = sp.docType === "purchase" ? "purchase" : "sales";
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
   const dateRange = parseReportDateRange(sp);
   const rows = await (docType === "purchase" ? getItemPurchaseReport : getItemSalesReport)(
     context.activeBusinessId,
@@ -52,7 +53,12 @@ export default async function ItemReportPage({
         ]}
       />
       <div className="mt-4">
-        <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} extraHiddenParams={{ docType }} />
+        <ReportFilterBar
+          dateFrom={sp.dateFrom}
+          dateTo={sp.dateTo}
+          fyStartMonth={fyStartMonth}
+          extraHiddenParams={{ docType }}
+        />
       </div>
       <ReportTable
         columns={columns}

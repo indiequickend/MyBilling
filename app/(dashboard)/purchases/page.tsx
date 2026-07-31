@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MoreHorizontal, Plus } from "lucide-react";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listPurchases, sumPurchaseTotals } from "@/lib/db/queries/purchases";
 import { purchaseListQuerySchema } from "@/lib/validation/purchases";
@@ -53,6 +53,8 @@ export default async function PurchasesPage({
   if (!can(context.membership, "purchases", "view")) {
     return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
+
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
 
   const query = purchaseListQuerySchema.parse({
     q: sp.q,
@@ -108,7 +110,7 @@ export default async function PurchasesPage({
           placeholder="Search purchase #, reference, vendor…"
           hiddenParams={{ tab: query.tab }}
         >
-          <DateRangeFilter dateFrom={query.dateFrom} dateTo={query.dateTo} />
+          <DateRangeFilter dateFrom={query.dateFrom} dateTo={query.dateTo} fyStartMonth={fyStartMonth} />
         </SearchInput>
       </div>
 

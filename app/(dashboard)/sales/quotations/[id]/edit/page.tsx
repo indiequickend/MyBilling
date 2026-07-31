@@ -37,6 +37,14 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
 
   const businessState = business.addresses?.billing?.state ?? "";
 
+  const fieldDefs = (business.documentCustomFieldDefs?.quotation ?? []).map((d) => ({
+    key: d.key,
+    label: d.label,
+    type: d.type,
+    options: d.options ?? [],
+    required: d.required,
+  }));
+
   const lineItems: LineItemRow[] = quotation.lineItems.map((li) => ({
     productId: li.productId ? String(li.productId) : "",
     variantId: li.variantId ? String(li.variantId) : "",
@@ -65,6 +73,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
         }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{
           customerId: String(quotation.customerId),
@@ -84,6 +93,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
               ? String(quotation.discountValue)
               : minorToRupeesString(quotation.discountValue),
           discountTarget: quotation.discountTarget,
+          customFieldValues: quotation.customFieldValues ?? {},
           lineItems,
         }}
       />

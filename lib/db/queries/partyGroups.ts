@@ -83,3 +83,20 @@ export async function restorePartyGroup(groupId: string, businessId: string) {
     { returnDocument: "after" },
   );
 }
+
+/** Finds or creates a party group by name+type — used by the bulk CSV import, which accepts
+ * free-text group names rather than requiring the user to pre-create every group first. Scoped by
+ * `type` since a Customer group and a Vendor group of the same name are distinct records (see the
+ * unique {businessId,type,name} index on PartyGroup). */
+export async function findOrCreatePartyGroupByName(businessId: string, type: PartyType, name: string) {
+  await connectToDatabase();
+  const trimmed = name.trim();
+  const existing = await PartyGroup.findOne({
+    businessId,
+    type,
+    name: trimmed,
+    deletedAt: { $exists: false },
+  });
+  if (existing) return existing;
+  return PartyGroup.create({ businessId, type, name: trimmed });
+}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowRightLeft, Pencil } from "lucide-react";
+import { ArrowRightLeft, Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findPurchaseOrderById } from "@/lib/db/queries/purchaseOrders";
@@ -74,6 +74,14 @@ export default async function PurchaseOrderDetailLayout({
                 <Pencil data-icon="inline-start" />
                 Edit
               </Link>
+            </Button>
+          ) : null}
+          {purchaseOrder.docNumber ? (
+            <Button variant="outline" asChild>
+              <a href={`/api/purchases/orders/${id}/pdf`}>
+                <Download data-icon="inline-start" />
+                Download PDF
+              </a>
             </Button>
           ) : null}
           {canCancel ? <CancelPurchaseOrderButton purchaseOrderId={id} /> : null}

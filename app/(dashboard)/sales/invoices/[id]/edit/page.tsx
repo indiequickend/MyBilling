@@ -7,6 +7,7 @@ import { listSignatures } from "@/lib/db/queries/signatures";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
 import { listWarehouses } from "@/lib/db/queries/warehouses";
+import { listProjects } from "@/lib/db/queries/projects";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findProductsByIds } from "@/lib/db/queries/products";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -32,7 +33,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
     redirect(`/sales/invoices/${id}`);
   }
 
-  const [customers, signatures, bankAccounts, noteTemplates, termTemplates, warehouses, business] =
+  const canViewProjects = can(context.membership, "projects", "view");
+  const [customers, signatures, bankAccounts, noteTemplates, termTemplates, warehouses, business, projects] =
     await Promise.all([
       listCustomers(context.activeBusinessId, { pageSize: 500 }),
       listSignatures(context.activeBusinessId, "active"),
@@ -41,6 +43,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
       listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "term", tab: "active" }),
       listWarehouses(context.activeBusinessId, "active"),
       findBusinessById(context.activeBusinessId),
+      canViewProjects ? listProjects(context.activeBusinessId, "active") : Promise.resolve(undefined),
     ]);
   if (!business) redirect("/");
 
@@ -94,6 +97,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
             ? String(business.preferences.productsInventory.inventory.defaultWarehouseId)
             : undefined
         }
+        projects={projects?.map((p) => ({ id: String(p._id), name: p.name }))}
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{
@@ -110,6 +114,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
           termTemplateId: invoice.termTemplateId ? String(invoice.termTemplateId) : "",
           signatureId: invoice.signatureId ? String(invoice.signatureId) : "",
           bankAccountId: invoice.bankAccountId ? String(invoice.bankAccountId) : "",
+          projectId: invoice.projectId ? String(invoice.projectId) : "",
           discountType: invoice.discountType,
           discountValue:
             invoice.discountType === "percentage"

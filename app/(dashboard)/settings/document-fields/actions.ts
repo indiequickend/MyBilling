@@ -10,7 +10,14 @@ import { parseIndexedRows } from "@/lib/validation/shared";
 import type { DocumentType } from "@/lib/constants/documentTypes";
 
 /** Only these doc types have a working create/edit form that reads documentCustomFieldDefs so far. */
-const SUPPORTED_DOC_TYPES: DocumentType[] = ["invoice", "purchase"];
+const SUPPORTED_DOC_TYPES: DocumentType[] = [
+  "invoice",
+  "purchase",
+  "quotation",
+  "sales_order",
+  "proforma_invoice",
+  "purchase_order",
+];
 
 export type DocumentFieldsPageState = { error?: string; success?: string };
 

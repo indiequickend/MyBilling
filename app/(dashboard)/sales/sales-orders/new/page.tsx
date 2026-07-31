@@ -50,6 +50,14 @@ export default async function NewSalesOrderPage({
     : undefined;
   const headerFromQuotation = sourceQuotation ? extractConvertibleHeader(sourceQuotation) : undefined;
 
+  const fieldDefs = (business.documentCustomFieldDefs?.sales_order ?? []).map((d) => ({
+    key: d.key,
+    label: d.label,
+    type: d.type,
+    options: d.options ?? [],
+    required: d.required,
+  }));
+
   return (
     <div>
       <h1 className="mb-6 text-lg font-semibold">New sales order</h1>
@@ -61,6 +69,7 @@ export default async function NewSalesOrderPage({
         }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{
           customerId: sourceQuotation ? String(sourceQuotation.customerId) : "",
@@ -77,6 +86,7 @@ export default async function NewSalesOrderPage({
           discountType: headerFromQuotation?.discountType ?? salesOrderPrefs.defaultDiscountType,
           discountValue: headerFromQuotation?.discountValue ?? "0",
           discountTarget: headerFromQuotation?.discountTarget ?? "total",
+          customFieldValues: {},
           lineItems: lineItemsFromQuotation ?? [],
           sourceQuotationId: sourceQuotation ? String(sourceQuotation._id) : undefined,
         }}

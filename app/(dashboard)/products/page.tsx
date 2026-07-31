@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listProducts } from "@/lib/db/queries/products";
@@ -20,6 +20,7 @@ import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/button";
+import { MasterExportButtons } from "@/components/importExport/MasterExportButtons";
 import { softDeleteProductAction, restoreProductAction } from "./actions";
 
 export default async function ProductsPage({
@@ -75,6 +76,14 @@ export default async function ProductsPage({
             Price lists
           </Link>
           {canCreate ? (
+            <Button variant="outline" asChild>
+              <Link href="/products/bulk-upload">
+                <Upload data-icon="inline-start" />
+                Bulk upload
+              </Link>
+            </Button>
+          ) : null}
+          {canCreate ? (
             <Button asChild>
               <Link href="/products/new">
                 <Plus data-icon="inline-start" />
@@ -91,6 +100,10 @@ export default async function ProductsPage({
           { label: "Deleted", href: "/products?tab=deleted", active: query.tab === "deleted" },
         ]}
       />
+
+      <div className="mb-3 flex justify-end">
+        <MasterExportButtons baseHref="/api/products/export" search={query.q} tab={query.tab} />
+      </div>
 
       <div className="mb-4">
         <SearchInput defaultValue={query.q} placeholder="Search products…" hiddenParams={{ tab: query.tab }}>

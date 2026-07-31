@@ -10,7 +10,9 @@ import {
   purchaseOrderLineItemsSchema,
   purchaseOrderDiscountSchema,
 } from "@/lib/validation/purchaseOrders";
+import { buildCustomFieldValuesSchema } from "@/lib/validation/business";
 import { parseIndexedRows, parseCheckbox } from "@/lib/validation/shared";
+import { findBusinessById } from "@/lib/db/queries/businesses";
 import {
   createPurchaseOrder,
   updatePurchaseOrder,
@@ -73,6 +75,7 @@ function parseLineItemRows(formData: FormData) {
 }
 
 async function parsePurchaseOrderForm(
+  businessId: string,
   formData: FormData,
 ): Promise<
   | { ok: true; input: Omit<PurchaseOrderWriteInput, "businessId"> }
@@ -113,6 +116,21 @@ async function parsePurchaseOrderForm(
     return { ok: false, error: discountParsed.error.issues[0]?.message ?? "Fix the discount." };
   }
 
+  const business = await findBusinessById(businessId);
+  if (!business) return { ok: false, error: "Business not found." };
+  const fieldDefs = business.documentCustomFieldDefs?.purchase_order ?? [];
+  const customFieldSchema = buildCustomFieldValuesSchema(fieldDefs);
+  const rawCustomFields: Record<string, unknown> = {};
+  for (const def of fieldDefs) rawCustomFields[def.key] = formData.get(def.key);
+  const customFieldsParsed = customFieldSchema.safeParse(rawCustomFields);
+  if (!customFieldsParsed.success) {
+    return {
+      ok: false,
+      error: "Fix the custom field values.",
+      fieldErrors: fieldErrorsFrom(customFieldsParsed.error),
+    };
+  }
+
   const h = headerParsed.data;
   const input: Omit<PurchaseOrderWriteInput, "businessId"> = {
     vendorId: h.vendorId,
@@ -126,6 +144,7 @@ async function parsePurchaseOrderForm(
     discountValue: discountParsed.data.discountValue,
     discountTarget: discountParsed.data.discountTarget,
     roundOff: h.roundOff,
+    customFieldValues: customFieldsParsed.data,
     notes: h.notes,
     terms: h.terms,
     noteTemplateId: h.noteTemplateId,
@@ -143,7 +162,7 @@ export async function savePurchaseOrderAction(
   const intent = String(formData.get("intent") ?? "draft"); // "draft" | "finalize"
   const purchaseOrderId = String(formData.get("purchaseOrderId") ?? "") || undefined;
 
-  const parsed = await parsePurchaseOrderForm(formData);
+  const parsed = await parsePurchaseOrderForm(context.activeBusinessId, formData);
   if (!parsed.ok) return { error: parsed.error, fieldErrors: parsed.fieldErrors };
 
   let result;

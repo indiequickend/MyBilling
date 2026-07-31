@@ -40,6 +40,24 @@ export async function findProductById(productId: string, businessId: string) {
   return Product.findOne({ _id: productId, businessId });
 }
 
+/** Unpaginated variant of listProducts for bulk export — "everything matching this search/tab
+ * filter," not one page of it. */
+export async function listAllProducts(
+  businessId: string,
+  params: { search?: string; tab?: "active" | "deleted" } = {},
+) {
+  await connectToDatabase();
+  const filter: Record<string, unknown> = {
+    businessId,
+    deletedAt: params.tab === "deleted" ? { $exists: true } : { $exists: false },
+  };
+  if (params.search) {
+    const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
+    filter.$or = [{ name: pattern }, { barcode: pattern }, { hsnOrSac: pattern }];
+  }
+  return Product.find(filter).sort({ name: 1 }).lean();
+}
+
 /** Thin, active-only wrapper around listProducts for the invoice line-item autocomplete. */
 export async function searchProductsForInvoice(businessId: string, query: string, limit = 20) {
   await connectToDatabase();

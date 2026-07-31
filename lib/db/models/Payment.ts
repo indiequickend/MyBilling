@@ -9,6 +9,10 @@ import { PAYMENT_MODES } from "@/lib/constants/payments";
 const paymentSchema = new Schema(
   {
     businessId: { type: Schema.Types.ObjectId, ref: "Business", required: true, index: true },
+    // Receipt number, reserved server-side in the same transaction as the payment write (see
+    // createPayment in lib/db/queries/payments.ts) — same numbering scheme as Invoice/Purchase.
+    docNumber: { type: String, trim: true },
+    seriesKey: { type: String, trim: true },
     // Optional: Expense/Indirect Income payments (Phase 4) have no linked Customer/Vendor.
     partyType: { type: String, enum: ["customer", "vendor"] },
     partyId: { type: Schema.Types.ObjectId, index: true },
@@ -36,6 +40,10 @@ const paymentSchema = new Schema(
   { timestamps: true },
 );
 
+paymentSchema.index(
+  { businessId: 1, docNumber: 1 },
+  { unique: true, partialFilterExpression: { docNumber: { $type: "string" } } },
+);
 paymentSchema.index({ businessId: 1, linkedDocumentType: 1, linkedDocumentId: 1 });
 paymentSchema.index({ businessId: 1, partyType: 1, partyId: 1, paymentDate: -1 });
 paymentSchema.index({ businessId: 1, bankAccountId: 1 });

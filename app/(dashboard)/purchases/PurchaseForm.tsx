@@ -51,6 +51,7 @@ export type PurchaseFormDefaultValues = {
   noteTemplateId: string;
   termTemplateId: string;
   bankAccountId: string;
+  projectId?: string;
   discountType: "amount" | "percentage";
   discountValue: string;
   discountTarget: (typeof DISCOUNT_TARGETS)[number];
@@ -77,6 +78,7 @@ export function PurchaseForm({
   termTemplates,
   warehouses,
   defaultWarehouseId,
+  projects,
   customFieldDefs,
   businessState,
   trackItcEligibility,
@@ -91,6 +93,9 @@ export function PurchaseForm({
   termTemplates: Array<{ id: string; label: string }>;
   warehouses: Array<{ id: string; name: string }>;
   defaultWarehouseId?: string;
+  /** Only passed when the current user can view Projects — absent (not just empty) means the
+   * picker shouldn't render at all for them. */
+  projects?: Array<{ id: string; name: string }>;
   customFieldDefs: Array<{
     key: string;
     label: string;
@@ -414,6 +419,22 @@ export function PurchaseForm({
           </Field>
         </CardContent>
       </Card>
+
+      {projects ? (
+        <Card>
+          <CardContent>
+            <Field>
+              <FieldLabel htmlFor="projectId">Project (optional)</FieldLabel>
+              <SelectField
+                name="projectId"
+                defaultValue={defaultValues?.projectId}
+                placeholder="None"
+                options={[{ value: "", label: "None" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+              />
+            </Field>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {showPayments ? (
         <Card className="bg-accent-mint text-accent-mint-foreground ring-0">

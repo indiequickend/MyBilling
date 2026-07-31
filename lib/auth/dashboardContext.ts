@@ -34,3 +34,10 @@ export const getDashboardContext = cache(async (): Promise<DashboardContext | nu
 
   return { user, businesses, activeBusinessId, membership };
 });
+
+/** The active business's fiscal-year start month (1-12), for date-range presets like "FY 25-26" —
+ * `context.businesses` is already fetched by getDashboardContext, so this adds no extra query. */
+export function getActiveBusinessFyStartMonth(context: DashboardContext): number {
+  const business = context.businesses.find((b) => String(b._id) === context.activeBusinessId);
+  return business?.preferences?.documentNumbering?.fyStartMonth ?? 4;
+}

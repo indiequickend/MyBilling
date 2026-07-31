@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownCircle, ArrowUpCircle, FileText, Package, Users, Wallet } from "lucide-react";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listInvoices, sumInvoiceTotals } from "@/lib/db/queries/invoices";
 import { listCustomers } from "@/lib/db/queries/customers";
@@ -55,6 +55,7 @@ export default async function InsightsPage({
 
   const businessId = context.activeBusinessId;
   const membership = context.membership;
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
   const dateRange = parseReportDateRange(sp);
 
   const canViewInvoices = can(membership, "sales_invoices", "view");
@@ -120,7 +121,7 @@ export default async function InsightsPage({
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-lg font-semibold">Insights</h1>
-        <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} />
+        <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} fyStartMonth={fyStartMonth} />
       </div>
 
       {tiles.length > 0 ? (

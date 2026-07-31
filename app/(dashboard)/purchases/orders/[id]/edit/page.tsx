@@ -37,6 +37,14 @@ export default async function EditPurchaseOrderPage({ params }: { params: Promis
 
   const businessState = business.addresses?.billing?.state ?? "";
 
+  const fieldDefs = (business.documentCustomFieldDefs?.purchase_order ?? []).map((d) => ({
+    key: d.key,
+    label: d.label,
+    type: d.type,
+    options: d.options ?? [],
+    required: d.required,
+  }));
+
   const lineItems: LineItemRow[] = purchaseOrder.lineItems.map((li) => ({
     productId: li.productId ? String(li.productId) : "",
     variantId: li.variantId ? String(li.variantId) : "",
@@ -65,6 +73,7 @@ export default async function EditPurchaseOrderPage({ params }: { params: Promis
         }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{
           vendorId: String(purchaseOrder.vendorId),
@@ -86,6 +95,7 @@ export default async function EditPurchaseOrderPage({ params }: { params: Promis
               ? String(purchaseOrder.discountValue)
               : minorToRupeesString(purchaseOrder.discountValue),
           discountTarget: purchaseOrder.discountTarget,
+          customFieldValues: purchaseOrder.customFieldValues ?? {},
           lineItems,
         }}
       />

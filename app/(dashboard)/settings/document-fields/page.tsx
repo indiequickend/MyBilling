@@ -9,6 +9,10 @@ import { DocumentCustomFieldDefsEditor } from "./DocumentCustomFieldDefsEditor";
 const DOC_TYPE_TABS = [
   { key: "invoice", label: "Invoice" },
   { key: "purchase", label: "Purchase" },
+  { key: "quotation", label: "Quotation" },
+  { key: "sales_order", label: "Sales Order" },
+  { key: "proforma_invoice", label: "Proforma Invoice" },
+  { key: "purchase_order", label: "Purchase Order" },
 ] as const;
 type SupportedDocType = (typeof DOC_TYPE_TABS)[number]["key"];
 

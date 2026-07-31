@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { getBillWiseItemReport, type BillWiseItemRow } from "@/lib/db/queries/billWiseItemReport";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -22,6 +22,7 @@ export default async function BillWiseItemReportPage({
   }
 
   const docType = sp.docType === "purchase" ? "purchase" : "invoice";
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
   const dateRange = parseReportDateRange(sp);
   const rows = await getBillWiseItemReport(context.activeBusinessId, docType, dateRange);
 
@@ -53,7 +54,12 @@ export default async function BillWiseItemReportPage({
         ]}
       />
       <div className="mt-4">
-        <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} extraHiddenParams={{ docType }} />
+        <ReportFilterBar
+          dateFrom={sp.dateFrom}
+          dateTo={sp.dateTo}
+          fyStartMonth={fyStartMonth}
+          extraHiddenParams={{ docType }}
+        />
       </div>
       <ReportTable
         columns={columns}

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { getSummaryReport, type SummaryReportRow } from "@/lib/db/queries/reports";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -25,6 +25,7 @@ export default async function SummaryReportPage({
   }
 
   const bucket: Bucket = BUCKETS.includes(sp.bucket as Bucket) ? (sp.bucket as Bucket) : "day";
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
   const dateRange = parseReportDateRange(sp);
   const rows = await getSummaryReport(context.activeBusinessId, { ...dateRange, bucket });
 
@@ -68,7 +69,12 @@ export default async function SummaryReportPage({
         }))}
       />
       <div className="mt-4">
-        <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} extraHiddenParams={{ bucket }} />
+        <ReportFilterBar
+          dateFrom={sp.dateFrom}
+          dateTo={sp.dateTo}
+          fyStartMonth={fyStartMonth}
+          extraHiddenParams={{ bucket }}
+        />
       </div>
       <ReportTable
         columns={columns}

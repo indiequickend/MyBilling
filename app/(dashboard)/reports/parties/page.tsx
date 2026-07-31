@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { getPartyReport, type PartyReportRow } from "@/lib/db/queries/reports";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -22,6 +22,7 @@ export default async function PartyReportPage({
   }
 
   const partyType = sp.partyType === "vendor" ? "vendor" : "customer";
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
   const dateRange = parseReportDateRange(sp);
   const rows = await getPartyReport(context.activeBusinessId, partyType, dateRange);
 
@@ -58,7 +59,12 @@ export default async function PartyReportPage({
         ]}
       />
       <div className="mt-4">
-        <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} extraHiddenParams={{ partyType }} />
+        <ReportFilterBar
+          dateFrom={sp.dateFrom}
+          dateTo={sp.dateTo}
+          fyStartMonth={fyStartMonth}
+          extraHiddenParams={{ partyType }}
+        />
       </div>
       <ReportTable
         columns={columns}

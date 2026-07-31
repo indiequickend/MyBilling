@@ -4,6 +4,7 @@ import { Expense, type ExpenseStatus } from "@/lib/db/models/Expense";
 import { Vendor } from "@/lib/db/models/Vendor";
 import { isOwnedExpenseCategory } from "@/lib/db/queries/expenseCategories";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
+import { isOwnedProject } from "@/lib/db/queries/projects";
 import { createPayment } from "@/lib/db/queries/payments";
 import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import type { PaymentMode } from "@/lib/constants/payments";
@@ -17,6 +18,7 @@ export type ExpenseWriteInput = {
   vendorId?: string;
   supplierName?: string;
   supplierGstin?: string;
+  projectId?: string;
   description?: string;
   expenseDate: Date;
   tdsApplicable?: boolean;
@@ -35,6 +37,7 @@ export type ExpenseWriteFailureReason =
   | "invalid_category"
   | "invalid_bank_account"
   | "invalid_vendor"
+  | "invalid_project"
   | "not_found"
   | "not_cancellable"
   | "not_deletable";
@@ -69,6 +72,9 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
     });
     if (!vendor) return { ok: false, reason: "invalid_vendor" };
   }
+  if (input.projectId && !(await isOwnedProject(input.projectId, input.businessId))) {
+    return { ok: false, reason: "invalid_project" };
+  }
 
   const conn = await connectToDatabase();
   const session = await conn.startSession();
@@ -86,6 +92,7 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
             vendorId: input.vendorId,
             supplierName: input.supplierName,
             supplierGstin: input.supplierGstin,
+            projectId: input.projectId,
             description: input.description,
             expenseDate: input.expenseDate,
             tdsApplicable: input.tdsApplicable ?? false,
@@ -176,6 +183,7 @@ export async function findExpenseById(expenseId: string, businessId: string) {
 export type ExpenseListParams = {
   search?: string;
   categoryId?: string;
+  projectId?: string;
   tab?: "all" | "recorded" | "cancelled" | "deleted";
   dateFrom?: Date;
   dateTo?: Date;
@@ -196,6 +204,7 @@ function buildExpenseFilter(
     filter.status = params.tab;
   }
   if (params.categoryId) filter.categoryId = params.categoryId;
+  if (params.projectId) filter.projectId = params.projectId;
   if (params.search) {
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
     filter.$or = [{ supplierName: pattern }, { description: pattern }];

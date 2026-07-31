@@ -4,6 +4,7 @@ import { can } from "@/lib/rbac/can";
 import { listExpenseCategories } from "@/lib/db/queries/expenseCategories";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listVendors } from "@/lib/db/queries/vendors";
+import { listProjects } from "@/lib/db/queries/projects";
 import { ExpenseForm } from "../ExpenseForm";
 
 export default async function NewExpensePage() {
@@ -15,10 +16,12 @@ export default async function NewExpensePage() {
     return <p className="text-sm text-destructive">You don&apos;t have permission to record expenses.</p>;
   }
 
-  const [categories, bankAccounts, vendors] = await Promise.all([
+  const canViewProjects = can(context.membership, "projects", "view");
+  const [categories, bankAccounts, vendors, projects] = await Promise.all([
     listExpenseCategories(context.activeBusinessId, "active"),
     listBankAccounts(context.activeBusinessId, "active"),
     listVendors(context.activeBusinessId, { pageSize: 500 }),
+    canViewProjects ? listProjects(context.activeBusinessId, "active") : Promise.resolve(undefined),
   ]);
 
   return (
@@ -31,6 +34,7 @@ export default async function NewExpensePage() {
           id: String(v._id),
           label: v.companyName ? `${v.displayName} (${v.companyName})` : v.displayName,
         }))}
+        projects={projects?.map((p) => ({ id: String(p._id), name: p.name }))}
       />
     </div>
   );

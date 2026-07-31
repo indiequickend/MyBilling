@@ -10,10 +10,13 @@ import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
 export function ReportFilterBar({
   dateFrom,
   dateTo,
+  fyStartMonth,
   extraHiddenParams,
 }: {
   dateFrom?: string;
   dateTo?: string;
+  /** Business's fiscal-year start month (1-12) — drives the "FY 25-26" presets. */
+  fyStartMonth?: number;
   extraHiddenParams?: Record<string, string | undefined>;
 }) {
   return (
@@ -23,7 +26,7 @@ export function ReportFilterBar({
             value ? <input key={key} type="hidden" name={key} value={value} /> : null,
           )
         : null}
-      <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} />
+      <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} fyStartMonth={fyStartMonth} />
       <Button type="submit" variant="outline">
         Filter
       </Button>

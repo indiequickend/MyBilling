@@ -5,6 +5,17 @@ import { resolveNumberingConfig } from "@/lib/documents/numbering";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { DocumentPreferencesForm } from "./DocumentPreferencesForm";
 import { DocumentNumberingForm } from "./DocumentNumberingForm";
+import type { DocumentPreferences } from "@/lib/db/models/Business";
+
+function toPlainDocPrefs(p: DocumentPreferences): DocumentPreferences {
+  return {
+    roundOff: p.roundOff,
+    defaultDiscountType: p.defaultDiscountType,
+    showHeaderFieldSuggestions: p.showHeaderFieldSuggestions,
+    defaultDueDateDays: p.defaultDueDateDays,
+    trackItcEligibility: p.trackItcEligibility,
+  };
+}
 
 export default async function DocumentPreferencesPage() {
   const context = await getDashboardContext();
@@ -28,16 +39,18 @@ export default async function DocumentPreferencesPage() {
       />
       <DocumentPreferencesForm
         preferences={{
-          sales: business.preferences.document.sales,
-          purchases: business.preferences.document.purchases,
-          conversions: business.preferences.document.conversions,
+          sales: toPlainDocPrefs(business.preferences.document.sales),
+          purchases: toPlainDocPrefs(business.preferences.document.purchases),
+          conversions: toPlainDocPrefs(business.preferences.document.conversions),
         }}
       />
 
       <div className="mt-10">
         <DocumentNumberingForm
           fyStartMonth={business.preferences.documentNumbering?.fyStartMonth ?? 4}
-          invoiceConfig={resolveNumberingConfig(business.preferences.documentNumbering, "invoice")}
+          invoiceConfig={{
+            ...resolveNumberingConfig(business.preferences.documentNumbering, "invoice"),
+          }}
         />
       </div>
     </div>

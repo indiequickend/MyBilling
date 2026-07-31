@@ -8,6 +8,7 @@ import { toPlainAddress } from "@/lib/db/models/shared/address";
 import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
+import { isOwnedProject } from "@/lib/db/queries/projects";
 import { createPayment, type CreatePaymentInput } from "@/lib/db/queries/payments";
 import {
   writeDocumentStockMovements,
@@ -80,6 +81,7 @@ export type PurchaseWriteInput = {
   bankAccountId?: string;
   /** Set when this Purchase is created by converting a Purchase Order (see purchaseOrders.ts). */
   sourcePurchaseOrderId?: string;
+  projectId?: string;
 };
 
 export type CreatePurchaseInput = PurchaseWriteInput & {
@@ -93,6 +95,7 @@ export type PurchaseWriteFailureReason =
   | "invalid_bank_account"
   | "invalid_note_template"
   | "invalid_term_template"
+  | "invalid_project"
   | "business_not_found"
   | "payments_exceed_total"
   | "not_found"
@@ -132,6 +135,7 @@ async function assertOwnedPurchaseReferences(params: {
   bankAccountId?: string;
   noteTemplateId?: string;
   termTemplateId?: string;
+  projectId?: string;
 }): Promise<
   | { ok: true; vendor: InstanceType<typeof Vendor> }
   | { ok: false; reason: PurchaseWriteFailureReason }
@@ -151,6 +155,9 @@ async function assertOwnedPurchaseReferences(params: {
   }
   if (params.termTemplateId && !(await isOwnedNoteTermTemplate(params.termTemplateId, params.businessId))) {
     return { ok: false, reason: "invalid_term_template" };
+  }
+  if (params.projectId && !(await isOwnedProject(params.projectId, params.businessId))) {
+    return { ok: false, reason: "invalid_project" };
   }
   return { ok: true, vendor };
 }
@@ -256,6 +263,7 @@ function buildPurchaseSetFields(input: PurchaseWriteInput, prepared: PreparedPur
     noteTemplateId: input.noteTemplateId,
     termTemplateId: input.termTemplateId,
     bankAccountId: input.bankAccountId,
+    projectId: input.projectId,
   };
 }
 
@@ -633,6 +641,7 @@ export async function findPurchaseById(purchaseId: string, businessId: string) {
 export type PurchaseListParams = {
   search?: string;
   vendorId?: string;
+  projectId?: string;
   tab?: "all" | "draft" | "pending" | "partially_paid" | "paid" | "cancelled" | "deleted";
   dateFrom?: Date;
   dateTo?: Date;
@@ -654,6 +663,11 @@ function buildPurchaseFilter(
   }
   if (params.vendorId) {
     filter.vendorId = options.forAggregate ? new mongoose.Types.ObjectId(params.vendorId) : params.vendorId;
+  }
+  if (params.projectId) {
+    filter.projectId = options.forAggregate
+      ? new mongoose.Types.ObjectId(params.projectId)
+      : params.projectId;
   }
   if (params.search) {
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");

@@ -43,6 +43,30 @@ export async function findVendorById(vendorId: string, businessId: string) {
   return Vendor.findOne({ _id: vendorId, businessId });
 }
 
+/** Unpaginated variant of listVendors for bulk export — "everything matching this search/tab
+ * filter," not one page of it. */
+export async function listAllVendors(
+  businessId: string,
+  params: { search?: string; tab?: "active" | "deleted" } = {},
+) {
+  await connectToDatabase();
+  const filter: Record<string, unknown> = {
+    businessId,
+    deletedAt: params.tab === "deleted" ? { $exists: true } : { $exists: false },
+  };
+  if (params.search) {
+    const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
+    filter.$or = [
+      { displayName: pattern },
+      { companyName: pattern },
+      { gstin: pattern },
+      { phone: pattern },
+      { email: pattern },
+    ];
+  }
+  return Vendor.find(filter).sort({ displayName: 1 }).lean();
+}
+
 export type VendorInput = {
   businessId: string;
   displayName: string;

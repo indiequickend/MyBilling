@@ -69,6 +69,7 @@ const rawInvoiceHeaderSchema = z.object({
   termTemplateId: optionalObjectId,
   signatureId: optionalObjectId,
   bankAccountId: optionalObjectId,
+  projectId: optionalObjectId,
   // TCS (Tax Collected at Source) this invoice collects from the customer — informational/report
   // field only, never added into the invoice's grandTotalMinor. See Invoice.ts's doc-comment.
   tcsApplicable: z.boolean(),
@@ -109,6 +110,7 @@ export function invoicePaymentSplitsSchema(maxTotalMinor: number) {
 export const invoiceListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
   customerId: objectId.optional().or(z.literal("").transform(() => undefined)),
+  projectId: objectId.optional().or(z.literal("").transform(() => undefined)),
   tab: z.enum(["all", "draft", "pending", "partially_paid", "paid", "cancelled", "deleted"]).default("all"),
   dateFrom: optionalTrimmed(30),
   dateTo: optionalTrimmed(30),

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { getTransactionReport, type TransactionReportRow } from "@/lib/db/queries/reports";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -27,6 +27,7 @@ export default async function TransactionReportPage({
     return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
   const dateRange = parseReportDateRange(sp);
   const rows = await getTransactionReport(context.activeBusinessId, dateRange);
 
@@ -66,7 +67,7 @@ export default async function TransactionReportPage({
   return (
     <div>
       <h1 className="mb-6 text-lg font-semibold">Transaction Report</h1>
-      <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} />
+      <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} fyStartMonth={fyStartMonth} />
       <ReportTable
         columns={columns}
         rows={rows}

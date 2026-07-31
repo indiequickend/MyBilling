@@ -6,6 +6,7 @@ import { listSignatures } from "@/lib/db/queries/signatures";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
 import { listWarehouses } from "@/lib/db/queries/warehouses";
+import { listProjects } from "@/lib/db/queries/projects";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findQuotationById } from "@/lib/db/queries/quotations";
 import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
@@ -27,7 +28,8 @@ export default async function NewInvoicePage({
     return <p className="text-sm text-destructive">You don&apos;t have permission to create invoices.</p>;
   }
 
-  const [customers, signatures, bankAccounts, noteTemplates, termTemplates, warehouses, business] =
+  const canViewProjects = can(context.membership, "projects", "view");
+  const [customers, signatures, bankAccounts, noteTemplates, termTemplates, warehouses, business, projects] =
     await Promise.all([
       listCustomers(context.activeBusinessId, { pageSize: 500 }),
       listSignatures(context.activeBusinessId, "active"),
@@ -36,6 +38,7 @@ export default async function NewInvoicePage({
       listNoteTermTemplates(context.activeBusinessId, { docType: "invoice", kind: "term", tab: "active" }),
       listWarehouses(context.activeBusinessId, "active"),
       findBusinessById(context.activeBusinessId),
+      canViewProjects ? listProjects(context.activeBusinessId, "active") : Promise.resolve(undefined),
     ]);
   if (!business) redirect("/");
 
@@ -100,6 +103,7 @@ export default async function NewInvoicePage({
             ? String(business.preferences.productsInventory.inventory.defaultWarehouseId)
             : undefined
         }
+        projects={projects?.map((p) => ({ id: String(p._id), name: p.name }))}
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{

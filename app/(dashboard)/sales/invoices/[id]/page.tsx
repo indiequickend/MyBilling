@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { Download } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findInvoiceById } from "@/lib/db/queries/invoices";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { RecordPaymentForm } from "./RecordPaymentForm";
 
 const PAYABLE_STATUSES = ["pending", "partially_paid"];
@@ -34,6 +36,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   const invoice = await findInvoiceById(id, context.activeBusinessId);
   if (!invoice) notFound();
+
+  const canViewPaymentReceipt = can(context.membership, "payments", "view");
 
   const [payments, bankAccounts, business, signature, bankAccount] = await Promise.all([
     listPaymentsForDocument("invoice", id, context.activeBusinessId),
@@ -214,6 +218,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   <TableHead>Mode</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
+                  {canViewPaymentReceipt ? <TableHead>Receipt</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -227,6 +232,20 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                         {p.voidedAt ? "Voided" : "Recorded"}
                       </Badge>
                     </TableCell>
+                    {canViewPaymentReceipt ? (
+                      <TableCell>
+                        {p.voidedAt ? (
+                          "—"
+                        ) : (
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={`/api/payments/${String(p._id)}/pdf`}>
+                              <Download data-icon="inline-start" />
+                              Receipt
+                            </a>
+                          </Button>
+                        )}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>

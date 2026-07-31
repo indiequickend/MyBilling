@@ -18,6 +18,7 @@ const rawExpenseHeaderSchema = z.object({
   vendorId: optionalObjectId,
   supplierName: optionalTrimmed(200),
   supplierGstin: gstinSchema,
+  projectId: optionalObjectId,
   description: optionalTrimmed(500),
   expenseDate: z.string().trim().min(1, "Expense date is required"),
   // TDS deducted from this supplier's payment, and TCS they collected on this expense — both
@@ -45,6 +46,7 @@ export type ExpenseHeaderInput = z.infer<typeof expenseHeaderSchema>;
 export const expenseListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
   categoryId: objectId.optional().or(z.literal("").transform(() => undefined)),
+  projectId: objectId.optional().or(z.literal("").transform(() => undefined)),
   tab: z.enum(["all", "recorded", "cancelled", "deleted"]).default("all"),
   page: z.coerce.number().int().min(1).default(1),
 });

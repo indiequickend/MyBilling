@@ -29,10 +29,14 @@ export function ExpenseForm({
   categories,
   bankAccounts,
   vendors,
+  projects,
 }: {
   categories: Array<{ id: string; name: string }>;
   bankAccounts: Array<{ id: string; name: string }>;
   vendors: Array<{ id: string; label: string }>;
+  /** Only passed when the current user can view Projects — absent (not just empty) means the
+   * picker shouldn't render at all for them. */
+  projects?: Array<{ id: string; name: string }>;
 }) {
   const [state, formAction] = useActionState(saveExpenseAction, initialState);
 
@@ -115,6 +119,17 @@ export function ExpenseForm({
               />
               <FormField label="Description" name="description" error={state.fieldErrors?.description} />
             </div>
+
+            {projects ? (
+              <Field>
+                <FieldLabel htmlFor="projectId">Project (optional)</FieldLabel>
+                <SelectField
+                  name="projectId"
+                  placeholder="None"
+                  options={[{ value: "", label: "None" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+                />
+              </Field>
+            ) : null}
 
             <Field>
               <FieldLabel htmlFor="receipt">Receipt (optional, PDF or image)</FieldLabel>

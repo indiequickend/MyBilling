@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { FormError } from "@/components/auth/AuthCard";
 import { DISCOUNT_TARGETS, DISCOUNT_TARGET_LABELS } from "@/lib/constants/invoices";
+import type { CustomFieldType } from "@/lib/validation/shared";
 import { LineItemsEditor, type LineItemRow } from "@/components/documents/LineItemsEditor";
 import { saveQuotationAction, type QuotationFormState } from "./actions";
 
@@ -50,6 +51,7 @@ export type QuotationFormDefaultValues = {
   discountType: "amount" | "percentage";
   discountValue: string;
   discountTarget: (typeof DISCOUNT_TARGETS)[number];
+  customFieldValues: Record<string, unknown>;
   lineItems: LineItemRow[];
 };
 
@@ -60,6 +62,7 @@ export function QuotationForm({
   customers,
   noteTemplates,
   termTemplates,
+  customFieldDefs,
   businessState,
   defaultValues,
 }: {
@@ -69,6 +72,13 @@ export function QuotationForm({
   customers: Array<{ id: string; label: string }>;
   noteTemplates: Array<{ id: string; label: string }>;
   termTemplates: Array<{ id: string; label: string }>;
+  customFieldDefs: Array<{
+    key: string;
+    label: string;
+    type: CustomFieldType;
+    options: string[];
+    required: boolean;
+  }>;
   businessState: string;
   defaultValues?: QuotationFormDefaultValues;
 }) {
@@ -143,6 +153,51 @@ export function QuotationForm({
           </FieldGroup>
         </CardContent>
       </Card>
+
+      {customFieldDefs.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Custom fields</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {customFieldDefs.map((def) => {
+                const value = defaultValues?.customFieldValues?.[def.key];
+                if (def.type === "select") {
+                  return (
+                    <Field key={def.key}>
+                      <FieldLabel htmlFor={def.key}>
+                        {def.label}
+                        {def.required ? " *" : ""}
+                      </FieldLabel>
+                      <SelectField
+                        name={def.key}
+                        defaultValue={typeof value === "string" ? value : ""}
+                        placeholder="Select…"
+                        required={def.required}
+                        options={def.options.map((o) => ({ value: o, label: o }))}
+                      />
+                    </Field>
+                  );
+                }
+                return (
+                  <FormField
+                    key={def.key}
+                    label={def.required ? `${def.label} *` : def.label}
+                    name={def.key}
+                    type={def.type === "number" ? "number" : def.type === "date" ? "date" : "text"}
+                    required={def.required}
+                    defaultValue={
+                      typeof value === "string" || typeof value === "number" ? String(value) : ""
+                    }
+                    error={state.fieldErrors?.[def.key]}
+                  />
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

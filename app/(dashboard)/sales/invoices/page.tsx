@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MoreHorizontal, Plus } from "lucide-react";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listInvoices, sumInvoiceTotals } from "@/lib/db/queries/invoices";
 import { invoiceListQuerySchema } from "@/lib/validation/invoices";
@@ -53,6 +53,8 @@ export default async function InvoicesPage({
   if (!can(context.membership, "sales_invoices", "view")) {
     return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
+
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
 
   const query = invoiceListQuerySchema.parse({
     q: sp.q,
@@ -108,7 +110,7 @@ export default async function InvoicesPage({
           placeholder="Search invoice #, reference, customer…"
           hiddenParams={{ tab: query.tab }}
         >
-          <DateRangeFilter dateFrom={query.dateFrom} dateTo={query.dateTo} />
+          <DateRangeFilter dateFrom={query.dateFrom} dateTo={query.dateTo} fyStartMonth={fyStartMonth} />
         </SearchInput>
       </div>
 

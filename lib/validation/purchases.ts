@@ -96,6 +96,7 @@ const rawPurchaseHeaderSchema = z.object({
   noteTemplateId: optionalObjectId,
   termTemplateId: optionalObjectId,
   bankAccountId: optionalObjectId,
+  projectId: optionalObjectId,
   // TDS deducted from this vendor's payment, and TCS the vendor collected on this purchase — both
   // payable-side, informational/report fields only. See Purchase.ts's doc-comment.
   tdsApplicable: z.boolean(),
@@ -143,6 +144,7 @@ export function purchasePaymentSplitsSchema(maxTotalMinor: number) {
 export const purchaseListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
   vendorId: objectId.optional().or(z.literal("").transform(() => undefined)),
+  projectId: objectId.optional().or(z.literal("").transform(() => undefined)),
   tab: z.enum(["all", "draft", "pending", "partially_paid", "paid", "cancelled", "deleted"]).default("all"),
   dateFrom: optionalTrimmed(30),
   dateTo: optionalTrimmed(30),

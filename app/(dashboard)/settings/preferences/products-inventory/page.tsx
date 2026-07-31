@@ -33,12 +33,25 @@ export default async function ProductsInventoryPreferencesPage() {
       />
       <ProductsInventoryPreferencesForm
         preferences={{
-          product: business.preferences.productsInventory.product,
+          product: {
+            defaultItemType: business.preferences.productsInventory.product.defaultItemType,
+            defaultPriceInclusiveOfTax:
+              business.preferences.productsInventory.product.defaultPriceInclusiveOfTax,
+            maxDiscountPercent: business.preferences.productsInventory.product.maxDiscountPercent,
+            defaultUnit: business.preferences.productsInventory.product.defaultUnit,
+            defaultTaxRatePercent:
+              business.preferences.productsInventory.product.defaultTaxRatePercent,
+          },
           inventory: {
             trackInventory: inv.trackInventory,
             defaultWarehouseId: inv.defaultWarehouseId ? String(inv.defaultWarehouseId) : "",
           },
-          batch: business.preferences.productsInventory.batch,
+          batch: {
+            batchTrackingEnabledByDefault:
+              business.preferences.productsInventory.batch.batchTrackingEnabledByDefault,
+            expiryTrackingEnabledByDefault:
+              business.preferences.productsInventory.batch.expiryTrackingEnabledByDefault,
+          },
         }}
         warehouses={warehouseOptions}
       />

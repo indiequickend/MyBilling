@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listCustomers } from "@/lib/db/queries/customers";
@@ -20,6 +20,7 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/button";
 import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
+import { MasterExportButtons } from "@/components/importExport/MasterExportButtons";
 import { softDeleteCustomerAction, restoreCustomerAction } from "./actions";
 
 export default async function CustomersPage({
@@ -65,6 +66,14 @@ export default async function CustomersPage({
             <Link href="/customers/groups">Manage groups</Link>
           </Button>
           {canCreate ? (
+            <Button variant="outline" asChild>
+              <Link href="/customers/bulk-upload">
+                <Upload data-icon="inline-start" />
+                Bulk upload
+              </Link>
+            </Button>
+          ) : null}
+          {canCreate ? (
             <Button asChild>
               <Link href="/customers/new">
                 <Plus data-icon="inline-start" />
@@ -81,6 +90,10 @@ export default async function CustomersPage({
           { label: "Deleted", href: "/customers?tab=deleted", active: query.tab === "deleted" },
         ]}
       />
+
+      <div className="mb-3 flex justify-end">
+        <MasterExportButtons baseHref="/api/customers/export" search={query.q} tab={query.tab} />
+      </div>
 
       <div className="mb-4">
         <SearchInput

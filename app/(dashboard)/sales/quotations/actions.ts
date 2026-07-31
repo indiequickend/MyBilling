@@ -10,7 +10,9 @@ import {
   quotationLineItemsSchema,
   quotationDiscountSchema,
 } from "@/lib/validation/quotations";
+import { buildCustomFieldValuesSchema } from "@/lib/validation/business";
 import { parseIndexedRows, parseCheckbox } from "@/lib/validation/shared";
+import { findBusinessById } from "@/lib/db/queries/businesses";
 import {
   createQuotation,
   updateQuotation,
@@ -73,6 +75,7 @@ function parseLineItemRows(formData: FormData) {
 }
 
 async function parseQuotationForm(
+  businessId: string,
   formData: FormData,
 ): Promise<
   | { ok: true; input: Omit<QuotationWriteInput, "businessId"> }
@@ -113,6 +116,21 @@ async function parseQuotationForm(
     return { ok: false, error: discountParsed.error.issues[0]?.message ?? "Fix the discount." };
   }
 
+  const business = await findBusinessById(businessId);
+  if (!business) return { ok: false, error: "Business not found." };
+  const fieldDefs = business.documentCustomFieldDefs?.quotation ?? [];
+  const customFieldSchema = buildCustomFieldValuesSchema(fieldDefs);
+  const rawCustomFields: Record<string, unknown> = {};
+  for (const def of fieldDefs) rawCustomFields[def.key] = formData.get(def.key);
+  const customFieldsParsed = customFieldSchema.safeParse(rawCustomFields);
+  if (!customFieldsParsed.success) {
+    return {
+      ok: false,
+      error: "Fix the custom field values.",
+      fieldErrors: fieldErrorsFrom(customFieldsParsed.error),
+    };
+  }
+
   const h = headerParsed.data;
   const input: Omit<QuotationWriteInput, "businessId"> = {
     customerId: h.customerId,
@@ -126,6 +144,7 @@ async function parseQuotationForm(
     discountValue: discountParsed.data.discountValue,
     discountTarget: discountParsed.data.discountTarget,
     roundOff: h.roundOff,
+    customFieldValues: customFieldsParsed.data,
     notes: h.notes,
     terms: h.terms,
     noteTemplateId: h.noteTemplateId,
@@ -147,7 +166,7 @@ export async function saveQuotationAction(
   const intent = String(formData.get("intent") ?? "draft"); // "draft" | "finalize"
   const quotationId = String(formData.get("quotationId") ?? "") || undefined;
 
-  const parsed = await parseQuotationForm(formData);
+  const parsed = await parseQuotationForm(context.activeBusinessId, formData);
   if (!parsed.ok) return { error: parsed.error, fieldErrors: parsed.fieldErrors };
 
   let result;

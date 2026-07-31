@@ -15,6 +15,7 @@ export type NavIconKey =
   | "products"
   | "warehouses"
   | "payments"
+  | "projects"
   | "settings"
   | "profile"
   | "company"
@@ -210,6 +211,13 @@ const MAIN_GROUPS: NavGroup[] = [
     ],
   },
   {
+    href: "/projects",
+    label: "Projects",
+    icon: "projects",
+    moduleKey: "projects",
+    action: "view",
+  },
+  {
     href: "/reports",
     label: "Reports",
     icon: "reports",
@@ -285,6 +293,13 @@ const SETTINGS_GROUP: NavGroup = {
     {
       href: "/settings/company",
       label: "Company Details",
+      icon: "company",
+      moduleKey: "settings",
+      action: "manage_company",
+    },
+    {
+      href: "/settings/businesses",
+      label: "Businesses",
       icon: "company",
       moduleKey: "settings",
       action: "manage_company",

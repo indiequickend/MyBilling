@@ -11,6 +11,7 @@ export const DOCUMENT_TYPES = [
   "sales_order",
   "proforma_invoice",
   "journal",
+  "payment",
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
@@ -24,4 +25,5 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   sales_order: "Sales Order",
   proforma_invoice: "Proforma Invoice",
   journal: "Journal",
+  payment: "Payment Receipt",
 };

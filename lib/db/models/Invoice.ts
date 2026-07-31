@@ -26,6 +26,8 @@ const invoiceSchema = new Schema(
     // Order — traceability only, mirrors Purchase.sourcePurchaseOrderId. At most one is ever set.
     sourceQuotationId: { type: Schema.Types.ObjectId, ref: "Quotation" },
     sourceSalesOrderId: { type: Schema.Types.ObjectId, ref: "SalesOrder" },
+    // Optional Project bucket (project_spec.md Projects) — see lib/db/queries/projects.ts.
+    projectId: { type: Schema.Types.ObjectId, ref: "Project" },
 
     // Absent while status is "draft" — a document number is reserved only on finalize (see
     // lib/db/queries/invoices.ts), so abandoned drafts never burn a legal invoice number.
@@ -102,6 +104,7 @@ const invoiceSchema = new Schema(
 
 invoiceSchema.index({ businessId: 1, status: 1, invoiceDate: -1 });
 invoiceSchema.index({ businessId: 1, customerId: 1 });
+invoiceSchema.index({ businessId: 1, projectId: 1 });
 // Defense-in-depth on top of the transactional counter in documentSequences.ts — only applies
 // once a docNumber is actually assigned (drafts have none).
 invoiceSchema.index(
@@ -124,6 +127,7 @@ export type InvoiceDoc = {
   customerSnapshot: InvoiceCustomerSnapshot;
   sourceQuotationId?: mongoose.Types.ObjectId;
   sourceSalesOrderId?: mongoose.Types.ObjectId;
+  projectId?: mongoose.Types.ObjectId;
   docNumber?: string;
   seriesKey?: string;
   status: InvoiceStatus;

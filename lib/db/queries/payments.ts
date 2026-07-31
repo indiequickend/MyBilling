@@ -8,10 +8,13 @@ import { CreditNote } from "@/lib/db/models/CreditNote";
 import { BankAccount } from "@/lib/db/models/BankAccount";
 import { Customer } from "@/lib/db/models/Customer";
 import { Vendor } from "@/lib/db/models/Vendor";
+import { Business } from "@/lib/db/models/Business";
 import { derivePaymentStatus } from "@/lib/documents/calc";
 import type { DocumentStatus } from "@/lib/constants/documents";
 import { clampPageParams, paginate, type PaginatedResult } from "@/lib/db/queryHelpers";
 import type { PaymentMode } from "@/lib/constants/payments";
+import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
+import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 
 export type PaymentsTimelineParams = {
   bankAccountId?: string;
@@ -253,6 +256,11 @@ export async function listPaymentsForDocument(
   return Payment.find({ businessId, linkedDocumentType, linkedDocumentId }).sort({ paymentDate: 1 }).lean();
 }
 
+export async function findPaymentById(paymentId: string, businessId: string) {
+  await connectToDatabase();
+  return Payment.findOne({ _id: paymentId, businessId });
+}
+
 export type CreatePaymentInput = {
   businessId: string;
   partyType?: "customer" | "vendor";
@@ -272,11 +280,41 @@ export type CreatePaymentInput = {
   gatewayPaymentId?: string;
 };
 
-/** Callable standalone (Phase 7) or inside another write's transaction by passing `session`. */
+async function createPaymentInSession(input: CreatePaymentInput, session: ClientSession) {
+  const business = await Business.findById(input.businessId)
+    .select("preferences.documentNumbering")
+    .session(session);
+  const numbering = business?.preferences?.documentNumbering;
+  const config = resolveNumberingConfig(numbering, "payment");
+  const seriesKey = resolveSeriesKey(input.paymentDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+  const number = await reserveNextDocumentNumber(input.businessId, "payment", seriesKey, session);
+  const docNumber = formatDocumentNumber(config, seriesKey, number);
+
+  const [payment] = await Payment.create([{ ...input, docNumber, seriesKey }], { session });
+  return payment;
+}
+
+/**
+ * Callable standalone (opens its own transaction so receipt-number reservation stays gap-safe)
+ * or inside another write's transaction by passing `session` (e.g. invoice/purchase creation
+ * recording an inline payment) — either way the docNumber reservation commits/rolls back
+ * atomically with the Payment write.
+ */
 export async function createPayment(input: CreatePaymentInput, session?: ClientSession) {
   await connectToDatabase();
-  const [payment] = await Payment.create([input], { session });
-  return payment;
+  if (session) return createPaymentInSession(input, session);
+
+  const conn = await connectToDatabase();
+  const ownSession = await conn.startSession();
+  try {
+    let payment!: Awaited<ReturnType<typeof createPaymentInSession>>;
+    await ownSession.withTransaction(async () => {
+      payment = await createPaymentInSession(input, ownSession);
+    });
+    return payment;
+  } finally {
+    await ownSession.endSession();
+  }
 }
 
 class PaymentAlreadyVoidedError extends Error {}

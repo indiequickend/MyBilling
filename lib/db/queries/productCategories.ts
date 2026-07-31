@@ -67,3 +67,17 @@ export async function restoreProductCategory(categoryId: string, businessId: str
     { returnDocument: "after" },
   );
 }
+
+/** Finds or creates a category by name — used by the bulk CSV import, which accepts a free-text
+ * category column rather than requiring the user to pre-create every category first. */
+export async function findOrCreateProductCategoryByName(businessId: string, name: string) {
+  await connectToDatabase();
+  const trimmed = name.trim();
+  const existing = await ProductCategory.findOne({
+    businessId,
+    name: trimmed,
+    deletedAt: { $exists: false },
+  });
+  if (existing) return existing;
+  return ProductCategory.create({ businessId, name: trimmed });
+}

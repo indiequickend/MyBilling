@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listShareHistory, type ShareHistoryEntry } from "@/lib/db/queries/shareHistory";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -27,6 +27,7 @@ export default async function ShareHistoryReportPage({
     return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
   const dateRange = parseReportDateRange(sp);
   const result = await listShareHistory(context.activeBusinessId, { ...dateRange, pageSize: 100 });
 
@@ -48,7 +49,7 @@ export default async function ShareHistoryReportPage({
     <div>
       <h1 className="mb-6 text-lg font-semibold">Share History</h1>
       <p className="mb-4 text-sm text-muted-foreground">Payment Links created for this business.</p>
-      <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} />
+      <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} fyStartMonth={fyStartMonth} />
       <ReportTable
         columns={columns}
         rows={result.items}

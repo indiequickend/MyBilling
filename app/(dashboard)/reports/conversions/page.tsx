@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDashboardContext } from "@/lib/auth/dashboardContext";
+import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { getDocumentConversionHistory, type ConversionHistoryEntry } from "@/lib/db/queries/reports";
 import { parseReportDateRange, reportExportQuery } from "@/lib/reports/searchParams";
@@ -30,6 +30,7 @@ export default async function ConversionHistoryReportPage({
     return <p className="text-sm text-destructive">You don&apos;t have permission to view this page.</p>;
   }
 
+  const fyStartMonth = getActiveBusinessFyStartMonth(context);
   const dateRange = parseReportDateRange(sp);
   const rows = await getDocumentConversionHistory(context.activeBusinessId, dateRange);
 
@@ -45,7 +46,7 @@ export default async function ConversionHistoryReportPage({
   return (
     <div>
       <h1 className="mb-6 text-lg font-semibold">Document Conversion History</h1>
-      <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} />
+      <ReportFilterBar dateFrom={sp.dateFrom} dateTo={sp.dateTo} fyStartMonth={fyStartMonth} />
       <ReportTable
         columns={columns}
         rows={rows}

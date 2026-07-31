@@ -46,6 +46,8 @@ const purchaseSchema = new Schema(
     // Set on the created Purchase when it originates from converting a Purchase Order (see
     // lib/db/queries/purchaseOrders.ts) — traceability only, never required.
     sourcePurchaseOrderId: { type: Schema.Types.ObjectId, ref: "PurchaseOrder" },
+    // Optional Project bucket (project_spec.md Projects) — see lib/db/queries/projects.ts.
+    projectId: { type: Schema.Types.ObjectId, ref: "Project" },
 
     // TDS (deducted from this vendor's payment, e.g. Section 194Q/194C) and TCS (collected by the
     // vendor on this purchase, e.g. Section 206C(1H)) — both payable-side. Informational/reporting
@@ -109,6 +111,7 @@ const purchaseSchema = new Schema(
 
 purchaseSchema.index({ businessId: 1, status: 1, purchaseDate: -1 });
 purchaseSchema.index({ businessId: 1, vendorId: 1 });
+purchaseSchema.index({ businessId: 1, projectId: 1 });
 // Defense-in-depth on top of the transactional counter in documentSequences.ts — only applies
 // once a docNumber is actually assigned (drafts have none).
 purchaseSchema.index(
@@ -139,6 +142,7 @@ export type PurchaseDoc = {
   placeOfSupplyState: string;
   reverseCharge: boolean;
   sourcePurchaseOrderId?: mongoose.Types.ObjectId;
+  projectId?: mongoose.Types.ObjectId;
   tdsApplicable: boolean;
   tdsSectionCode?: string;
   tdsRatePercent?: number;

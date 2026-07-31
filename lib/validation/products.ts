@@ -98,3 +98,27 @@ export const productListQuerySchema = z.object({
   tab: z.enum(["active", "deleted"]).default("active"),
   page: z.coerce.number().int().min(1).default(1),
 });
+
+/** One CSV row of the bulk-upload format. Category/group are free-text names (auto-created if
+ * new), not raw ids — a spreadsheet author shouldn't have to look up ObjectIds by hand. No
+ * variants/price-overrides/batches — bulk import covers the flat, single-price case only. */
+export const productRowSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  type: z.enum(["product", "service"]).default("product"),
+  hsnOrSac: optionalTrimmed(20),
+  unit: optionalTrimmed(20),
+  categoryName: optionalTrimmed(100),
+  groupName: optionalTrimmed(100),
+  purchasePriceMinor: optionalRupeesToMinorUnits,
+  sellingPriceMinor: rupeesToMinorUnits,
+  priceIsTaxInclusive: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .transform((v) => v === "yes" || v === "true")
+    .optional()
+    .transform((v) => v ?? false),
+  taxRatePercent: z.coerce.number().min(0).max(100),
+  barcode: optionalTrimmed(100),
+});
+export type ProductRowInput = z.infer<typeof productRowSchema>;

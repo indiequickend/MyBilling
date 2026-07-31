@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
+import { findBusinessById } from "@/lib/db/queries/businesses";
 import { minorToRupeesString } from "@/lib/utils/money";
 import {
   Table,
@@ -25,6 +26,12 @@ export default async function SalesOrderDetailPage({ params }: { params: Promise
 
   const salesOrder = await findSalesOrderById(id, context.activeBusinessId);
   if (!salesOrder) notFound();
+
+  const business = await findBusinessById(context.activeBusinessId);
+  const fieldDefs = business?.documentCustomFieldDefs?.sales_order ?? [];
+  const customFieldEntries = fieldDefs
+    .map((def) => ({ label: def.label, value: salesOrder.customFieldValues?.[def.key] }))
+    .filter((e) => e.value !== undefined && e.value !== "");
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -53,6 +60,12 @@ export default async function SalesOrderDetailPage({ params }: { params: Promise
               <p className="text-sm text-muted-foreground">Place of supply</p>
               <p className="font-medium">{salesOrder.placeOfSupplyState}</p>
             </div>
+            {customFieldEntries.map((e) => (
+              <div key={e.label}>
+                <p className="text-sm text-muted-foreground">{e.label}</p>
+                <p className="font-medium">{String(e.value)}</p>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

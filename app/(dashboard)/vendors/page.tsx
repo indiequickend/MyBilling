@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listVendors } from "@/lib/db/queries/vendors";
@@ -20,6 +20,7 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/button";
 import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
+import { MasterExportButtons } from "@/components/importExport/MasterExportButtons";
 import { softDeleteVendorAction, restoreVendorAction } from "./actions";
 
 export default async function VendorsPage({
@@ -65,6 +66,14 @@ export default async function VendorsPage({
             <Link href="/vendors/groups">Manage groups</Link>
           </Button>
           {canCreate ? (
+            <Button variant="outline" asChild>
+              <Link href="/vendors/bulk-upload">
+                <Upload data-icon="inline-start" />
+                Bulk upload
+              </Link>
+            </Button>
+          ) : null}
+          {canCreate ? (
             <Button asChild>
               <Link href="/vendors/new">
                 <Plus data-icon="inline-start" />
@@ -81,6 +90,10 @@ export default async function VendorsPage({
           { label: "Deleted", href: "/vendors?tab=deleted", active: query.tab === "deleted" },
         ]}
       />
+
+      <div className="mb-3 flex justify-end">
+        <MasterExportButtons baseHref="/api/vendors/export" search={query.q} tab={query.tab} />
+      </div>
 
       <div className="mb-4">
         <SearchInput

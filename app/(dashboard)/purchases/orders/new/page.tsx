@@ -28,6 +28,14 @@ export default async function NewPurchaseOrderPage() {
   const defaultTermTemplate = termTemplates.find((t) => t.isDefault);
   const businessState = business.addresses?.billing?.state ?? "";
 
+  const fieldDefs = (business.documentCustomFieldDefs?.purchase_order ?? []).map((d) => ({
+    key: d.key,
+    label: d.label,
+    type: d.type,
+    options: d.options ?? [],
+    required: d.required,
+  }));
+
   return (
     <div>
       <h1 className="mb-6 text-lg font-semibold">New purchase order</h1>
@@ -39,6 +47,7 @@ export default async function NewPurchaseOrderPage() {
         }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{
           vendorId: "",
@@ -55,6 +64,7 @@ export default async function NewPurchaseOrderPage() {
           discountType: purchasePrefs.defaultDiscountType,
           discountValue: "0",
           discountTarget: "total",
+          customFieldValues: {},
           lineItems: [],
         }}
       />

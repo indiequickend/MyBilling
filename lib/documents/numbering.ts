@@ -13,6 +13,7 @@ const DEFAULT_PREFIXES: Record<DocumentType, string> = {
   sales_order: "SO-",
   proforma_invoice: "PI-",
   journal: "JNL-",
+  payment: "REC-",
 };
 
 export function resolveNumberingConfig(

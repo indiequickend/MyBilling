@@ -61,3 +61,17 @@ export async function restoreProductGroup(groupId: string, businessId: string) {
     { returnDocument: "after" },
   );
 }
+
+/** Finds or creates a group by name — used by the bulk CSV import, which accepts a free-text
+ * group column rather than requiring the user to pre-create every group first. */
+export async function findOrCreateProductGroupByName(businessId: string, name: string) {
+  await connectToDatabase();
+  const trimmed = name.trim();
+  const existing = await ProductGroup.findOne({
+    businessId,
+    name: trimmed,
+    deletedAt: { $exists: false },
+  });
+  if (existing) return existing;
+  return ProductGroup.create({ businessId, name: trimmed });
+}
