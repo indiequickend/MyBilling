@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { z } from "zod";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
-import { requirePermission, type MembershipContext } from "@/lib/rbac/can";
+import { requirePermission, can, type MembershipContext } from "@/lib/rbac/can";
 import { vendorSchema, vendorAddressesSchema } from "@/lib/validation/vendors";
+import { partyPaymentSchema } from "@/lib/validation/payments";
 import { parseAddressFromFormData } from "@/lib/validation/shared";
 import {
   createVendor,
@@ -13,9 +14,11 @@ import {
   softDeleteVendor,
   restoreVendor,
 } from "@/lib/db/queries/vendors";
+import { recordPartyPayment } from "@/lib/db/queries/payments";
 import type { ActionKey } from "@/lib/rbac/permissions";
 
 export type VendorFormState = { error?: string; fieldErrors?: Record<string, string> };
+export type VendorPaymentActionState = { error?: string };
 
 export async function requireVendorsPermission(action: ActionKey): Promise<{
   activeBusinessId: string;
@@ -138,4 +141,51 @@ export async function restoreVendorAction(formData: FormData): Promise<void> {
   if (!vendorId) return;
   await restoreVendor(vendorId, context.activeBusinessId);
   revalidatePath("/vendors");
+}
+
+/** The Vendor Ledger's "You Got"/"You Gave" quick payment entry — records an advance/on-account
+ * payment with no purchase attached (see recordPartyPayment). */
+export async function recordVendorPaymentAction(
+  _prev: VendorPaymentActionState,
+  formData: FormData,
+): Promise<VendorPaymentActionState> {
+  const context = await getDashboardContext();
+  if (!context) redirect("/login");
+  if (!context.activeBusinessId || !context.membership) redirect("/");
+  if (!can(context.membership, "payments", "create")) {
+    return { error: "You don't have permission to record payments." };
+  }
+  const vendorId = String(formData.get("vendorId") ?? "");
+
+  const parsed = partyPaymentSchema.safeParse({
+    direction: formData.get("direction"),
+    amountMinor: formData.get("amountMinor"),
+    mode: formData.get("mode"),
+    bankAccountId: formData.get("bankAccountId"),
+    paymentDate: formData.get("paymentDate"),
+    referenceNote: formData.get("referenceNote"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Fix the payment." };
+
+  const result = await recordPartyPayment({
+    businessId: context.activeBusinessId,
+    partyType: "vendor",
+    partyId: vendorId,
+    direction: parsed.data.direction,
+    amountMinor: parsed.data.amountMinor,
+    mode: parsed.data.mode,
+    bankAccountId: parsed.data.bankAccountId,
+    paymentDate: new Date(parsed.data.paymentDate),
+    referenceNote: parsed.data.referenceNote,
+    createdByUserId: context.membership.userId,
+  });
+  if (!result.ok) {
+    return {
+      error: result.reason === "party_not_found" ? "Vendor not found." : "Select a valid bank account.",
+    };
+  }
+
+  revalidatePath(`/vendors/${vendorId}/ledger`);
+  revalidatePath("/payments");
+  return {};
 }

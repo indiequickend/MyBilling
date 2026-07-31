@@ -3,7 +3,7 @@ import { Download } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findInvoiceById } from "@/lib/db/queries/invoices";
-import { listPaymentsForDocument } from "@/lib/db/queries/payments";
+import { listPaymentsForDocument, listAvailableAdvances } from "@/lib/db/queries/payments";
 import { listBankAccounts, findBankAccountById } from "@/lib/db/queries/bankAccounts";
 import { findSignatureById } from "@/lib/db/queries/signatures";
 import { findBusinessById } from "@/lib/db/queries/businesses";
@@ -21,6 +21,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RecordPaymentForm } from "./RecordPaymentForm";
+import { ApplyAdvanceForm } from "@/components/payments/ApplyAdvanceForm";
+import { applyAdvanceToInvoiceAction } from "../actions";
 
 const PAYABLE_STATUSES = ["pending", "partially_paid"];
 
@@ -39,7 +41,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   const canViewPaymentReceipt = can(context.membership, "payments", "view");
 
-  const [payments, bankAccounts, business, signature, bankAccount] = await Promise.all([
+  const [payments, bankAccounts, business, signature, bankAccount, availableAdvances] = await Promise.all([
     listPaymentsForDocument("invoice", id, context.activeBusinessId),
     listBankAccounts(context.activeBusinessId, "active"),
     findBusinessById(context.activeBusinessId),
@@ -47,6 +49,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     invoice.bankAccountId
       ? findBankAccountById(String(invoice.bankAccountId), context.activeBusinessId)
       : null,
+    listAvailableAdvances("customer", String(invoice.customerId), context.activeBusinessId, "in"),
   ]);
 
   const fieldDefs = business?.documentCustomFieldDefs?.invoice ?? [];
@@ -253,6 +256,24 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           )}
         </CardContent>
       </Card>
+
+      {PAYABLE_STATUSES.includes(invoice.status) &&
+      can(context.membership, "payments", "create") &&
+      availableAdvances.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Apply an advance payment</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ApplyAdvanceForm
+              targetIdFieldName="invoiceId"
+              targetId={id}
+              advances={availableAdvances}
+              action={applyAdvanceToInvoiceAction}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {PAYABLE_STATUSES.includes(invoice.status) && can(context.membership, "payments", "create") ? (
         <Card className="bg-accent-mint text-accent-mint-foreground ring-0">

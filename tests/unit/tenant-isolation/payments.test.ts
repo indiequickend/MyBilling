@@ -10,6 +10,9 @@ import {
   getPartyLedger,
   getBillWiseForParty,
   listPaymentsForDocument,
+  recordPartyPayment,
+  listAvailableAdvances,
+  applyAdvancePayment,
 } from "@/lib/db/queries/payments";
 import { Invoice } from "@/lib/db/models/Invoice";
 import { Purchase } from "@/lib/db/models/Purchase";
@@ -204,5 +207,145 @@ describe("vendor ledger — sign convention", () => {
 
     // Balance = what we owe the vendor: 100_000 debit - 40_000 credit = 60_000 still payable.
     expect(paymentEntry.balanceMinor).toBe(60_000);
+  });
+});
+
+describe("advance payments — recordPartyPayment / applyAdvancePayment", () => {
+  let tenants: TwoTenants;
+  let customerAId: string;
+  let bankAId: string;
+
+  const lineItems = [
+    {
+      description: "Widget",
+      quantity: 1,
+      unitPriceMinor: 100_000,
+      discountType: "percentage" as const,
+      discountValue: 0,
+      taxRatePercent: 0,
+    },
+  ];
+
+  beforeAll(async () => {
+    tenants = await setupTwoTenants("advance-payments");
+    await Business.updateOne(
+      { _id: tenants.businessAId },
+      { $set: { "addresses.billing.state": "Maharashtra" } },
+    );
+    const customerA = await createCustomer({ businessId: tenants.businessAId, displayName: "Customer A" });
+    if (!customerA.ok) throw new Error("setup failed");
+    customerAId = String(customerA.customer._id);
+
+    const bankA = await createBankAccount({ businessId: tenants.businessAId, type: "cash", name: "Cash" });
+    bankAId = String(bankA._id);
+  });
+
+  afterAll(async () => {
+    await Promise.all([
+      Invoice.deleteMany({ businessId: tenants.businessAId }),
+      Payment.deleteMany({ businessId: tenants.businessAId }),
+      Customer.deleteMany({ businessId: tenants.businessAId }),
+      BankAccount.deleteMany({ businessId: tenants.businessAId }),
+    ]);
+    await teardownTwoTenants(tenants);
+  });
+
+  it("recordPartyPayment rejects a customer belonging to another business", async () => {
+    const result = await recordPartyPayment({
+      businessId: tenants.businessBId,
+      partyType: "customer",
+      partyId: customerAId,
+      direction: "in",
+      amountMinor: 50_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      paymentDate: new Date(),
+      createdByUserId: tenants.userBId,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("party_not_found");
+  });
+
+  it("recordPartyPayment creates an unlinked advance that shows up in the ledger and listAvailableAdvances", async () => {
+    const result = await recordPartyPayment({
+      businessId: tenants.businessAId,
+      partyType: "customer",
+      partyId: customerAId,
+      direction: "in",
+      amountMinor: 50_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      paymentDate: new Date(),
+      createdByUserId: tenants.userAId,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payment.linkedDocumentType).toBeUndefined();
+
+    const ledger = await getPartyLedger("customer", customerAId, tenants.businessAId);
+    expect(ledger.items).toHaveLength(1);
+    expect(ledger.items[0].creditMinor).toBe(50_000);
+    expect(ledger.items[0].balanceMinor).toBe(-50_000);
+
+    const advances = await listAvailableAdvances("customer", customerAId, tenants.businessAId, "in");
+    expect(advances).toHaveLength(1);
+    expect(advances[0].amountMinor).toBe(50_000);
+
+    const crossedAdvances = await listAvailableAdvances("customer", customerAId, tenants.businessBId, "in");
+    expect(crossedAdvances).toHaveLength(0);
+  });
+
+  it("applyAdvancePayment partially applies an advance, splitting it into an applied portion and a remaining advance", async () => {
+    const advances = await listAvailableAdvances("customer", customerAId, tenants.businessAId, "in");
+    const advance = advances[0];
+
+    const created = await createInvoice({
+      businessId: tenants.businessAId,
+      customerId: customerAId,
+      invoiceDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      reverseCharge: false,
+      lineItems,
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const invoiceId = String(created.invoice._id);
+
+    const cannotCrossApply = await applyAdvancePayment({
+      businessId: tenants.businessBId,
+      paymentId: advance.paymentId,
+      targetType: "invoice",
+      targetId: invoiceId,
+      amountMinor: 30_000,
+    });
+    expect(cannotCrossApply.ok).toBe(false);
+
+    const result = await applyAdvancePayment({
+      businessId: tenants.businessAId,
+      paymentId: advance.paymentId,
+      targetType: "invoice",
+      targetId: invoiceId,
+      amountMinor: 30_000,
+    });
+    expect(result.ok).toBe(true);
+
+    const invoice = await findInvoiceById(invoiceId, tenants.businessAId);
+    expect(invoice?.amountPaidMinor).toBe(30_000);
+    expect(invoice?.status).toBe("partially_paid");
+
+    // 20_000 remains as a still-unlinked advance, still available to apply elsewhere.
+    const remainingAdvances = await listAvailableAdvances("customer", customerAId, tenants.businessAId, "in");
+    expect(remainingAdvances).toHaveLength(1);
+    expect(remainingAdvances[0].amountMinor).toBe(20_000);
+
+    // Total money recorded for the customer is unchanged by the split (50_000 in, none lost).
+    const allPayments = await Payment.find({ businessId: tenants.businessAId, partyId: customerAId }).lean();
+    const totalMinor = allPayments.reduce((sum, p) => sum + p.amountMinor, 0);
+    expect(totalMinor).toBe(50_000);
   });
 });

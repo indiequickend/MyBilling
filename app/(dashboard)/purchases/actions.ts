@@ -11,6 +11,7 @@ import {
   purchaseDiscountSchema,
   purchasePaymentSplitSchema,
 } from "@/lib/validation/purchases";
+import { applyAdvanceSchema } from "@/lib/validation/payments";
 import { buildCustomFieldValuesSchema } from "@/lib/validation/business";
 import { parseIndexedRows, parseCheckbox } from "@/lib/validation/shared";
 import { findBusinessById } from "@/lib/db/queries/businesses";
@@ -27,6 +28,7 @@ import {
   type PurchaseWriteFailureReason,
   type PurchasePaymentSplitWriteInput,
 } from "@/lib/db/queries/purchases";
+import { applyAdvancePayment } from "@/lib/db/queries/payments";
 // Only the "Convert to Purchase" flow (Purchase Orders feature) ever sets sourcePurchaseOrderId.
 import { markPurchaseOrderClosed } from "@/lib/db/queries/purchaseOrders";
 
@@ -353,6 +355,45 @@ export async function recordPurchasePaymentAction(
     context.membership.userId,
   );
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+
+  revalidatePath(`/purchases/${purchaseId}`);
+  return {};
+}
+
+const APPLY_ADVANCE_MESSAGES: Record<string, string> = {
+  advance_not_found: "That advance payment is no longer available.",
+  target_not_found: "Purchase not found.",
+  not_payable: "This purchase isn't awaiting payment.",
+  party_mismatch: "That advance doesn't belong to this purchase's vendor.",
+  amount_invalid: "Enter an amount up to the advance and the balance due.",
+};
+
+/** Settles some or all of an existing unlinked advance payment against this purchase — the
+ * manual-settle counterpart to recordPurchasePaymentAction (see applyAdvancePayment). */
+export async function applyAdvanceToPurchaseAction(
+  _prev: PurchaseActionState,
+  formData: FormData,
+): Promise<PurchaseActionState> {
+  const context = await requireDashboardContext();
+  if (!can(context.membership, "payments", "create")) {
+    return { error: "You don't have permission to record payments." };
+  }
+  const purchaseId = String(formData.get("purchaseId") ?? "");
+
+  const parsed = applyAdvanceSchema.safeParse({
+    paymentId: formData.get("paymentId"),
+    amountMinor: formData.get("amountMinor"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Fix the amount." };
+
+  const result = await applyAdvancePayment({
+    businessId: context.activeBusinessId,
+    paymentId: parsed.data.paymentId,
+    targetType: "purchase",
+    targetId: purchaseId,
+    amountMinor: parsed.data.amountMinor,
+  });
+  if (!result.ok) return { error: APPLY_ADVANCE_MESSAGES[result.reason] };
 
   revalidatePath(`/purchases/${purchaseId}`);
   return {};

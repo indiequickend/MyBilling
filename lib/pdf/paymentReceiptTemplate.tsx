@@ -58,7 +58,9 @@ export async function PaymentReceiptDocument(data: PaymentReceiptTemplateData) {
   const { payment, business, bankAccount, partyName, linkedDocumentNumber } = data;
 
   const billingAddress = addressLine(business.addresses?.billing);
-  const linkedLabel = LINKED_DOCUMENT_LABELS[payment.linkedDocumentType] ?? payment.linkedDocumentType;
+  const linkedLabel = payment.linkedDocumentType
+    ? (LINKED_DOCUMENT_LABELS[payment.linkedDocumentType] ?? payment.linkedDocumentType)
+    : "Advance / On account";
 
   const rows: Array<[string, string]> = [
     ["Direction", payment.direction === "in" ? "Received" : "Paid"],

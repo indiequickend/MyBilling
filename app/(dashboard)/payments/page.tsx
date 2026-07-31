@@ -118,13 +118,15 @@ export default async function PaymentsTimelinePage({
         <TableBody>
           {items.length === 0 ? <TableEmptyState colSpan={7} message="No payments found." /> : null}
           {items.map((p) => {
-            const linkPrefix = DOC_LINK_PREFIX[p.linkedDocumentType];
+            const linkPrefix = p.linkedDocumentType ? DOC_LINK_PREFIX[p.linkedDocumentType] : undefined;
             return (
               <TableRow key={String(p._id)}>
                 <TableCell>{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
                 <TableCell>{p.partyName ?? "—"}</TableCell>
                 <TableCell>
-                  {linkPrefix ? (
+                  {!p.linkedDocumentType ? (
+                    <span className="text-muted-foreground">Advance / On account</span>
+                  ) : linkPrefix ? (
                     <Link href={`${linkPrefix}/${String(p.linkedDocumentId)}`} className="hover:underline">
                       {p.linkedDocumentNumber ??
                         DOCUMENT_TYPE_LABELS[p.linkedDocumentType as keyof typeof DOCUMENT_TYPE_LABELS] ??

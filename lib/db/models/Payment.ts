@@ -5,6 +5,11 @@ import { PAYMENT_MODES } from "@/lib/constants/payments";
  * Minimal Payment shape for Phase 3 (inline payment recording at invoice-save time);
  * formalized further in Phase 7 (Payments Timeline/Journals/Reconciliation). Money movement is
  * voided, never hard-deleted — `voidedAt` is the operative "reversed" marker.
+ *
+ * `linkedDocumentType`/`linkedDocumentId` are absent for an unlinked/advance payment recorded
+ * against a Customer/Vendor's Ledger before any Invoice/Purchase exists to settle (see
+ * recordPartyPayment/applyAdvancePayment in lib/db/queries/payments.ts) — every other payment has
+ * both set at creation time.
  */
 const paymentSchema = new Schema(
   {
@@ -24,9 +29,8 @@ const paymentSchema = new Schema(
     linkedDocumentType: {
       type: String,
       enum: ["invoice", "purchase", "expense", "indirect_income"],
-      required: true,
     },
-    linkedDocumentId: { type: Schema.Types.ObjectId, required: true, index: true },
+    linkedDocumentId: { type: Schema.Types.ObjectId, index: true },
     referenceNote: { type: String, trim: true },
     createdByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     voidedAt: { type: Date },

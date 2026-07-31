@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { z } from "zod";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
-import { requirePermission, type MembershipContext } from "@/lib/rbac/can";
+import { requirePermission, can, type MembershipContext } from "@/lib/rbac/can";
 import { customerSchema, customerAddressesSchema } from "@/lib/validation/customers";
+import { partyPaymentSchema } from "@/lib/validation/payments";
 import { parseAddressFromFormData } from "@/lib/validation/shared";
 import {
   createCustomer,
@@ -13,9 +14,11 @@ import {
   softDeleteCustomer,
   restoreCustomer,
 } from "@/lib/db/queries/customers";
+import { recordPartyPayment } from "@/lib/db/queries/payments";
 import type { ActionKey } from "@/lib/rbac/permissions";
 
 export type CustomerFormState = { error?: string; fieldErrors?: Record<string, string> };
+export type CustomerPaymentActionState = { error?: string };
 
 export async function requireCustomersPermission(action: ActionKey): Promise<{
   activeBusinessId: string;
@@ -138,4 +141,51 @@ export async function restoreCustomerAction(formData: FormData): Promise<void> {
   if (!customerId) return;
   await restoreCustomer(customerId, context.activeBusinessId);
   revalidatePath("/customers");
+}
+
+/** The Customer Ledger's "You Got"/"You Gave" quick payment entry — records an advance/on-account
+ * payment with no invoice attached (see recordPartyPayment). */
+export async function recordCustomerPaymentAction(
+  _prev: CustomerPaymentActionState,
+  formData: FormData,
+): Promise<CustomerPaymentActionState> {
+  const context = await getDashboardContext();
+  if (!context) redirect("/login");
+  if (!context.activeBusinessId || !context.membership) redirect("/");
+  if (!can(context.membership, "payments", "create")) {
+    return { error: "You don't have permission to record payments." };
+  }
+  const customerId = String(formData.get("customerId") ?? "");
+
+  const parsed = partyPaymentSchema.safeParse({
+    direction: formData.get("direction"),
+    amountMinor: formData.get("amountMinor"),
+    mode: formData.get("mode"),
+    bankAccountId: formData.get("bankAccountId"),
+    paymentDate: formData.get("paymentDate"),
+    referenceNote: formData.get("referenceNote"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Fix the payment." };
+
+  const result = await recordPartyPayment({
+    businessId: context.activeBusinessId,
+    partyType: "customer",
+    partyId: customerId,
+    direction: parsed.data.direction,
+    amountMinor: parsed.data.amountMinor,
+    mode: parsed.data.mode,
+    bankAccountId: parsed.data.bankAccountId,
+    paymentDate: new Date(parsed.data.paymentDate),
+    referenceNote: parsed.data.referenceNote,
+    createdByUserId: context.membership.userId,
+  });
+  if (!result.ok) {
+    return {
+      error: result.reason === "party_not_found" ? "Customer not found." : "Select a valid bank account.",
+    };
+  }
+
+  revalidatePath(`/customers/${customerId}/ledger`);
+  revalidatePath("/payments");
+  return {};
 }

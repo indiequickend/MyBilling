@@ -11,6 +11,7 @@ import {
   invoiceDiscountSchema,
   invoicePaymentSplitSchema,
 } from "@/lib/validation/invoices";
+import { applyAdvanceSchema } from "@/lib/validation/payments";
 import { buildCustomFieldValuesSchema } from "@/lib/validation/business";
 import { parseIndexedRows, parseCheckbox } from "@/lib/validation/shared";
 import { findBusinessById } from "@/lib/db/queries/businesses";
@@ -27,6 +28,7 @@ import {
   type InvoiceWriteFailureReason,
   type InvoicePaymentSplitWriteInput,
 } from "@/lib/db/queries/invoices";
+import { applyAdvancePayment } from "@/lib/db/queries/payments";
 // Only the "Convert to Invoice" flow (Quotation/Sales Order features) ever sets these.
 import { markQuotationClosed } from "@/lib/db/queries/quotations";
 import { markSalesOrderClosed } from "@/lib/db/queries/salesOrders";
@@ -350,6 +352,45 @@ export async function recordInvoicePaymentAction(
     context.membership.userId,
   );
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+
+  revalidatePath(`/sales/invoices/${invoiceId}`);
+  return {};
+}
+
+const APPLY_ADVANCE_MESSAGES: Record<string, string> = {
+  advance_not_found: "That advance payment is no longer available.",
+  target_not_found: "Invoice not found.",
+  not_payable: "This invoice isn't awaiting payment.",
+  party_mismatch: "That advance doesn't belong to this invoice's customer.",
+  amount_invalid: "Enter an amount up to the advance and the balance due.",
+};
+
+/** Settles some or all of an existing unlinked advance payment against this invoice — the
+ * manual-settle counterpart to recordInvoicePaymentAction (see applyAdvancePayment). */
+export async function applyAdvanceToInvoiceAction(
+  _prev: InvoiceActionState,
+  formData: FormData,
+): Promise<InvoiceActionState> {
+  const context = await requireDashboardContext();
+  if (!can(context.membership, "payments", "create")) {
+    return { error: "You don't have permission to record payments." };
+  }
+  const invoiceId = String(formData.get("invoiceId") ?? "");
+
+  const parsed = applyAdvanceSchema.safeParse({
+    paymentId: formData.get("paymentId"),
+    amountMinor: formData.get("amountMinor"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Fix the amount." };
+
+  const result = await applyAdvancePayment({
+    businessId: context.activeBusinessId,
+    paymentId: parsed.data.paymentId,
+    targetType: "invoice",
+    targetId: invoiceId,
+    amountMinor: parsed.data.amountMinor,
+  });
+  if (!result.ok) return { error: APPLY_ADVANCE_MESSAGES[result.reason] };
 
   revalidatePath(`/sales/invoices/${invoiceId}`);
   return {};

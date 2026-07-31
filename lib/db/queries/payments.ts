@@ -9,6 +9,7 @@ import { BankAccount } from "@/lib/db/models/BankAccount";
 import { Customer } from "@/lib/db/models/Customer";
 import { Vendor } from "@/lib/db/models/Vendor";
 import { Business } from "@/lib/db/models/Business";
+import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { derivePaymentStatus } from "@/lib/documents/calc";
 import type { DocumentStatus } from "@/lib/constants/documents";
 import { clampPageParams, paginate, type PaginatedResult } from "@/lib/db/queryHelpers";
@@ -55,8 +56,9 @@ export type PaymentTimelineEntry = {
   partyType?: "customer" | "vendor";
   partyId?: mongoose.Types.ObjectId;
   partyName?: string;
-  linkedDocumentType: string;
-  linkedDocumentId: mongoose.Types.ObjectId;
+  /** Absent for an unlinked/advance payment — see recordPartyPayment/applyAdvancePayment. */
+  linkedDocumentType?: string;
+  linkedDocumentId?: mongoose.Types.ObjectId;
   linkedDocumentNumber?: string;
   createdByUserId: mongoose.Types.ObjectId;
 };
@@ -74,8 +76,8 @@ async function resolvePaymentTimelineNames(
     bankAccountId: mongoose.Types.ObjectId;
     partyType?: "customer" | "vendor" | null;
     partyId?: mongoose.Types.ObjectId | null;
-    linkedDocumentType: string;
-    linkedDocumentId: mongoose.Types.ObjectId;
+    linkedDocumentType?: string | null;
+    linkedDocumentId?: mongoose.Types.ObjectId | null;
     createdByUserId: mongoose.Types.ObjectId;
   }>,
 ): Promise<PaymentTimelineEntry[]> {
@@ -129,8 +131,8 @@ async function resolvePaymentTimelineNames(
       partyType: p.partyType ?? undefined,
       partyId: p.partyId ?? undefined,
       partyName,
-      linkedDocumentType: p.linkedDocumentType,
-      linkedDocumentId: p.linkedDocumentId,
+      linkedDocumentType: p.linkedDocumentType ?? undefined,
+      linkedDocumentId: p.linkedDocumentId ?? undefined,
       linkedDocumentNumber,
       createdByUserId: p.createdByUserId,
     };
@@ -270,8 +272,10 @@ export type CreatePaymentInput = {
   mode: PaymentMode;
   bankAccountId: string;
   paymentDate: Date;
-  linkedDocumentType: "invoice" | "purchase" | "expense" | "indirect_income";
-  linkedDocumentId: string;
+  /** Both absent for an unlinked/advance payment (see recordPartyPayment) — every other caller
+   * (invoice/purchase/expense/indirect-income payment recording) sets both. */
+  linkedDocumentType?: "invoice" | "purchase" | "expense" | "indirect_income";
+  linkedDocumentId?: string;
   referenceNote?: string;
   createdByUserId: string;
   /** "gateway" for Razorpay-collected Payment Link payments (see recordGatewayPayment in
@@ -615,4 +619,243 @@ export async function getBillWiseForParty(
       mode: p.mode,
     })),
   }));
+}
+
+export type RecordPartyPaymentInput = {
+  businessId: string;
+  partyType: "customer" | "vendor";
+  partyId: string;
+  direction: "in" | "out";
+  amountMinor: number;
+  mode: PaymentMode;
+  bankAccountId: string;
+  paymentDate: Date;
+  referenceNote?: string;
+  createdByUserId: string;
+};
+
+export type RecordPartyPaymentResult =
+  | { ok: true; payment: InstanceType<typeof Payment> }
+  | { ok: false; reason: "party_not_found" | "invalid_bank_account" };
+
+/**
+ * Records money in/out against a Customer or Vendor with no linked document — an advance/
+ * on-account payment (project_spec.md's Payments Timeline "unlinked / advance" entries, and the
+ * Ledger's "You Got"/"You Gave" quick entry). It shows up immediately in that party's Ledger and
+ * the Payments Timeline; settling it against a real Invoice/Purchase later is a separate, manual
+ * step — see applyAdvancePayment.
+ */
+export async function recordPartyPayment(input: RecordPartyPaymentInput): Promise<RecordPartyPaymentResult> {
+  await connectToDatabase();
+  const PartyModel = input.partyType === "customer" ? Customer : Vendor;
+  const party = await PartyModel.findOne({
+    _id: input.partyId,
+    businessId: input.businessId,
+    deletedAt: { $exists: false },
+  });
+  if (!party) return { ok: false, reason: "party_not_found" };
+  if (!(await isOwnedBankAccount(input.bankAccountId, input.businessId))) {
+    return { ok: false, reason: "invalid_bank_account" };
+  }
+
+  const payment = await createPayment({
+    businessId: input.businessId,
+    partyType: input.partyType,
+    partyId: input.partyId,
+    direction: input.direction,
+    amountMinor: input.amountMinor,
+    mode: input.mode,
+    bankAccountId: input.bankAccountId,
+    paymentDate: input.paymentDate,
+    referenceNote: input.referenceNote,
+    createdByUserId: input.createdByUserId,
+  });
+  return { ok: true, payment };
+}
+
+export type AvailableAdvance = {
+  paymentId: string;
+  docNumber?: string;
+  paymentDate: Date;
+  amountMinor: number;
+  mode: PaymentMode;
+  referenceNote?: string;
+};
+
+/** Unlinked (advance/on-account) payments still available to apply against a future
+ * Invoice/Purchase for this party — the source list behind applyAdvancePayment's UI. */
+export async function listAvailableAdvances(
+  partyType: "customer" | "vendor",
+  partyId: string,
+  businessId: string,
+  direction: "in" | "out",
+): Promise<AvailableAdvance[]> {
+  await connectToDatabase();
+  const rows = await Payment.find({
+    businessId,
+    partyType,
+    partyId,
+    direction,
+    linkedDocumentId: { $exists: false },
+    voidedAt: { $exists: false },
+  })
+    .sort({ paymentDate: 1, _id: 1 })
+    .lean();
+  return rows.map((p) => ({
+    paymentId: String(p._id),
+    docNumber: p.docNumber ?? undefined,
+    paymentDate: p.paymentDate,
+    amountMinor: p.amountMinor,
+    mode: p.mode,
+    referenceNote: p.referenceNote ?? undefined,
+  }));
+}
+
+const APPLY_ADVANCE_PAYABLE_STATUSES = ["pending", "partially_paid"];
+
+/**
+ * Moves some or all of an unlinked advance payment onto a real Invoice/Purchase (in the same
+ * `session`-style transaction pattern as recordInvoicePayment/voidPayment). A full-amount apply
+ * just relinks the existing Payment; a partial apply splits it — the original keeps the unapplied
+ * remainder (still unlinked, so it stays visible as a smaller advance) and a new Payment (its own
+ * receipt number) is created for the applied portion, linked to the target document. Either way no
+ * money is created or destroyed and the audit trail (who received what, when) is preserved.
+ */
+async function settleAdvance(
+  advance: InstanceType<typeof Payment>,
+  amountMinor: number,
+  linkedDocumentType: "invoice" | "purchase",
+  linkedDocumentId: mongoose.Types.ObjectId,
+  session: ClientSession,
+): Promise<void> {
+  if (amountMinor === advance.amountMinor) {
+    advance.linkedDocumentType = linkedDocumentType;
+    advance.linkedDocumentId = linkedDocumentId;
+    await advance.save({ session });
+    return;
+  }
+  advance.amountMinor -= amountMinor;
+  await advance.save({ session });
+  await createPaymentInSession(
+    {
+      businessId: String(advance.businessId),
+      partyType: advance.partyType as "customer" | "vendor",
+      partyId: String(advance.partyId),
+      direction: advance.direction as "in" | "out",
+      amountMinor,
+      mode: advance.mode as PaymentMode,
+      bankAccountId: String(advance.bankAccountId),
+      paymentDate: new Date(),
+      linkedDocumentType,
+      linkedDocumentId: String(linkedDocumentId),
+      referenceNote: advance.docNumber ? `Applied from advance ${advance.docNumber}` : "Applied from advance",
+      createdByUserId: String(advance.createdByUserId),
+    },
+    session,
+  );
+}
+
+export type ApplyAdvancePaymentInput = {
+  businessId: string;
+  paymentId: string;
+  targetType: "invoice" | "purchase";
+  targetId: string;
+  amountMinor: number;
+};
+
+export type ApplyAdvancePaymentResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "advance_not_found" | "target_not_found" | "not_payable" | "party_mismatch" | "amount_invalid";
+    };
+
+export async function applyAdvancePayment(input: ApplyAdvancePaymentInput): Promise<ApplyAdvancePaymentResult> {
+  await connectToDatabase();
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  try {
+    let result: ApplyAdvancePaymentResult = { ok: false, reason: "advance_not_found" };
+    await session.withTransaction(async () => {
+      const advance = await Payment.findOne({
+        _id: input.paymentId,
+        businessId: input.businessId,
+        linkedDocumentId: { $exists: false },
+        voidedAt: { $exists: false },
+      }).session(session);
+      if (!advance) {
+        result = { ok: false, reason: "advance_not_found" };
+        return;
+      }
+
+      if (input.targetType === "invoice") {
+        const invoice = await Invoice.findOne({
+          _id: input.targetId,
+          businessId: input.businessId,
+          deletedAt: { $exists: false },
+        }).session(session);
+        if (!invoice) {
+          result = { ok: false, reason: "target_not_found" };
+          return;
+        }
+        if (!APPLY_ADVANCE_PAYABLE_STATUSES.includes(invoice.status)) {
+          result = { ok: false, reason: "not_payable" };
+          return;
+        }
+        if (
+          advance.partyType !== "customer" ||
+          String(advance.partyId) !== String(invoice.customerId) ||
+          advance.direction !== "in"
+        ) {
+          result = { ok: false, reason: "party_mismatch" };
+          return;
+        }
+        const remainingDue = invoice.grandTotalMinor - invoice.amountPaidMinor;
+        if (input.amountMinor <= 0 || input.amountMinor > advance.amountMinor || input.amountMinor > remainingDue) {
+          result = { ok: false, reason: "amount_invalid" };
+          return;
+        }
+        await settleAdvance(advance, input.amountMinor, "invoice", invoice._id, session);
+        invoice.amountPaidMinor += input.amountMinor;
+        invoice.status = derivePaymentStatus(invoice.grandTotalMinor, invoice.amountPaidMinor);
+        await invoice.save({ session });
+      } else {
+        const purchase = await Purchase.findOne({
+          _id: input.targetId,
+          businessId: input.businessId,
+          deletedAt: { $exists: false },
+        }).session(session);
+        if (!purchase) {
+          result = { ok: false, reason: "target_not_found" };
+          return;
+        }
+        if (!APPLY_ADVANCE_PAYABLE_STATUSES.includes(purchase.status)) {
+          result = { ok: false, reason: "not_payable" };
+          return;
+        }
+        if (
+          advance.partyType !== "vendor" ||
+          String(advance.partyId) !== String(purchase.vendorId) ||
+          advance.direction !== "out"
+        ) {
+          result = { ok: false, reason: "party_mismatch" };
+          return;
+        }
+        const remainingDue = purchase.grandTotalMinor - purchase.amountPaidMinor;
+        if (input.amountMinor <= 0 || input.amountMinor > advance.amountMinor || input.amountMinor > remainingDue) {
+          result = { ok: false, reason: "amount_invalid" };
+          return;
+        }
+        await settleAdvance(advance, input.amountMinor, "purchase", purchase._id, session);
+        purchase.amountPaidMinor += input.amountMinor;
+        purchase.status = derivePaymentStatus(purchase.grandTotalMinor, purchase.amountPaidMinor);
+        await purchase.save({ session });
+      }
+
+      result = { ok: true };
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }
