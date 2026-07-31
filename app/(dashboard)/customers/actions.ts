@@ -13,12 +13,15 @@ import {
   updateCustomer,
   softDeleteCustomer,
   restoreCustomer,
+  findCustomerById,
 } from "@/lib/db/queries/customers";
 import { recordPartyPayment } from "@/lib/db/queries/payments";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 import type { ActionKey } from "@/lib/rbac/permissions";
 
 export type CustomerFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type CustomerPaymentActionState = { error?: string };
+export type RevealResult = { ok: true; value: string } | { ok: false; error: string };
 
 export async function requireCustomersPermission(action: ActionKey): Promise<{
   activeBusinessId: string;
@@ -131,7 +134,15 @@ export async function softDeleteCustomerAction(formData: FormData): Promise<void
   const context = await requireCustomersPermission("delete");
   const customerId = String(formData.get("customerId") ?? "");
   if (!customerId) return;
-  await softDeleteCustomer(customerId, context.activeBusinessId);
+  const customer = await softDeleteCustomer(customerId, context.activeBusinessId);
+  if (customer) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "customer.deleted",
+      target: { type: "customer", id: customerId, label: customer.displayName },
+    });
+  }
   revalidatePath("/customers");
 }
 
@@ -139,7 +150,15 @@ export async function restoreCustomerAction(formData: FormData): Promise<void> {
   const context = await requireCustomersPermission("edit");
   const customerId = String(formData.get("customerId") ?? "");
   if (!customerId) return;
-  await restoreCustomer(customerId, context.activeBusinessId);
+  const customer = await restoreCustomer(customerId, context.activeBusinessId);
+  if (customer) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "customer.restored",
+      target: { type: "customer", id: customerId, label: customer.displayName },
+    });
+  }
   revalidatePath("/customers");
 }
 
@@ -188,4 +207,22 @@ export async function recordCustomerPaymentAction(
   revalidatePath(`/customers/${customerId}/ledger`);
   revalidatePath("/payments");
   return {};
+}
+
+/** Reveals a customer's unmasked GSTIN (list page shows it masked by default) — audit-logged so
+ * every reveal is traceable to a user. */
+export async function revealCustomerGstinAction(customerId: string): Promise<RevealResult> {
+  const context = await requireCustomersPermission("view");
+  const customer = await findCustomerById(customerId, context.activeBusinessId);
+  if (!customer?.gstin) return { ok: false, error: "Not available." };
+
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "sensitive_field.revealed",
+    target: { type: "customer", id: customerId, label: customer.displayName },
+    after: { field: "gstin" },
+  });
+
+  return { ok: true, value: customer.gstin };
 }

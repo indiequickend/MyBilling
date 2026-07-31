@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/rbac/can";
 import { journalHeaderSchema, journalLinesSchema } from "@/lib/validation/journals";
 import { parseIndexedRows } from "@/lib/validation/shared";
 import { createJournal, softDeleteJournal, type JournalWriteFailureReason } from "@/lib/db/queries/journals";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type JournalFormState = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -83,7 +84,15 @@ export async function softDeleteJournalAction(formData: FormData): Promise<void>
   const context = await requirePaymentsPermission("delete");
   const journalId = String(formData.get("journalId") ?? "");
   if (!journalId) return;
-  await softDeleteJournal(journalId, context.activeBusinessId);
+  const journal = await softDeleteJournal(journalId, context.activeBusinessId);
+  if (journal) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "journal.deleted",
+      target: { type: "journal", id: journalId, label: journal.narration },
+    });
+  }
   revalidatePath("/payments/journals");
   redirect("/payments/journals");
 }

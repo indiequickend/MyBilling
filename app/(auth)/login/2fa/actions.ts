@@ -8,6 +8,7 @@ import { verifyTotpCode, findMatchingBackupCodeHash } from "@/lib/auth/totp";
 import { getPendingLoginUserId, clearPendingLogin } from "@/lib/auth/pendingLogin";
 import { createSession } from "@/lib/auth/session";
 import { checkRateLimit, rateLimitKeyFromHeaders } from "@/lib/auth/rateLimit";
+import { recordLoginAudit } from "@/lib/db/queries/auditLog";
 
 export type TwoFactorState = { error?: string };
 
@@ -49,5 +50,6 @@ export async function verifyTotpAction(
 
   await clearPendingLogin();
   await createSession(String(user._id));
+  await recordLoginAudit(String(user._id), "login.success", user.email);
   redirect("/");
 }

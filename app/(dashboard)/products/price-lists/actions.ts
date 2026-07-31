@@ -12,6 +12,7 @@ import {
   softDeletePriceList,
   restorePriceList,
 } from "@/lib/db/queries/priceLists";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type PriceListFormState = { error?: string };
 
@@ -20,7 +21,7 @@ async function requireProductsPermission() {
   if (!context) redirect("/login");
   if (!context.activeBusinessId || !context.membership) redirect("/");
   requirePermission(context.membership, "products", "edit");
-  return { activeBusinessId: context.activeBusinessId };
+  return { activeBusinessId: context.activeBusinessId, userId: context.membership.userId };
 }
 
 export async function createPriceListAction(
@@ -61,7 +62,15 @@ export async function softDeletePriceListAction(formData: FormData): Promise<voi
   const context = await requireProductsPermission();
   const priceListId = String(formData.get("priceListId") ?? "");
   if (!priceListId) return;
-  await softDeletePriceList(priceListId, context.activeBusinessId);
+  const priceList = await softDeletePriceList(priceListId, context.activeBusinessId);
+  if (priceList) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "price_list.deleted",
+      target: { type: "price_list", id: priceListId, label: priceList.name },
+    });
+  }
   revalidatePath("/products/price-lists");
 }
 
@@ -69,6 +78,14 @@ export async function restorePriceListAction(formData: FormData): Promise<void> 
   const context = await requireProductsPermission();
   const priceListId = String(formData.get("priceListId") ?? "");
   if (!priceListId) return;
-  await restorePriceList(priceListId, context.activeBusinessId);
+  const priceList = await restorePriceList(priceListId, context.activeBusinessId);
+  if (priceList) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "price_list.restored",
+      target: { type: "price_list", id: priceListId, label: priceList.name },
+    });
+  }
   revalidatePath("/products/price-lists");
 }

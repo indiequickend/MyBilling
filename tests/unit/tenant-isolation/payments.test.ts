@@ -95,7 +95,7 @@ describe("payments — tenant isolation", () => {
   });
 
   it("voidPayment cannot void another business's payment", async () => {
-    const result = await voidPayment(paymentAId, tenants.businessBId);
+    const result = await voidPayment(paymentAId, tenants.businessBId, tenants.userAId);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("not_found");
 
@@ -104,7 +104,7 @@ describe("payments — tenant isolation", () => {
   });
 
   it("voidPayment decrements the linked invoice's amountPaidMinor and re-derives status", async () => {
-    const result = await voidPayment(paymentAId, tenants.businessAId);
+    const result = await voidPayment(paymentAId, tenants.businessAId, tenants.userAId);
     expect(result.ok).toBe(true);
 
     const invoice = await findInvoiceById(invoiceAId, tenants.businessAId);
@@ -113,7 +113,7 @@ describe("payments — tenant isolation", () => {
   });
 
   it("voidPayment rejects voiding an already-voided payment", async () => {
-    const result = await voidPayment(paymentAId, tenants.businessAId);
+    const result = await voidPayment(paymentAId, tenants.businessAId, tenants.userAId);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("already_voided");
   });

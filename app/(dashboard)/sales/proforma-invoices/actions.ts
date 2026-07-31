@@ -24,6 +24,7 @@ import {
   type ProformaInvoiceWriteInput,
   type ProformaInvoiceWriteFailureReason,
 } from "@/lib/db/queries/proformaInvoices";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type ProformaInvoiceFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type ProformaInvoiceActionState = { error?: string };
@@ -235,6 +236,12 @@ export async function softDeleteProformaInvoiceAction(
   const proformaInvoiceId = String(formData.get("proformaInvoiceId") ?? "");
   const result = await softDeleteProformaInvoice(proformaInvoiceId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "proforma_invoice.deleted",
+    target: { type: "proforma_invoice", id: proformaInvoiceId, label: result.proformaInvoice.docNumber },
+  });
   revalidatePath("/sales/proforma-invoices");
   redirect("/sales/proforma-invoices");
 }
@@ -244,6 +251,14 @@ export async function restoreProformaInvoiceAction(formData: FormData): Promise<
   requirePermission(context.membership, "proforma_invoices", "delete");
   const proformaInvoiceId = String(formData.get("proformaInvoiceId") ?? "");
   if (!proformaInvoiceId) return;
-  await restoreProformaInvoice(proformaInvoiceId, context.activeBusinessId);
+  const proformaInvoice = await restoreProformaInvoice(proformaInvoiceId, context.activeBusinessId);
+  if (proformaInvoice) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "proforma_invoice.restored",
+      target: { type: "proforma_invoice", id: proformaInvoiceId, label: proformaInvoice.docNumber },
+    });
+  }
   revalidatePath("/sales/proforma-invoices");
 }

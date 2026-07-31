@@ -11,6 +11,7 @@ import {
   softDeleteExpenseCategory,
   restoreExpenseCategory,
 } from "@/lib/db/queries/expenseCategories";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type ExpenseCategoryFormState = { error?: string };
 
@@ -19,7 +20,7 @@ async function requireExpensesPermission() {
   if (!context) redirect("/login");
   if (!context.activeBusinessId || !context.membership) redirect("/");
   requirePermission(context.membership, "expenses", "edit");
-  return { activeBusinessId: context.activeBusinessId };
+  return { activeBusinessId: context.activeBusinessId, userId: context.membership.userId };
 }
 
 export async function createExpenseCategoryAction(
@@ -49,7 +50,15 @@ export async function softDeleteExpenseCategoryAction(formData: FormData): Promi
   const context = await requireExpensesPermission();
   const categoryId = String(formData.get("categoryId") ?? "");
   if (!categoryId) return;
-  await softDeleteExpenseCategory(categoryId, context.activeBusinessId);
+  const category = await softDeleteExpenseCategory(categoryId, context.activeBusinessId);
+  if (category) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "expense_category.deleted",
+      target: { type: "expense_category", id: categoryId, label: category.name },
+    });
+  }
   revalidatePath("/expenses/categories");
 }
 
@@ -57,6 +66,14 @@ export async function restoreExpenseCategoryAction(formData: FormData): Promise<
   const context = await requireExpensesPermission();
   const categoryId = String(formData.get("categoryId") ?? "");
   if (!categoryId) return;
-  await restoreExpenseCategory(categoryId, context.activeBusinessId);
+  const category = await restoreExpenseCategory(categoryId, context.activeBusinessId);
+  if (category) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "expense_category.restored",
+      target: { type: "expense_category", id: categoryId, label: category.name },
+    });
+  }
   revalidatePath("/expenses/categories");
 }

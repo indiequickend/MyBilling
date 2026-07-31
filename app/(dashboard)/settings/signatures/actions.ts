@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/queries/signatures";
 import { uploadFile, deleteFile } from "@/lib/storage/cloudinary";
 import { detectImageMimeType } from "@/lib/storage/imageMime";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type SignatureFormState = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -24,7 +25,7 @@ async function requireDocumentSettingsPermission() {
   if (!context) redirect("/login");
   if (!context.activeBusinessId || !context.membership) redirect("/");
   requirePermission(context.membership, "settings", "manage_document_settings");
-  return { activeBusinessId: context.activeBusinessId };
+  return { activeBusinessId: context.activeBusinessId, userId: context.membership.userId };
 }
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -113,7 +114,15 @@ export async function softDeleteSignatureAction(formData: FormData): Promise<voi
   const context = await requireDocumentSettingsPermission();
   const signatureId = String(formData.get("signatureId") ?? "");
   if (!signatureId) return;
-  await softDeleteSignature(signatureId, context.activeBusinessId);
+  const signature = await softDeleteSignature(signatureId, context.activeBusinessId);
+  if (signature) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "signature.deleted",
+      target: { type: "signature", id: signatureId, label: signature.name },
+    });
+  }
   revalidatePath("/settings/signatures");
 }
 
@@ -121,6 +130,14 @@ export async function restoreSignatureAction(formData: FormData): Promise<void> 
   const context = await requireDocumentSettingsPermission();
   const signatureId = String(formData.get("signatureId") ?? "");
   if (!signatureId) return;
-  await restoreSignature(signatureId, context.activeBusinessId);
+  const signature = await restoreSignature(signatureId, context.activeBusinessId);
+  if (signature) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "signature.restored",
+      target: { type: "signature", id: signatureId, label: signature.name },
+    });
+  }
   revalidatePath("/settings/signatures");
 }

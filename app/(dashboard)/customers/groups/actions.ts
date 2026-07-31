@@ -11,6 +11,7 @@ import {
   softDeletePartyGroup,
   restorePartyGroup,
 } from "@/lib/db/queries/partyGroups";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type PartyGroupFormState = { error?: string };
 
@@ -19,7 +20,7 @@ async function requireGroupsPermission() {
   if (!context) redirect("/login");
   if (!context.activeBusinessId || !context.membership) redirect("/");
   requirePermission(context.membership, "customers", "edit");
-  return { activeBusinessId: context.activeBusinessId };
+  return { activeBusinessId: context.activeBusinessId, userId: context.membership.userId };
 }
 
 export async function createCustomerGroupAction(
@@ -49,7 +50,15 @@ export async function softDeleteCustomerGroupAction(formData: FormData): Promise
   const context = await requireGroupsPermission();
   const groupId = String(formData.get("groupId") ?? "");
   if (!groupId) return;
-  await softDeletePartyGroup(groupId, context.activeBusinessId);
+  const group = await softDeletePartyGroup(groupId, context.activeBusinessId);
+  if (group) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "customer_group.deleted",
+      target: { type: "customer_group", id: groupId, label: group.name },
+    });
+  }
   revalidatePath("/customers/groups");
 }
 
@@ -57,6 +66,14 @@ export async function restoreCustomerGroupAction(formData: FormData): Promise<vo
   const context = await requireGroupsPermission();
   const groupId = String(formData.get("groupId") ?? "");
   if (!groupId) return;
-  await restorePartyGroup(groupId, context.activeBusinessId);
+  const group = await restorePartyGroup(groupId, context.activeBusinessId);
+  if (group) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "customer_group.restored",
+      target: { type: "customer_group", id: groupId, label: group.name },
+    });
+  }
   revalidatePath("/customers/groups");
 }

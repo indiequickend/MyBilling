@@ -18,6 +18,7 @@ import {
   restoreDebitNote,
   type DebitNoteWriteFailureReason,
 } from "@/lib/db/queries/debitNotes";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type DebitNoteFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type DebitNoteActionState = { error?: string };
@@ -152,6 +153,12 @@ export async function softDeleteDebitNoteAction(
   const debitNoteId = String(formData.get("debitNoteId") ?? "");
   const result = await softDeleteDebitNote(debitNoteId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "debit_note.deleted",
+    target: { type: "debit_note", id: debitNoteId, label: result.debitNote.docNumber },
+  });
   revalidatePath("/purchases/debit-notes");
   redirect("/purchases/debit-notes");
 }
@@ -161,6 +168,14 @@ export async function restoreDebitNoteAction(formData: FormData): Promise<void> 
   requirePermission(context.membership, "debit_notes", "delete");
   const debitNoteId = String(formData.get("debitNoteId") ?? "");
   if (!debitNoteId) return;
-  await restoreDebitNote(debitNoteId, context.activeBusinessId);
+  const debitNote = await restoreDebitNote(debitNoteId, context.activeBusinessId);
+  if (debitNote) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "debit_note.restored",
+      target: { type: "debit_note", id: debitNoteId, label: debitNote.docNumber },
+    });
+  }
   revalidatePath("/purchases/debit-notes");
 }

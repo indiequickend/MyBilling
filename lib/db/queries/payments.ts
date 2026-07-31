@@ -16,6 +16,7 @@ import { clampPageParams, paginate, type PaginatedResult } from "@/lib/db/queryH
 import type { PaymentMode } from "@/lib/constants/payments";
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type PaymentsTimelineParams = {
   bankAccountId?: string;
@@ -333,16 +334,20 @@ export type PaymentWriteResult =
  * decrement the linked Invoice/Purchase's amountPaidMinor and re-derive its status alongside
  * marking the payment voided — a lost-update race here would silently corrupt the paid amount.
  */
-export async function voidPayment(paymentId: string, businessId: string): Promise<PaymentWriteResult> {
+export async function voidPayment(
+  paymentId: string,
+  businessId: string,
+  voidedByUserId: string,
+): Promise<PaymentWriteResult> {
   await connectToDatabase();
   const conn = await connectToDatabase();
   const session = await conn.startSession();
   try {
-    let result: PaymentWriteResult = { ok: false, reason: "not_found" };
+    let result: PaymentWriteResult;
     try {
-      await session.withTransaction(async () => {
+      result = await session.withTransaction<PaymentWriteResult>(async () => {
         const payment = await Payment.findOne({ _id: paymentId, businessId }).session(session);
-        if (!payment) return; // result stays "not_found"; nothing was written, safe to just commit a no-op
+        if (!payment) return { ok: false, reason: "not_found" };
         if (payment.voidedAt) throw new PaymentAlreadyVoidedError();
 
         payment.voidedAt = new Date();
@@ -372,12 +377,22 @@ export async function voidPayment(paymentId: string, businessId: string): Promis
           await purchase.save({ session });
         }
 
-        result = { ok: true, payment };
+        return { ok: true, payment };
       });
     } catch (err) {
       if (err instanceof PaymentAlreadyVoidedError) return { ok: false, reason: "already_voided" };
       if (err instanceof LinkedInvoiceNotFoundError) return { ok: false, reason: "linked_document_not_found" };
       throw err;
+    }
+    if (result.ok) {
+      await recordAuditLog({
+        businessId,
+        userId: voidedByUserId,
+        action: "payment.voided",
+        target: { type: "payment", id: paymentId },
+        before: { voidedAt: null },
+        after: { voidedAt: result.payment.voidedAt, amountMinor: result.payment.amountMinor },
+      });
     }
     return result;
   } finally {

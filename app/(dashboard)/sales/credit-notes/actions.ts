@@ -18,6 +18,7 @@ import {
   restoreCreditNote,
   type CreditNoteWriteFailureReason,
 } from "@/lib/db/queries/creditNotes";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type CreditNoteFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type CreditNoteActionState = { error?: string };
@@ -153,6 +154,12 @@ export async function softDeleteCreditNoteAction(
   const creditNoteId = String(formData.get("creditNoteId") ?? "");
   const result = await softDeleteCreditNote(creditNoteId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "credit_note.deleted",
+    target: { type: "credit_note", id: creditNoteId, label: result.creditNote.docNumber },
+  });
   revalidatePath("/sales/credit-notes");
   redirect("/sales/credit-notes");
 }
@@ -162,6 +169,14 @@ export async function restoreCreditNoteAction(formData: FormData): Promise<void>
   requirePermission(context.membership, "sales_credit_notes", "delete");
   const creditNoteId = String(formData.get("creditNoteId") ?? "");
   if (!creditNoteId) return;
-  await restoreCreditNote(creditNoteId, context.activeBusinessId);
+  const creditNote = await restoreCreditNote(creditNoteId, context.activeBusinessId);
+  if (creditNote) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "credit_note.restored",
+      target: { type: "credit_note", id: creditNoteId, label: creditNote.docNumber },
+    });
+  }
   revalidatePath("/sales/credit-notes");
 }

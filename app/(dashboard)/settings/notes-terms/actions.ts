@@ -14,6 +14,7 @@ import {
   softDeleteNoteTermTemplate,
   restoreNoteTermTemplate,
 } from "@/lib/db/queries/noteTermTemplates";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type NoteTermFormState = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -22,7 +23,7 @@ async function requireDocumentSettingsPermission() {
   if (!context) redirect("/login");
   if (!context.activeBusinessId || !context.membership) redirect("/");
   requirePermission(context.membership, "settings", "manage_document_settings");
-  return { activeBusinessId: context.activeBusinessId };
+  return { activeBusinessId: context.activeBusinessId, userId: context.membership.userId };
 }
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -93,7 +94,15 @@ export async function softDeleteNoteTermTemplateAction(formData: FormData): Prom
   const context = await requireDocumentSettingsPermission();
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return;
-  await softDeleteNoteTermTemplate(templateId, context.activeBusinessId);
+  const template = await softDeleteNoteTermTemplate(templateId, context.activeBusinessId);
+  if (template) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "note_term_template.deleted",
+      target: { type: "note_term_template", id: templateId, label: template.title ?? undefined },
+    });
+  }
   revalidatePath("/settings/notes-terms");
 }
 
@@ -101,6 +110,14 @@ export async function restoreNoteTermTemplateAction(formData: FormData): Promise
   const context = await requireDocumentSettingsPermission();
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return;
-  await restoreNoteTermTemplate(templateId, context.activeBusinessId);
+  const template = await restoreNoteTermTemplate(templateId, context.activeBusinessId);
+  if (template) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "note_term_template.restored",
+      target: { type: "note_term_template", id: templateId, label: template.title ?? undefined },
+    });
+  }
   revalidatePath("/settings/notes-terms");
 }

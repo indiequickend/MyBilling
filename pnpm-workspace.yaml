@@ -1,4 +1,24 @@
 allowBuilds:
   argon2: true
+  esbuild: true
   sharp: true
   unrs-resolver: true
+
+auditConfig:
+  ignoreGhsas:
+    - GHSA-q4gf-8mx6-v5v3
+    - GHSA-8h8q-6873-q5fj
+    - GHSA-26hh-7cqf-hhc6
+    - GHSA-mg66-mrh9-m8jx
+    - GHSA-c4j6-fc7j-m34r
+    - GHSA-267c-6grr-h53f
+    - GHSA-36qx-fr4f-26g5
+    - GHSA-f88m-g3jw-g9cj
+    - GHSA-m99w-x7hq-7vfj
+    - GHSA-89xv-2m56-2m9x
+    - GHSA-p9j2-gv94-2wf4
+    - GHSA-6g55-p6wh-862q
+    - GHSA-r28c-9q8g-f849
+
+overrides:
+  brace-expansion: ">=5.0.8"

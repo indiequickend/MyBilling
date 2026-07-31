@@ -13,12 +13,15 @@ import {
   updateVendor,
   softDeleteVendor,
   restoreVendor,
+  findVendorById,
 } from "@/lib/db/queries/vendors";
 import { recordPartyPayment } from "@/lib/db/queries/payments";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 import type { ActionKey } from "@/lib/rbac/permissions";
 
 export type VendorFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type VendorPaymentActionState = { error?: string };
+export type RevealResult = { ok: true; value: string } | { ok: false; error: string };
 
 export async function requireVendorsPermission(action: ActionKey): Promise<{
   activeBusinessId: string;
@@ -131,7 +134,15 @@ export async function softDeleteVendorAction(formData: FormData): Promise<void> 
   const context = await requireVendorsPermission("delete");
   const vendorId = String(formData.get("vendorId") ?? "");
   if (!vendorId) return;
-  await softDeleteVendor(vendorId, context.activeBusinessId);
+  const vendor = await softDeleteVendor(vendorId, context.activeBusinessId);
+  if (vendor) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "vendor.deleted",
+      target: { type: "vendor", id: vendorId, label: vendor.displayName },
+    });
+  }
   revalidatePath("/vendors");
 }
 
@@ -139,7 +150,15 @@ export async function restoreVendorAction(formData: FormData): Promise<void> {
   const context = await requireVendorsPermission("edit");
   const vendorId = String(formData.get("vendorId") ?? "");
   if (!vendorId) return;
-  await restoreVendor(vendorId, context.activeBusinessId);
+  const vendor = await restoreVendor(vendorId, context.activeBusinessId);
+  if (vendor) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "vendor.restored",
+      target: { type: "vendor", id: vendorId, label: vendor.displayName },
+    });
+  }
   revalidatePath("/vendors");
 }
 
@@ -188,4 +207,22 @@ export async function recordVendorPaymentAction(
   revalidatePath(`/vendors/${vendorId}/ledger`);
   revalidatePath("/payments");
   return {};
+}
+
+/** Reveals a vendor's unmasked GSTIN (list page shows it masked by default) — audit-logged so
+ * every reveal is traceable to a user. */
+export async function revealVendorGstinAction(vendorId: string): Promise<RevealResult> {
+  const context = await requireVendorsPermission("view");
+  const vendor = await findVendorById(vendorId, context.activeBusinessId);
+  if (!vendor?.gstin) return { ok: false, error: "Not available." };
+
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "sensitive_field.revealed",
+    target: { type: "vendor", id: vendorId, label: vendor.displayName },
+    after: { field: "gstin" },
+  });
+
+  return { ok: true, value: vendor.gstin };
 }

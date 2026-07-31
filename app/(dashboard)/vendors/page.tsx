@@ -21,7 +21,9 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/button";
 import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
 import { MasterExportButtons } from "@/components/importExport/MasterExportButtons";
-import { softDeleteVendorAction, restoreVendorAction } from "./actions";
+import { RevealField } from "@/components/ui/RevealField";
+import { maskGstin } from "@/lib/utils/mask";
+import { softDeleteVendorAction, restoreVendorAction, revealVendorGstinAction } from "./actions";
 
 export default async function VendorsPage({
   searchParams,
@@ -141,7 +143,16 @@ export default async function VendorsPage({
                   </Link>
                 </TableCell>
                 <TableCell>{v.companyName ?? "—"}</TableCell>
-                <TableCell>{v.gstin ?? "—"}</TableCell>
+                <TableCell>
+                  {v.gstin ? (
+                    <RevealField
+                      maskedValue={maskGstin(v.gstin) ?? ""}
+                      reveal={revealVendorGstinAction.bind(null, id)}
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
                 <TableCell>{v.phone ?? "—"}</TableCell>
                 <TableCell className="text-right">
                   {query.tab === "active" ? (

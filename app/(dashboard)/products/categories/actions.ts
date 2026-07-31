@@ -11,6 +11,7 @@ import {
   softDeleteProductCategory,
   restoreProductCategory,
 } from "@/lib/db/queries/productCategories";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type ProductCategoryFormState = { error?: string };
 
@@ -19,7 +20,7 @@ async function requireProductsPermission() {
   if (!context) redirect("/login");
   if (!context.activeBusinessId || !context.membership) redirect("/");
   requirePermission(context.membership, "products", "edit");
-  return { activeBusinessId: context.activeBusinessId };
+  return { activeBusinessId: context.activeBusinessId, userId: context.membership.userId };
 }
 
 export async function createProductCategoryAction(
@@ -49,7 +50,15 @@ export async function softDeleteProductCategoryAction(formData: FormData): Promi
   const context = await requireProductsPermission();
   const categoryId = String(formData.get("categoryId") ?? "");
   if (!categoryId) return;
-  await softDeleteProductCategory(categoryId, context.activeBusinessId);
+  const category = await softDeleteProductCategory(categoryId, context.activeBusinessId);
+  if (category) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "product_category.deleted",
+      target: { type: "product_category", id: categoryId, label: category.name },
+    });
+  }
   revalidatePath("/products/categories");
 }
 
@@ -57,6 +66,14 @@ export async function restoreProductCategoryAction(formData: FormData): Promise<
   const context = await requireProductsPermission();
   const categoryId = String(formData.get("categoryId") ?? "");
   if (!categoryId) return;
-  await restoreProductCategory(categoryId, context.activeBusinessId);
+  const category = await restoreProductCategory(categoryId, context.activeBusinessId);
+  if (category) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "product_category.restored",
+      target: { type: "product_category", id: categoryId, label: category.name },
+    });
+  }
   revalidatePath("/products/categories");
 }

@@ -32,6 +32,7 @@ import { applyAdvancePayment } from "@/lib/db/queries/payments";
 // Only the "Convert to Invoice" flow (Quotation/Sales Order features) ever sets these.
 import { markQuotationClosed } from "@/lib/db/queries/quotations";
 import { markSalesOrderClosed } from "@/lib/db/queries/salesOrders";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type InvoiceFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type InvoiceActionState = { error?: string };
@@ -303,6 +304,12 @@ export async function softDeleteInvoiceAction(
   const invoiceId = String(formData.get("invoiceId") ?? "");
   const result = await softDeleteInvoice(invoiceId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "invoice.deleted",
+    target: { type: "invoice", id: invoiceId, label: result.invoice.docNumber },
+  });
   revalidatePath("/sales/invoices");
   redirect("/sales/invoices");
 }
@@ -312,7 +319,15 @@ export async function restoreInvoiceAction(formData: FormData): Promise<void> {
   requirePermission(context.membership, "sales_invoices", "delete");
   const invoiceId = String(formData.get("invoiceId") ?? "");
   if (!invoiceId) return;
-  await restoreInvoice(invoiceId, context.activeBusinessId);
+  const invoice = await restoreInvoice(invoiceId, context.activeBusinessId);
+  if (invoice) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "invoice.restored",
+      target: { type: "invoice", id: invoiceId, label: invoice.docNumber },
+    });
+  }
   revalidatePath("/sales/invoices");
 }
 

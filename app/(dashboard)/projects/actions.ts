@@ -11,6 +11,7 @@ import {
   softDeleteProject,
   restoreProject,
 } from "@/lib/db/queries/projects";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type ProjectFormState = { error?: string };
 
@@ -72,7 +73,15 @@ export async function softDeleteProjectAction(formData: FormData): Promise<void>
   requirePermission(context.membership, "projects", "delete");
   const projectId = String(formData.get("projectId") ?? "");
   if (!projectId) return;
-  await softDeleteProject(projectId, context.activeBusinessId);
+  const project = await softDeleteProject(projectId, context.activeBusinessId);
+  if (project) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "project.deleted",
+      target: { type: "project", id: projectId, label: project.name },
+    });
+  }
   revalidatePath("/projects");
 }
 
@@ -81,6 +90,14 @@ export async function restoreProjectAction(formData: FormData): Promise<void> {
   requirePermission(context.membership, "projects", "delete");
   const projectId = String(formData.get("projectId") ?? "");
   if (!projectId) return;
-  await restoreProject(projectId, context.activeBusinessId);
+  const project = await restoreProject(projectId, context.activeBusinessId);
+  if (project) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "project.restored",
+      target: { type: "project", id: projectId, label: project.name },
+    });
+  }
   revalidatePath("/projects");
 }

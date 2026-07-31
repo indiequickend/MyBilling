@@ -14,6 +14,7 @@ import {
   softDeleteWarehouse,
   restoreWarehouse,
 } from "@/lib/db/queries/warehouses";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type WarehouseFormState = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -22,7 +23,7 @@ async function requireInventoryPermission() {
   if (!context) redirect("/login");
   if (!context.activeBusinessId || !context.membership) redirect("/");
   requirePermission(context.membership, "inventory", "edit");
-  return { activeBusinessId: context.activeBusinessId };
+  return { activeBusinessId: context.activeBusinessId, userId: context.membership.userId };
 }
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -91,7 +92,15 @@ export async function softDeleteWarehouseAction(formData: FormData): Promise<voi
   const context = await requireInventoryPermission();
   const warehouseId = String(formData.get("warehouseId") ?? "");
   if (!warehouseId) return;
-  await softDeleteWarehouse(warehouseId, context.activeBusinessId);
+  const warehouse = await softDeleteWarehouse(warehouseId, context.activeBusinessId);
+  if (warehouse) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "warehouse.deleted",
+      target: { type: "warehouse", id: warehouseId, label: warehouse.name },
+    });
+  }
   revalidatePath("/inventory/warehouses");
 }
 
@@ -99,6 +108,14 @@ export async function restoreWarehouseAction(formData: FormData): Promise<void> 
   const context = await requireInventoryPermission();
   const warehouseId = String(formData.get("warehouseId") ?? "");
   if (!warehouseId) return;
-  await restoreWarehouse(warehouseId, context.activeBusinessId);
+  const warehouse = await restoreWarehouse(warehouseId, context.activeBusinessId);
+  if (warehouse) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "warehouse.restored",
+      target: { type: "warehouse", id: warehouseId, label: warehouse.name },
+    });
+  }
   revalidatePath("/inventory/warehouses");
 }

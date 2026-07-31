@@ -18,6 +18,7 @@ import {
 import { createAttachment } from "@/lib/db/queries/attachments";
 import { uploadFile } from "@/lib/storage/cloudinary";
 import { detectAttachmentMimeType } from "@/lib/storage/imageMime";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type ExpenseFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type ExpenseActionState = { error?: string };
@@ -157,6 +158,12 @@ export async function softDeleteExpenseAction(
   const expenseId = String(formData.get("expenseId") ?? "");
   const result = await softDeleteExpense(expenseId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "expense.deleted",
+    target: { type: "expense", id: expenseId, label: result.expense.description },
+  });
   revalidatePath("/expenses");
   redirect("/expenses");
 }
@@ -166,6 +173,14 @@ export async function restoreExpenseAction(formData: FormData): Promise<void> {
   requirePermission(context.membership, "expenses", "delete");
   const expenseId = String(formData.get("expenseId") ?? "");
   if (!expenseId) return;
-  await restoreExpense(expenseId, context.activeBusinessId);
+  const expense = await restoreExpense(expenseId, context.activeBusinessId);
+  if (expense) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "expense.restored",
+      target: { type: "expense", id: expenseId, label: expense.description },
+    });
+  }
   revalidatePath("/expenses");
 }

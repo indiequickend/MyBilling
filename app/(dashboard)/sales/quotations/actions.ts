@@ -24,6 +24,7 @@ import {
   type QuotationWriteInput,
   type QuotationWriteFailureReason,
 } from "@/lib/db/queries/quotations";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type QuotationFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type QuotationActionState = { error?: string };
@@ -225,6 +226,12 @@ export async function softDeleteQuotationAction(
   const quotationId = String(formData.get("quotationId") ?? "");
   const result = await softDeleteQuotation(quotationId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "quotation.deleted",
+    target: { type: "quotation", id: quotationId, label: result.quotation.docNumber },
+  });
   revalidatePath("/sales/quotations");
   redirect("/sales/quotations");
 }
@@ -234,6 +241,14 @@ export async function restoreQuotationAction(formData: FormData): Promise<void> 
   requirePermission(context.membership, "quotations", "delete");
   const quotationId = String(formData.get("quotationId") ?? "");
   if (!quotationId) return;
-  await restoreQuotation(quotationId, context.activeBusinessId);
+  const quotation = await restoreQuotation(quotationId, context.activeBusinessId);
+  if (quotation) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "quotation.restored",
+      target: { type: "quotation", id: quotationId, label: quotation.docNumber },
+    });
+  }
   revalidatePath("/sales/quotations");
 }

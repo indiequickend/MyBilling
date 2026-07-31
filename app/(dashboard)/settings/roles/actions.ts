@@ -10,7 +10,8 @@ import {
   createRoleFromScratchSchema,
   updateRoleSchema,
 } from "@/lib/validation/roles";
-import { createRole, updateRole, deleteRole } from "@/lib/db/queries/roles";
+import { createRole, updateRole, deleteRole, findRoleById } from "@/lib/db/queries/roles";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type RolesPageState = { error?: string; success?: string };
 
@@ -40,7 +41,14 @@ export async function createRoleFromTemplateAction(
   }
 
   const permissions = ROLE_TEMPLATES[parsed.data.template as RoleTemplateName];
-  await createRole({ businessId: context.activeBusinessId, name: parsed.data.name, permissions });
+  const role = await createRole({ businessId: context.activeBusinessId, name: parsed.data.name, permissions });
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "role.created",
+    target: { type: "role", id: String(role._id), label: role.name },
+    after: { permissions },
+  });
   return { success: `Role "${parsed.data.name}" created.` };
 }
 
@@ -59,10 +67,17 @@ export async function createRoleFromScratchAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  await createRole({
+  const role = await createRole({
     businessId: context.activeBusinessId,
     name: parsed.data.name,
     permissions: parsed.data.permissions,
+  });
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "role.created",
+    target: { type: "role", id: String(role._id), label: role.name },
+    after: { permissions: parsed.data.permissions },
   });
   return { success: `Role "${parsed.data.name}" created.` };
 }
@@ -85,8 +100,17 @@ export async function updateRoleAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
+  const before = await findRoleById(roleId, context.activeBusinessId);
   const updated = await updateRole(roleId, context.activeBusinessId, parsed.data);
   if (!updated) return { error: "Role not found." };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "role.updated",
+    target: { type: "role", id: roleId, label: updated.name },
+    before: before ? { name: before.name, permissions: before.permissions } : undefined,
+    after: { name: updated.name, permissions: updated.permissions },
+  });
   return { success: "Role updated." };
 }
 
@@ -99,6 +123,7 @@ export async function deleteRoleAction(
   const roleId = String(formData.get("roleId") ?? "");
   if (!roleId) return { error: "Missing role." };
 
+  const before = await findRoleById(roleId, context.activeBusinessId);
   const result = await deleteRole(roleId, context.activeBusinessId);
   if (!result.ok) {
     const messages = {
@@ -108,5 +133,12 @@ export async function deleteRoleAction(
     } as const;
     return { error: messages[result.reason] };
   }
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "role.deleted",
+    target: { type: "role", id: roleId, label: before?.name ?? roleId },
+    before: before ? { name: before.name, permissions: before.permissions } : undefined,
+  });
   return { success: "Role deleted." };
 }

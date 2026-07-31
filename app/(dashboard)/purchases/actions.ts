@@ -31,6 +31,7 @@ import {
 import { applyAdvancePayment } from "@/lib/db/queries/payments";
 // Only the "Convert to Purchase" flow (Purchase Orders feature) ever sets sourcePurchaseOrderId.
 import { markPurchaseOrderClosed } from "@/lib/db/queries/purchaseOrders";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type PurchaseFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type PurchaseActionState = { error?: string };
@@ -306,6 +307,12 @@ export async function softDeletePurchaseAction(
   const purchaseId = String(formData.get("purchaseId") ?? "");
   const result = await softDeletePurchase(purchaseId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "purchase.deleted",
+    target: { type: "purchase", id: purchaseId, label: result.purchase.docNumber },
+  });
   revalidatePath("/purchases");
   redirect("/purchases");
 }
@@ -315,7 +322,15 @@ export async function restorePurchaseAction(formData: FormData): Promise<void> {
   requirePermission(context.membership, "purchases", "delete");
   const purchaseId = String(formData.get("purchaseId") ?? "");
   if (!purchaseId) return;
-  await restorePurchase(purchaseId, context.activeBusinessId);
+  const purchase = await restorePurchase(purchaseId, context.activeBusinessId);
+  if (purchase) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "purchase.restored",
+      target: { type: "purchase", id: purchaseId, label: purchase.docNumber },
+    });
+  }
   revalidatePath("/purchases");
 }
 

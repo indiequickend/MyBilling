@@ -26,6 +26,7 @@ import {
 } from "@/lib/db/queries/salesOrders";
 // Only the "Convert to Sales Order" flow (Quotations feature) ever sets sourceQuotationId.
 import { markQuotationClosed } from "@/lib/db/queries/quotations";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type SalesOrderFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type SalesOrderActionState = { error?: string };
@@ -235,6 +236,12 @@ export async function softDeleteSalesOrderAction(
   const salesOrderId = String(formData.get("salesOrderId") ?? "");
   const result = await softDeleteSalesOrder(salesOrderId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "sales_order.deleted",
+    target: { type: "sales_order", id: salesOrderId, label: result.salesOrder.docNumber },
+  });
   revalidatePath("/sales/sales-orders");
   redirect("/sales/sales-orders");
 }
@@ -244,6 +251,14 @@ export async function restoreSalesOrderAction(formData: FormData): Promise<void>
   requirePermission(context.membership, "sales_orders", "delete");
   const salesOrderId = String(formData.get("salesOrderId") ?? "");
   if (!salesOrderId) return;
-  await restoreSalesOrder(salesOrderId, context.activeBusinessId);
+  const salesOrder = await restoreSalesOrder(salesOrderId, context.activeBusinessId);
+  if (salesOrder) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "sales_order.restored",
+      target: { type: "sales_order", id: salesOrderId, label: salesOrder.docNumber },
+    });
+  }
   revalidatePath("/sales/sales-orders");
 }

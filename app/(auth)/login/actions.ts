@@ -9,6 +9,7 @@ import { isLocked, recordFailedLogin, clearFailedLogins } from "@/lib/auth/locko
 import { createSession } from "@/lib/auth/session";
 import { setPendingLogin } from "@/lib/auth/pendingLogin";
 import { checkRateLimit, rateLimitKeyFromHeaders } from "@/lib/auth/rateLimit";
+import { recordLoginAudit } from "@/lib/db/queries/auditLog";
 
 export type LoginState = { error?: string };
 
@@ -41,6 +42,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const passwordOk = await verifyPassword(user.passwordHash, password);
   if (!passwordOk) {
     await recordFailedLogin(String(user._id));
+    await recordLoginAudit(String(user._id), "login.failed", user.email);
     return { error: GENERIC_ERROR };
   }
   await clearFailedLogins(String(user._id));
@@ -55,5 +57,6 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   }
 
   await createSession(String(user._id));
+  await recordLoginAudit(String(user._id), "login.success", user.email);
   redirect("/");
 }

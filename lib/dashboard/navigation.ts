@@ -31,7 +31,8 @@ export type NavIconKey =
   | "gst"
   | "apiKeys"
   | "webhooks"
-  | "paymentGateway";
+  | "paymentGateway"
+  | "auditLog";
 
 export type NavItem = {
   href: string;
@@ -373,6 +374,13 @@ const SETTINGS_GROUP: NavGroup = {
       icon: "paymentGateway",
       moduleKey: "settings",
       action: "manage_integrations",
+    },
+    {
+      href: "/settings/audit-log",
+      label: "Audit Log",
+      icon: "auditLog",
+      moduleKey: "settings",
+      action: "view_audit_log",
     },
   ],
 };

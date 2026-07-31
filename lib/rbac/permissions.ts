@@ -45,6 +45,9 @@ export const SETTINGS_ACTIONS = [
   "manage_document_settings",
   // Bank/cash/personal accounts + transfer funds.
   "manage_banking",
+  // View-only access to the Audit Log — deliberately separate from manage_roles/manage_users so
+  // it can be granted without also granting the ability to change who has access to what.
+  "view_audit_log",
 ] as const;
 export type SettingsAction = (typeof SETTINGS_ACTIONS)[number];
 

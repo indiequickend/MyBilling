@@ -31,6 +31,7 @@ import {
   KeyRound,
   Webhook,
   CreditCard,
+  History,
   type LucideIcon,
 } from "lucide-react";
 import type { NavGroup, NavIconKey } from "@/lib/dashboard/navigation";
@@ -66,6 +67,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   apiKeys: KeyRound,
   webhooks: Webhook,
   paymentGateway: CreditCard,
+  auditLog: History,
 };
 
 function isActive(pathname: string, href: string) {

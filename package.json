@@ -11,7 +11,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "audit": "pnpm audit --audit-level=high",
+    "migrate:audit-log-permission": "tsx --env-file=.env scripts/backfillAuditLogPermission.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
@@ -58,6 +60,7 @@
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

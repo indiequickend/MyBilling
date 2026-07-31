@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { requirePermission } from "@/lib/rbac/can";
 import { inviteUserSchema } from "@/lib/validation/users";
-import { findUserByEmail } from "@/lib/db/queries/users";
+import { findUserByEmail, findUserById } from "@/lib/db/queries/users";
 import {
   findMembership,
   findMembershipById,
@@ -20,6 +20,7 @@ import { generateToken, hashToken } from "@/lib/auth/tokens";
 import { sendInvitationEmail } from "@/lib/auth/mailer";
 import { absoluteUrl } from "@/lib/auth/urls";
 import { checkRateLimit, rateLimitKeyFromHeaders } from "@/lib/auth/rateLimit";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type UsersPageState = { error?: string; success?: string };
 
@@ -85,6 +86,13 @@ export async function inviteUserAction(
     business?.name ?? "the business",
     absoluteUrl(`/accept-invite?token=${token}`),
   );
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "membership.invited",
+    target: { type: "invitation", label: email },
+    after: { email, roleId, roleName: role.name },
+  });
 
   return { success: `Invitation sent to ${email}.` };
 }
@@ -117,7 +125,21 @@ export async function changeMembershipRoleAction(formData: FormData): Promise<vo
     }
   }
 
+  const previousRole = await findRoleById(String(targetMembership.roleId), context.activeBusinessId);
   await updateMembershipRole(membershipId, context.activeBusinessId, roleId);
+  const targetUser = await findUserById(String(targetMembership.userId));
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "membership.role_changed",
+    target: {
+      type: "membership",
+      id: membershipId,
+      label: targetUser?.name ?? targetUser?.email ?? membershipId,
+    },
+    before: { roleId: String(targetMembership.roleId), roleName: previousRole?.name },
+    after: { roleId, roleName: newRole.name },
+  });
 }
 
 export async function setMembershipStatusAction(formData: FormData): Promise<void> {
@@ -141,5 +163,17 @@ export async function setMembershipStatusAction(formData: FormData): Promise<voi
     }
   }
 
+  const targetMembership = await findMembershipById(membershipId, context.activeBusinessId);
   await setMembershipStatus(membershipId, context.activeBusinessId, status);
+  const targetUser = targetMembership ? await findUserById(String(targetMembership.userId)) : null;
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: status === "deactivated" ? "membership.deactivated" : "membership.reactivated",
+    target: {
+      type: "membership",
+      id: membershipId,
+      label: targetUser?.name ?? targetUser?.email ?? membershipId,
+    },
+  });
 }

@@ -21,7 +21,9 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/button";
 import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
 import { MasterExportButtons } from "@/components/importExport/MasterExportButtons";
-import { softDeleteCustomerAction, restoreCustomerAction } from "./actions";
+import { RevealField } from "@/components/ui/RevealField";
+import { maskGstin } from "@/lib/utils/mask";
+import { softDeleteCustomerAction, restoreCustomerAction, revealCustomerGstinAction } from "./actions";
 
 export default async function CustomersPage({
   searchParams,
@@ -143,7 +145,16 @@ export default async function CustomersPage({
                   </Link>
                 </TableCell>
                 <TableCell>{c.companyName ?? "—"}</TableCell>
-                <TableCell>{c.gstin ?? "—"}</TableCell>
+                <TableCell>
+                  {c.gstin ? (
+                    <RevealField
+                      maskedValue={maskGstin(c.gstin) ?? ""}
+                      reveal={revealCustomerGstinAction.bind(null, id)}
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
                 <TableCell>{c.phone ?? "—"}</TableCell>
                 <TableCell className="text-right">
                   {query.tab === "active" ? (

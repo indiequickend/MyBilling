@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/queries/products";
 import { uploadFile } from "@/lib/storage/cloudinary";
 import { detectImageMimeType } from "@/lib/storage/imageMime";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 import type { ActionKey } from "@/lib/rbac/permissions";
 
 export type ProductFormState = { error?: string; fieldErrors?: Record<string, string> };
@@ -192,7 +193,15 @@ export async function softDeleteProductAction(formData: FormData): Promise<void>
   const context = await requireProductsPermission("delete");
   const productId = String(formData.get("productId") ?? "");
   if (!productId) return;
-  await softDeleteProduct(productId, context.activeBusinessId);
+  const product = await softDeleteProduct(productId, context.activeBusinessId);
+  if (product) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "product.deleted",
+      target: { type: "product", id: productId, label: product.name },
+    });
+  }
   revalidatePath("/products");
 }
 
@@ -200,6 +209,14 @@ export async function restoreProductAction(formData: FormData): Promise<void> {
   const context = await requireProductsPermission("edit");
   const productId = String(formData.get("productId") ?? "");
   if (!productId) return;
-  await restoreProduct(productId, context.activeBusinessId);
+  const product = await restoreProduct(productId, context.activeBusinessId);
+  if (product) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "product.restored",
+      target: { type: "product", id: productId, label: product.name },
+    });
+  }
   revalidatePath("/products");
 }

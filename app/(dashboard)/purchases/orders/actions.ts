@@ -24,6 +24,7 @@ import {
   type PurchaseOrderWriteInput,
   type PurchaseOrderWriteFailureReason,
 } from "@/lib/db/queries/purchaseOrders";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type PurchaseOrderFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type PurchaseOrderActionState = { error?: string };
@@ -221,6 +222,12 @@ export async function softDeletePurchaseOrderAction(
   const purchaseOrderId = String(formData.get("purchaseOrderId") ?? "");
   const result = await softDeletePurchaseOrder(purchaseOrderId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "purchase_order.deleted",
+    target: { type: "purchase_order", id: purchaseOrderId, label: result.purchaseOrder.docNumber },
+  });
   revalidatePath("/purchases/orders");
   redirect("/purchases/orders");
 }
@@ -230,6 +237,14 @@ export async function restorePurchaseOrderAction(formData: FormData): Promise<vo
   requirePermission(context.membership, "purchase_orders", "delete");
   const purchaseOrderId = String(formData.get("purchaseOrderId") ?? "");
   if (!purchaseOrderId) return;
-  await restorePurchaseOrder(purchaseOrderId, context.activeBusinessId);
+  const purchaseOrder = await restorePurchaseOrder(purchaseOrderId, context.activeBusinessId);
+  if (purchaseOrder) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "purchase_order.restored",
+      target: { type: "purchase_order", id: purchaseOrderId, label: purchaseOrder.docNumber },
+    });
+  }
   revalidatePath("/purchases/orders");
 }

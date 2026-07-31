@@ -13,8 +13,10 @@ import {
   setDefaultBankAccount,
   softDeleteBankAccount,
   restoreBankAccount,
+  findBankAccountById,
   transferFunds,
 } from "@/lib/db/queries/bankAccounts";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type BankAccountFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type TransferFundsFormState = { error?: string; success?: string };
@@ -98,6 +100,7 @@ export async function softDeleteBankAccountAction(
   const context = await requireBankingPermission();
   const bankAccountId = String(formData.get("bankAccountId") ?? "");
   if (!bankAccountId) return {};
+  const account = await findBankAccountById(bankAccountId, context.activeBusinessId);
   const result = await softDeleteBankAccount(bankAccountId, context.activeBusinessId);
   if (!result.ok) {
     return {
@@ -107,6 +110,12 @@ export async function softDeleteBankAccountAction(
           : "Account not found.",
     };
   }
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.userId,
+    action: "bank_account.deleted",
+    target: { type: "bank_account", id: bankAccountId, label: account?.name },
+  });
   revalidatePath("/settings/banks");
   return {};
 }
@@ -115,7 +124,15 @@ export async function restoreBankAccountAction(formData: FormData): Promise<void
   const context = await requireBankingPermission();
   const bankAccountId = String(formData.get("bankAccountId") ?? "");
   if (!bankAccountId) return;
-  await restoreBankAccount(bankAccountId, context.activeBusinessId);
+  const account = await restoreBankAccount(bankAccountId, context.activeBusinessId);
+  if (account) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.userId,
+      action: "bank_account.restored",
+      target: { type: "bank_account", id: bankAccountId, label: account.name },
+    });
+  }
   revalidatePath("/settings/banks");
 }
 

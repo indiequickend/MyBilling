@@ -13,6 +13,7 @@ import {
   restoreIndirectIncome,
   type IndirectIncomeWriteFailureReason,
 } from "@/lib/db/queries/indirectIncome";
+import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type IndirectIncomeFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type IndirectIncomeActionState = { error?: string };
@@ -108,6 +109,12 @@ export async function softDeleteIndirectIncomeAction(
   const indirectIncomeId = String(formData.get("indirectIncomeId") ?? "");
   const result = await softDeleteIndirectIncome(indirectIncomeId, context.activeBusinessId);
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.membership.userId,
+    action: "indirect_income.deleted",
+    target: { type: "indirect_income", id: indirectIncomeId, label: result.indirectIncome.description },
+  });
   revalidatePath("/indirect-income");
   redirect("/indirect-income");
 }
@@ -117,6 +124,14 @@ export async function restoreIndirectIncomeAction(formData: FormData): Promise<v
   requirePermission(context.membership, "indirect_income", "delete");
   const indirectIncomeId = String(formData.get("indirectIncomeId") ?? "");
   if (!indirectIncomeId) return;
-  await restoreIndirectIncome(indirectIncomeId, context.activeBusinessId);
+  const indirectIncome = await restoreIndirectIncome(indirectIncomeId, context.activeBusinessId);
+  if (indirectIncome) {
+    await recordAuditLog({
+      businessId: context.activeBusinessId,
+      userId: context.membership.userId,
+      action: "indirect_income.restored",
+      target: { type: "indirect_income", id: indirectIncomeId, label: indirectIncome.description },
+    });
+  }
   revalidatePath("/indirect-income");
 }
