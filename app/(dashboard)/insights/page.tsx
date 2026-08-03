@@ -12,9 +12,9 @@ import { minorToRupeesString } from "@/lib/utils/money";
 import { parseReportDateRange, reportExportQuery } from "@/lib/reports/searchParams";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { SalesTrendChart, WeeklyRevenueChart, PaymentsByBankChart } from "@/components/insights/InsightsCharts";
-import { INVOICE_STATUS_BADGE_VARIANT, INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
+import { resolveInvoiceStatusDisplay } from "@/lib/constants/invoices";
 
 function StatTile({
   label,
@@ -204,22 +204,25 @@ export default async function InsightsPage({
                 <p className="text-sm text-muted-foreground">No pending invoices for this range.</p>
               ) : (
                 <ul className="divide-y">
-                  {pendingInvoices.items.map((inv) => (
-                    <li key={String(inv._id)} className="flex items-center justify-between py-2">
-                      <div>
-                        <Link href={`/sales/invoices/${String(inv._id)}`} className="text-sm font-medium hover:underline">
-                          {inv.docNumber ?? "Draft"}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">{inv.customerSnapshot.displayName}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={INVOICE_STATUS_BADGE_VARIANT[inv.status]}>
-                          {INVOICE_STATUS_LABELS[inv.status]}
-                        </Badge>
-                        <span className="text-sm">₹{minorToRupeesString(inv.grandTotalMinor)}</span>
-                      </div>
-                    </li>
-                  ))}
+                  {pendingInvoices.items.map((inv) => {
+                    const statusDisplay = resolveInvoiceStatusDisplay(inv.status, inv.dueDate);
+                    return (
+                      <li key={String(inv._id)} className="flex items-center justify-between py-2">
+                        <div>
+                          <Link href={`/sales/invoices/${String(inv._id)}`} className="text-sm font-medium hover:underline">
+                            {inv.docNumber ?? "Draft"}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">{inv.customerSnapshot.displayName}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StatusStamp variant={statusDisplay.variant} seed={String(inv._id)}>
+                            {statusDisplay.label}
+                          </StatusStamp>
+                          <span className="text-sm">₹{minorToRupeesString(inv.grandTotalMinor)}</span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
               <Link

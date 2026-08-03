@@ -143,7 +143,7 @@ export default async function PaymentsTimelinePage({
                     {p.direction === "in" ? "Received" : "Given"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right font-medium">
+                <TableCell className="text-right font-medium font-tabular tabular-nums">
                   ₹{minorToRupeesString(p.amountMinor)}
                 </TableCell>
               </TableRow>

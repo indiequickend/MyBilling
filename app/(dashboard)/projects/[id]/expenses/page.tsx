@@ -68,7 +68,7 @@ export default async function ProjectExpensesPage({
                   {e.status === "cancelled" ? "Cancelled" : "Recorded"}
                 </Badge>
               </TableCell>
-              <TableCell>₹{minorToRupeesString(e.amountMinor)}</TableCell>
+              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(e.amountMinor)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -91,10 +91,10 @@ export default async function Gstr2bPage({
                 <TableRow key={i}>
                   <TableCell>{r.vendorGstin}</TableCell>
                   <TableCell>{r.taxRatePercent}</TableCell>
-                  <TableCell>{minorToRupeesString(r.taxableAmountMinor)}</TableCell>
-                  <TableCell>{minorToRupeesString(r.cgstMinor)}</TableCell>
-                  <TableCell>{minorToRupeesString(r.sgstMinor)}</TableCell>
-                  <TableCell>{minorToRupeesString(r.igstMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">{minorToRupeesString(r.taxableAmountMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">{minorToRupeesString(r.cgstMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">{minorToRupeesString(r.sgstMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">{minorToRupeesString(r.igstMinor)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -138,12 +138,12 @@ export default async function Gstr2bPage({
                   <TableCell>
                     <Badge variant={DIFF_VARIANTS[r.category]}>{DIFF_LABELS[r.category]}</Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="font-tabular tabular-nums">
                     {r.localTaxableValueMinor != null
                       ? `${minorToRupeesString(r.localTaxableValueMinor)} / ${minorToRupeesString(r.localTaxMinor ?? 0)}`
                       : "—"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="font-tabular tabular-nums">
                     {r.importedTaxableValueMinor != null
                       ? `${minorToRupeesString(r.importedTaxableValueMinor)} / ${minorToRupeesString(r.importedTaxMinor ?? 0)}`
                       : "—"}

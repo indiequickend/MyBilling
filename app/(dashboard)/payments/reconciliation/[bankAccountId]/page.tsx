@@ -67,11 +67,11 @@ export default async function ReconcileAccountPage({
                   <TableRow key={String(line._id)}>
                     <TableCell>{new Date(line.statementDate).toLocaleDateString()}</TableCell>
                     <TableCell className="whitespace-normal">{line.description ?? "—"}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right font-tabular tabular-nums">
                       {line.direction === "credit" ? "+" : "-"}₹{minorToRupeesString(line.amountMinor)}
                     </TableCell>
                     {canEdit ? (
-                      <TableCell>
+                      <TableCell className="font-tabular tabular-nums">
                         <form action={matchStatementLineAction} className="flex gap-1">
                           <input type="hidden" name="lineId" value={String(line._id)} />
                           <input type="hidden" name="bankAccountId" value={bankAccountId} />
@@ -124,7 +124,7 @@ export default async function ReconcileAccountPage({
                   <TableRow key={String(p._id)}>
                     <TableCell>{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
                     <TableCell>{p.direction === "in" ? "Received" : "Given"}</TableCell>
-                    <TableCell className="text-right">₹{minorToRupeesString(p.amountMinor)}</TableCell>
+                    <TableCell className="text-right font-tabular tabular-nums">₹{minorToRupeesString(p.amountMinor)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -155,7 +155,7 @@ export default async function ReconcileAccountPage({
                 <TableRow key={String(line._id)}>
                   <TableCell>{new Date(line.statementDate).toLocaleDateString()}</TableCell>
                   <TableCell className="whitespace-normal">{line.description ?? "—"}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right font-tabular tabular-nums">
                     {line.direction === "credit" ? "+" : "-"}₹{minorToRupeesString(line.amountMinor)}
                   </TableCell>
                   {canEdit ? (

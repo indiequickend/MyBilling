@@ -57,7 +57,7 @@ export default async function EwayBillsPage() {
                   <TableCell>{inv.docNumber ?? "—"}</TableCell>
                   <TableCell>{inv.invoiceDate.toLocaleDateString("en-IN")}</TableCell>
                   <TableCell>{inv.customerDisplayName}</TableCell>
-                  <TableCell>{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
                   <TableCell>
                     {status === "generated" ? <Badge variant="success">Generated</Badge> : <Badge variant="outline">Not Generated</Badge>}
                   </TableCell>

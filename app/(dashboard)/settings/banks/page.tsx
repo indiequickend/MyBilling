@@ -75,7 +75,7 @@ export default async function BanksPage() {
                     </Link>
                   </TableCell>
                   <TableCell>{BANK_ACCOUNT_TYPE_LABELS[a.type]}</TableCell>
-                  <TableCell>₹{minorToRupeesString(balances[i])}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(balances[i])}</TableCell>
                   <TableCell>
                     {a.isDefault ? (
                       <Badge variant="success">Default</Badge>
@@ -158,7 +158,7 @@ export default async function BanksPage() {
                 {transfers.items.map((t) => (
                   <TableRow key={String(t._id)}>
                     <TableCell>{new Date(t.transferDate).toLocaleDateString()}</TableCell>
-                    <TableCell>₹{minorToRupeesString(t.amountMinor)}</TableCell>
+                    <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(t.amountMinor)}</TableCell>
                     <TableCell>{t.note ?? "—"}</TableCell>
                   </TableRow>
                 ))}

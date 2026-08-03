@@ -67,10 +67,10 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
                   <TableCell>{line.accountLabel}</TableCell>
                   <TableCell>{ACCOUNT_TYPE_LABELS[line.accountType] ?? line.accountType}</TableCell>
                   <TableCell>{line.note ?? "—"}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right font-tabular tabular-nums">
                     {line.debitMinor > 0 ? `₹${minorToRupeesString(line.debitMinor)}` : "—"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right font-tabular tabular-nums">
                     {line.creditMinor > 0 ? `₹${minorToRupeesString(line.creditMinor)}` : "—"}
                   </TableCell>
                 </TableRow>
@@ -79,10 +79,10 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
                 <TableCell colSpan={3} className="text-right font-medium">
                   Total
                 </TableCell>
-                <TableCell className="text-right font-medium">
+                <TableCell className="text-right font-medium font-tabular tabular-nums">
                   ₹{minorToRupeesString(journal.totalMinor)}
                 </TableCell>
-                <TableCell className="text-right font-medium">
+                <TableCell className="text-right font-medium font-tabular tabular-nums">
                   ₹{minorToRupeesString(journal.totalMinor)}
                 </TableCell>
               </TableRow>

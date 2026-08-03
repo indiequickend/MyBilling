@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelDebitNoteButton, DeleteDebitNoteButton } from "./DebitNoteActionButtons";
 
@@ -47,7 +47,9 @@ export default async function DebitNoteDetailPage({ params }: { params: Promise<
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{debitNote.docNumber ?? "Draft debit note"}</h1>
-            <Badge variant={STATUS_BADGE_VARIANT[debitNote.status]}>{STATUS_LABELS[debitNote.status]}</Badge>
+            <StatusStamp variant={STATUS_BADGE_VARIANT[debitNote.status]} seed={String(debitNote._id)}>
+              {STATUS_LABELS[debitNote.status]}
+            </StatusStamp>
           </div>
           <p className="text-sm text-muted-foreground">{debitNote.vendorSnapshot.displayName}</p>
           <Link
@@ -113,11 +115,11 @@ export default async function DebitNoteDetailPage({ params }: { params: Promise<
                   <TableCell>
                     {li.quantity} {li.unit}
                   </TableCell>
-                  <TableCell>₹{minorToRupeesString(li.unitPriceMinor)}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(li.unitPriceMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">
                     {li.taxRatePercent}% (₹{minorToRupeesString(li.cgstMinor + li.sgstMinor + li.igstMinor)})
                   </TableCell>
-                  <TableCell>₹{minorToRupeesString(li.totalMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(li.totalMinor)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

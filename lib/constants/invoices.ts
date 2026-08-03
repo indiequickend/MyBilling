@@ -20,6 +20,26 @@ export const INVOICE_STATUS_BADGE_VARIANT: Record<
   cancelled: "danger",
 };
 
+/**
+ * "Overdue" isn't a persisted status — it's computed for display only, so it
+ * never touches the stored InvoiceStatus enum/schema. A pending/partially-paid
+ * invoice past its due date reads as overdue everywhere its status is shown.
+ */
+export function resolveInvoiceStatusDisplay(
+  status: InvoiceStatus,
+  dueDate: Date | string | null | undefined,
+): { label: string; variant: "success" | "warning" | "danger" | "outline" } {
+  const isOverdue =
+    (status === "pending" || status === "partially_paid") &&
+    dueDate != null &&
+    new Date(dueDate).getTime() < Date.now();
+
+  if (isOverdue) {
+    return { label: "Overdue", variant: "danger" };
+  }
+  return { label: INVOICE_STATUS_LABELS[status], variant: INVOICE_STATUS_BADGE_VARIANT[status] };
+}
+
 export const DISCOUNT_TARGETS = ["unit_price", "price_with_tax", "net_amount", "total"] as const;
 export type DiscountTarget = (typeof DISCOUNT_TARGETS)[number];
 

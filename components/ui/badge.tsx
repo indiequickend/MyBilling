@@ -19,6 +19,7 @@ const badgeVariants = cva(
         success: "bg-success text-success-foreground [a]:hover:bg-success/80",
         warning: "bg-warning text-warning-foreground [a]:hover:bg-warning/80",
         danger: "bg-danger text-danger-foreground [a]:hover:bg-danger/80",
+        brass: "bg-brass text-brass-foreground [a]:hover:bg-brass/80",
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",

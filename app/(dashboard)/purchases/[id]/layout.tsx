@@ -5,7 +5,7 @@ import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findPurchaseById } from "@/lib/db/queries/purchases";
 import { DOCUMENT_STATUS_BADGE_VARIANT, DOCUMENT_STATUS_LABELS } from "@/lib/constants/documents";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelPurchaseButton, DeletePurchaseButton } from "./PurchaseActionButtons";
 
@@ -44,9 +44,9 @@ export default async function PurchaseDetailLayout({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{purchase.docNumber ?? "Draft purchase"}</h1>
-            <Badge variant={DOCUMENT_STATUS_BADGE_VARIANT[purchase.status]}>
+            <StatusStamp variant={DOCUMENT_STATUS_BADGE_VARIANT[purchase.status]} seed={String(purchase._id)}>
               {DOCUMENT_STATUS_LABELS[purchase.status]}
-            </Badge>
+            </StatusStamp>
           </div>
           <p className="text-sm text-muted-foreground">{purchase.vendorSnapshot.displayName}</p>
         </div>

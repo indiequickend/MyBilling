@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelCreditNoteButton, DeleteCreditNoteButton } from "./CreditNoteActionButtons";
 
@@ -47,7 +47,9 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{creditNote.docNumber ?? "Draft credit note"}</h1>
-            <Badge variant={STATUS_BADGE_VARIANT[creditNote.status]}>{STATUS_LABELS[creditNote.status]}</Badge>
+            <StatusStamp variant={STATUS_BADGE_VARIANT[creditNote.status]} seed={String(creditNote._id)}>
+              {STATUS_LABELS[creditNote.status]}
+            </StatusStamp>
           </div>
           <p className="text-sm text-muted-foreground">{creditNote.customerSnapshot.displayName}</p>
           <Link
@@ -113,11 +115,11 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
                   <TableCell>
                     {li.quantity} {li.unit}
                   </TableCell>
-                  <TableCell>₹{minorToRupeesString(li.unitPriceMinor)}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(li.unitPriceMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">
                     {li.taxRatePercent}% (₹{minorToRupeesString(li.cgstMinor + li.sgstMinor + li.igstMinor)})
                   </TableCell>
-                  <TableCell>₹{minorToRupeesString(li.totalMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(li.totalMinor)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

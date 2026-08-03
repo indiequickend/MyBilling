@@ -120,7 +120,7 @@ export default async function ExpensesPage({
                     {e.status === "cancelled" ? "Cancelled" : "Recorded"}
                   </Badge>
                 </TableCell>
-                <TableCell>₹{minorToRupeesString(e.amountMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(e.amountMinor)}</TableCell>
                 <TableCell className="text-right">
                   <Button variant="outline" size="sm" asChild>
                     <Link href={`/expenses/${id}`}>View</Link>

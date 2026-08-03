@@ -60,9 +60,9 @@ export default async function VendorLedgerPage({
               <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
               <TableCell className="capitalize">{entry.type.replace("_", " ")}</TableCell>
               <TableCell>{entry.description}</TableCell>
-              <TableCell>{entry.debitMinor > 0 ? `₹${minorToRupeesString(entry.debitMinor)}` : "—"}</TableCell>
-              <TableCell>{entry.creditMinor > 0 ? `₹${minorToRupeesString(entry.creditMinor)}` : "—"}</TableCell>
-              <TableCell>₹{minorToRupeesString(entry.balanceMinor)}</TableCell>
+              <TableCell className="font-tabular tabular-nums">{entry.debitMinor > 0 ? `₹${minorToRupeesString(entry.debitMinor)}` : "—"}</TableCell>
+              <TableCell className="font-tabular tabular-nums">{entry.creditMinor > 0 ? `₹${minorToRupeesString(entry.creditMinor)}` : "—"}</TableCell>
+              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(entry.balanceMinor)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -68,7 +68,7 @@ export default async function JournalsPage({
               </TableCell>
               <TableCell>{new Date(j.journalDate).toLocaleDateString()}</TableCell>
               <TableCell className="whitespace-normal">{j.narration}</TableCell>
-              <TableCell className="text-right">₹{minorToRupeesString(j.totalMinor)}</TableCell>
+              <TableCell className="text-right font-tabular tabular-nums">₹{minorToRupeesString(j.totalMinor)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -4,7 +4,7 @@ import { ArrowRightLeft, Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findQuotationById } from "@/lib/db/queries/quotations";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelQuotationButton, DeleteQuotationButton } from "./QuotationActionButtons";
 
@@ -62,9 +62,9 @@ export default async function QuotationDetailLayout({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{quotation.docNumber ?? "Draft quotation"}</h1>
-            <Badge variant={STATUS_BADGE_VARIANT[quotation.status]}>
+            <StatusStamp variant={STATUS_BADGE_VARIANT[quotation.status]} seed={String(quotation._id)}>
               {STATUS_LABELS[quotation.status]}
-            </Badge>
+            </StatusStamp>
           </div>
           <p className="text-sm text-muted-foreground">{quotation.customerSnapshot.displayName}</p>
         </div>

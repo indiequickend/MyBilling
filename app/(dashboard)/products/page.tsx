@@ -154,7 +154,7 @@ export default async function ProductsPage({
               </TableCell>
               <TableCell>{p.type === "product" ? "Product" : "Service"}</TableCell>
               <TableCell>{p.hsnOrSac ?? "—"}</TableCell>
-              <TableCell>
+              <TableCell className="font-tabular tabular-nums">
                 {p.variants.length > 0
                   ? "Varies by variant"
                   : `₹${minorToRupeesString(p.sellingPriceMinor)}`}

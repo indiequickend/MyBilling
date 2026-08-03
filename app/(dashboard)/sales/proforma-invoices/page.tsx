@@ -18,7 +18,7 @@ import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -128,9 +128,11 @@ export default async function ProformaInvoicesPage({
                 <TableCell>{new Date(pi.proformaDate).toLocaleDateString()}</TableCell>
                 <TableCell>{pi.customerSnapshot.displayName}</TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_BADGE_VARIANT[pi.status]}>{STATUS_LABELS[pi.status]}</Badge>
+                  <StatusStamp variant={STATUS_BADGE_VARIANT[pi.status]} seed={String(pi._id)}>
+                    {STATUS_LABELS[pi.status]}
+                  </StatusStamp>
                 </TableCell>
-                <TableCell>₹{minorToRupeesString(pi.grandTotalMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(pi.grandTotalMinor)}</TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="outline" size="sm" asChild>

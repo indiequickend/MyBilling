@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableEmptyState } from "@/components/ui/TableEmptyState";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Pagination } from "@/components/ui/Pagination";
 
 export default async function ProjectPurchasesPage({
@@ -65,11 +65,11 @@ export default async function ProjectPurchasesPage({
               <TableCell>{new Date(p.purchaseDate).toLocaleDateString()}</TableCell>
               <TableCell>{p.vendorSnapshot.displayName}</TableCell>
               <TableCell>
-                <Badge variant={DOCUMENT_STATUS_BADGE_VARIANT[p.status]}>
+                <StatusStamp variant={DOCUMENT_STATUS_BADGE_VARIANT[p.status]} seed={String(p._id)}>
                   {DOCUMENT_STATUS_LABELS[p.status]}
-                </Badge>
+                </StatusStamp>
               </TableCell>
-              <TableCell>₹{minorToRupeesString(p.grandTotalMinor)}</TableCell>
+              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.grandTotalMinor)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

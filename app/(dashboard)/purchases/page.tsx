@@ -20,7 +20,7 @@ import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
 import {
@@ -140,12 +140,12 @@ export default async function PurchasesPage({
                 <TableCell>{new Date(p.purchaseDate).toLocaleDateString()}</TableCell>
                 <TableCell>{p.vendorSnapshot.displayName}</TableCell>
                 <TableCell>
-                  <Badge variant={DOCUMENT_STATUS_BADGE_VARIANT[p.status]}>
+                  <StatusStamp variant={DOCUMENT_STATUS_BADGE_VARIANT[p.status]} seed={String(p._id)}>
                     {DOCUMENT_STATUS_LABELS[p.status]}
-                  </Badge>
+                  </StatusStamp>
                 </TableCell>
-                <TableCell>₹{minorToRupeesString(p.grandTotalMinor)}</TableCell>
-                <TableCell>₹{minorToRupeesString(p.amountPaidMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.grandTotalMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.amountPaidMinor)}</TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="outline" size="sm" asChild>
@@ -177,8 +177,8 @@ export default async function PurchasesPage({
           <TableFooter>
             <TableRow className="hover:bg-muted/50">
               <TableCell colSpan={4}>Total</TableCell>
-              <TableCell>₹{minorToRupeesString(totals.totalMinor)}</TableCell>
-              <TableCell>₹{minorToRupeesString(totals.paidMinor)}</TableCell>
+              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(totals.totalMinor)}</TableCell>
+              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(totals.paidMinor)}</TableCell>
               <TableCell />
             </TableRow>
           </TableFooter>

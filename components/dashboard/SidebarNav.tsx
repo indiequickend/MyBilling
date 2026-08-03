@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import type { NavGroup } from "@/lib/dashboard/navigation";
@@ -41,10 +42,8 @@ export function SidebarNav({ main, settings }: { main: NavGroup[]; settings: Nav
           collapsed && "flex-col justify-center gap-2 px-0 py-2",
         )}
       >
-        <Link href="/" className="flex flex-1 items-center gap-2 font-semibold">
-          <span className="flex size-6 items-center justify-center rounded-md bg-primary text-xs text-primary-foreground">
-            M
-          </span>
+        <Link href="/" className="flex flex-1 items-center gap-2 font-heading font-semibold">
+          <Image src="/icons/icon-192.png" alt="" width={24} height={24} className="size-6 shrink-0 rounded-md" />
           {collapsed ? null : <span>MyBilling</span>}
         </Link>
         <button

@@ -66,7 +66,7 @@ export default async function VendorBillWisePage({
                         <TableRow key={p.paymentId}>
                           <TableCell>{new Date(p.date).toLocaleDateString()}</TableCell>
                           <TableCell>{PAYMENT_MODE_LABELS[p.mode]}</TableCell>
-                          <TableCell>₹{minorToRupeesString(p.amountMinor)}</TableCell>
+                          <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.amountMinor)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

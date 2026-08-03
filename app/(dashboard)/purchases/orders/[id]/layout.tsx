@@ -4,7 +4,7 @@ import { ArrowRightLeft, Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findPurchaseOrderById } from "@/lib/db/queries/purchaseOrders";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelPurchaseOrderButton, DeletePurchaseOrderButton } from "./PurchaseOrderActionButtons";
 
@@ -52,9 +52,9 @@ export default async function PurchaseOrderDetailLayout({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{purchaseOrder.docNumber ?? "Draft purchase order"}</h1>
-            <Badge variant={STATUS_BADGE_VARIANT[purchaseOrder.status]}>
+            <StatusStamp variant={STATUS_BADGE_VARIANT[purchaseOrder.status]} seed={String(purchaseOrder._id)}>
               {STATUS_LABELS[purchaseOrder.status]}
-            </Badge>
+            </StatusStamp>
           </div>
           <p className="text-sm text-muted-foreground">{purchaseOrder.vendorSnapshot.displayName}</p>
         </div>

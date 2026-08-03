@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { listInvoices } from "@/lib/db/queries/invoices";
-import { INVOICE_STATUS_BADGE_VARIANT, INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
+import { resolveInvoiceStatusDisplay } from "@/lib/constants/invoices";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { PartyDetailTabs } from "@/components/dashboard/PartyDetailTabs";
 import {
@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableEmptyState } from "@/components/ui/TableEmptyState";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 
 export default async function CustomerTransactionsPage({
   params,
@@ -44,23 +44,26 @@ export default async function CustomerTransactionsPage({
         </TableHeader>
         <TableBody>
           {items.length === 0 ? <TableEmptyState colSpan={5} message="No transactions yet." /> : null}
-          {items.map((inv) => (
-            <TableRow key={String(inv._id)}>
-              <TableCell>
-                <Link href={`/sales/invoices/${String(inv._id)}`} className="font-medium hover:underline">
-                  {inv.docNumber ?? "Draft"}
-                </Link>
-              </TableCell>
-              <TableCell>{new Date(inv.invoiceDate).toLocaleDateString()}</TableCell>
-              <TableCell>
-                <Badge variant={INVOICE_STATUS_BADGE_VARIANT[inv.status]}>
-                  {INVOICE_STATUS_LABELS[inv.status]}
-                </Badge>
-              </TableCell>
-              <TableCell>₹{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
-              <TableCell>₹{minorToRupeesString(inv.amountPaidMinor)}</TableCell>
-            </TableRow>
-          ))}
+          {items.map((inv) => {
+            const statusDisplay = resolveInvoiceStatusDisplay(inv.status, inv.dueDate);
+            return (
+              <TableRow key={String(inv._id)}>
+                <TableCell>
+                  <Link href={`/sales/invoices/${String(inv._id)}`} className="font-medium hover:underline">
+                    {inv.docNumber ?? "Draft"}
+                  </Link>
+                </TableCell>
+                <TableCell>{new Date(inv.invoiceDate).toLocaleDateString()}</TableCell>
+                <TableCell>
+                  <StatusStamp variant={statusDisplay.variant} seed={String(inv._id)}>
+                    {statusDisplay.label}
+                  </StatusStamp>
+                </TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(inv.amountPaidMinor)}</TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

@@ -90,7 +90,7 @@ export default async function EInvoicesPage({
                 <TableCell>{inv.docNumber ?? "—"}</TableCell>
                 <TableCell>{inv.invoiceDate.toLocaleDateString("en-IN")}</TableCell>
                 <TableCell>{inv.customerDisplayName}</TableCell>
-                <TableCell>{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[inv.status]}>{inv.status}</Badge>
                 </TableCell>

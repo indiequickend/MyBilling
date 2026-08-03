@@ -18,7 +18,7 @@ import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -130,9 +130,11 @@ export default async function SalesOrdersPage({
                 <TableCell>{new Date(so.orderDate).toLocaleDateString()}</TableCell>
                 <TableCell>{so.customerSnapshot.displayName}</TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_BADGE_VARIANT[so.status]}>{STATUS_LABELS[so.status]}</Badge>
+                  <StatusStamp variant={STATUS_BADGE_VARIANT[so.status]} seed={String(so._id)}>
+                    {STATUS_LABELS[so.status]}
+                  </StatusStamp>
                 </TableCell>
-                <TableCell>₹{minorToRupeesString(so.grandTotalMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(so.grandTotalMinor)}</TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="outline" size="sm" asChild>

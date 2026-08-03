@@ -89,11 +89,11 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
                   <TableCell>
                     {li.quantity} {li.unit}
                   </TableCell>
-                  <TableCell>₹{minorToRupeesString(li.unitPriceMinor)}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(li.unitPriceMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">
                     {li.taxRatePercent}% (₹{minorToRupeesString(li.cgstMinor + li.sgstMinor + li.igstMinor)})
                   </TableCell>
-                  <TableCell>₹{minorToRupeesString(li.totalMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(li.totalMinor)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

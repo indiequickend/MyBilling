@@ -94,31 +94,31 @@ export default async function Gstr3bPage({
             <TableBody>
               <TableRow>
                 <TableCell>(a) Outward Taxable Supplies</TableCell>
-                <TableCell>{minorToRupeesString(data.outwardTaxableSupplies.taxableAmountMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.outwardTaxableSupplies.cgstMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.outwardTaxableSupplies.sgstMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.outwardTaxableSupplies.igstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.outwardTaxableSupplies.taxableAmountMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.outwardTaxableSupplies.cgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.outwardTaxableSupplies.sgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.outwardTaxableSupplies.igstMinor)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>(b) Zero Rated (Exports)</TableCell>
-                <TableCell>{minorToRupeesString(data.zeroRatedAndExempt.zeroRatedMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.zeroRatedAndExempt.zeroRatedMinor)}</TableCell>
                 <TableCell>—</TableCell>
                 <TableCell>—</TableCell>
                 <TableCell>—</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>(c) Nil Rated / Exempt</TableCell>
-                <TableCell>{minorToRupeesString(data.zeroRatedAndExempt.nilExemptMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.zeroRatedAndExempt.nilExemptMinor)}</TableCell>
                 <TableCell>—</TableCell>
                 <TableCell>—</TableCell>
                 <TableCell>—</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>(d) Inward Liable to Reverse Charge</TableCell>
-                <TableCell>{minorToRupeesString(data.inwardReverseCharge.taxableAmountMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.inwardReverseCharge.cgstMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.inwardReverseCharge.sgstMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.inwardReverseCharge.igstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.inwardReverseCharge.taxableAmountMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.inwardReverseCharge.cgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.inwardReverseCharge.sgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.inwardReverseCharge.igstMinor)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -143,8 +143,8 @@ export default async function Gstr3bPage({
               {data.interstateToUnregistered.map((r) => (
                 <TableRow key={r.placeOfSupplyState}>
                   <TableCell>{r.placeOfSupplyState}</TableCell>
-                  <TableCell>{minorToRupeesString(r.taxableAmountMinor)}</TableCell>
-                  <TableCell>{minorToRupeesString(r.igstMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">{minorToRupeesString(r.taxableAmountMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">{minorToRupeesString(r.igstMinor)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -167,21 +167,21 @@ export default async function Gstr3bPage({
             <TableBody>
               <TableRow>
                 <TableCell>ITC Available</TableCell>
-                <TableCell>{minorToRupeesString(data.itc.availableCgstMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.itc.availableSgstMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.itc.availableIgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.itc.availableCgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.itc.availableSgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.itc.availableIgstMinor)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>ITC Reversed (Debit Notes)</TableCell>
-                <TableCell>{minorToRupeesString(data.itc.reversedCgstMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.itc.reversedSgstMinor)}</TableCell>
-                <TableCell>{minorToRupeesString(data.itc.reversedIgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.itc.reversedCgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.itc.reversedSgstMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">{minorToRupeesString(data.itc.reversedIgstMinor)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Net ITC</TableCell>
-                <TableCell className="font-medium">{minorToRupeesString(data.itc.netCgstMinor)}</TableCell>
-                <TableCell className="font-medium">{minorToRupeesString(data.itc.netSgstMinor)}</TableCell>
-                <TableCell className="font-medium">{minorToRupeesString(data.itc.netIgstMinor)}</TableCell>
+                <TableCell className="font-medium font-tabular tabular-nums">{minorToRupeesString(data.itc.netCgstMinor)}</TableCell>
+                <TableCell className="font-medium font-tabular tabular-nums">{minorToRupeesString(data.itc.netSgstMinor)}</TableCell>
+                <TableCell className="font-medium font-tabular tabular-nums">{minorToRupeesString(data.itc.netIgstMinor)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>

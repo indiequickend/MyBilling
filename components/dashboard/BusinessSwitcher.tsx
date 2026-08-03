@@ -34,7 +34,7 @@ export function BusinessSwitcher({
       </form>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="max-w-48 justify-start gap-2 px-2">
+          <Button variant="ghost" className="max-w-28 justify-start gap-2 px-2 sm:max-w-48">
             <Building2 className="size-4 shrink-0 text-muted-foreground" />
             <span className="truncate">{active?.name ?? "Select business"}</span>
             <ChevronsUpDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" />

@@ -152,12 +152,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                     <TableCell>{v.name}</TableCell>
                     <TableCell>{v.sku ?? "—"}</TableCell>
                     <TableCell>{v.barcode ?? "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-tabular tabular-nums">
                       {v.sellingPriceOverrideMinor != null
                         ? `₹${minorToRupeesString(v.sellingPriceOverrideMinor)}`
                         : "—"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="font-tabular tabular-nums">
                       {v.purchasePriceOverrideMinor != null
                         ? `₹${minorToRupeesString(v.purchasePriceOverrideMinor)}`
                         : "—"}
@@ -190,7 +190,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 {product.priceOverrides.map((p, i) => (
                   <TableRow key={i}>
                     <TableCell>{String(p.priceListId)}</TableCell>
-                    <TableCell>₹{minorToRupeesString(p.priceMinor)}</TableCell>
+                    <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.priceMinor)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

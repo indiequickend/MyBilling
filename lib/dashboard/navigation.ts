@@ -385,7 +385,7 @@ const SETTINGS_GROUP: NavGroup = {
   ],
 };
 
-function isVisible(item: NavItem, membership: MembershipContext | null): boolean {
+export function isVisible(item: NavItem, membership: MembershipContext | null): boolean {
   if (!item.moduleKey || !item.action) return true;
   if (!membership) return false;
   return can(membership, item.moduleKey, item.action);
@@ -407,4 +407,44 @@ export function buildNavGroups(membership: MembershipContext | null): {
   );
   const settings = filterGroup(SETTINGS_GROUP, membership);
   return { main, settings };
+}
+
+const BOTTOM_TAB_CANDIDATES: NavItem[] = [
+  { href: "/", label: "Dashboard", icon: "dashboard" },
+  { href: "/sales/invoices", label: "Invoices", icon: "invoices", moduleKey: "sales_invoices", action: "view" },
+  { href: "/payments", label: "Payments", icon: "payments", moduleKey: "payments", action: "view" },
+];
+
+/** No unified "parties" list exists — prefer Customers, fall back to Vendors, hide if neither is permitted. */
+function buildPartiesTabItem(membership: MembershipContext | null): NavItem | null {
+  const customers: NavItem = { href: "/customers", label: "Parties", icon: "customers", moduleKey: "customers", action: "view" };
+  const vendors: NavItem = { href: "/vendors", label: "Parties", icon: "vendors", moduleKey: "vendors", action: "view" };
+  if (isVisible(customers, membership)) return customers;
+  if (isVisible(vendors, membership)) return vendors;
+  return null;
+}
+
+/**
+ * Fixed 5th-slot-reserved-for-"More" bottom tab bar items (mobile shell, `md:hidden`).
+ * Runs through the same RBAC visibility check as `buildNavGroups` — no duplicated
+ * permission logic. A role missing one of these simply doesn't get that slot,
+ * rather than another item shifting in to fill the gap.
+ */
+export function buildBottomTabItems(membership: MembershipContext | null): NavItem[] {
+  const items = BOTTOM_TAB_CANDIDATES.filter((item) => isVisible(item, membership));
+  const parties = buildPartiesTabItem(membership);
+  return parties ? [...items, parties] : items;
+}
+
+const QUICK_CREATE_CANDIDATES: NavItem[] = [
+  { href: "/sales/invoices/new", label: "Invoice", icon: "invoices", moduleKey: "sales_invoices", action: "create" },
+  { href: "/customers/new", label: "Customer", icon: "customers", moduleKey: "customers", action: "create" },
+  // No standalone "record a payment" route exists — payments are recorded from
+  // the specific invoice/purchase/expense they settle. Link to the Timeline instead.
+  { href: "/payments", label: "Payments", icon: "payments", moduleKey: "payments", action: "view" },
+];
+
+/** RBAC-filtered shortcuts for the mobile quick-create sheet. */
+export function buildQuickCreateItems(membership: MembershipContext | null): NavItem[] {
+  return QUICK_CREATE_CANDIDATES.filter((item) => isVisible(item, membership));
 }

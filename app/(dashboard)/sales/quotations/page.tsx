@@ -18,7 +18,7 @@ import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -137,9 +137,11 @@ export default async function QuotationsPage({
                 <TableCell>{new Date(q.quotationDate).toLocaleDateString()}</TableCell>
                 <TableCell>{q.customerSnapshot.displayName}</TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_BADGE_VARIANT[q.status]}>{STATUS_LABELS[q.status]}</Badge>
+                  <StatusStamp variant={STATUS_BADGE_VARIANT[q.status]} seed={String(q._id)}>
+                    {STATUS_LABELS[q.status]}
+                  </StatusStamp>
                 </TableCell>
-                <TableCell>₹{minorToRupeesString(q.grandTotalMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(q.grandTotalMinor)}</TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="outline" size="sm" asChild>

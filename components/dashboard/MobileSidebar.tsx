@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { Menu } from "lucide-react";
 import type { NavGroup } from "@/lib/dashboard/navigation";
 import { NavLinks } from "@/components/dashboard/NavLinks";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -15,23 +14,30 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-export function MobileSidebar({ main, settings }: { main: NavGroup[]; settings: NavGroup | null }) {
+/**
+ * Full RBAC-filtered nav tree in a Sheet. `trigger` is caller-supplied — on
+ * mobile widths this is opened from the bottom tab bar's "More" tab, not a
+ * standalone hamburger button.
+ */
+export function MobileSidebar({
+  main,
+  settings,
+  trigger,
+}: {
+  main: NavGroup[];
+  settings: NavGroup | null;
+  trigger: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="icon" className="md:hidden" aria-label="Open menu">
-          <Menu />
-        </Button>
-      </SheetTrigger>
+      <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent side="left" className="w-72 p-0">
         <SheetHeader className="border-b">
           <SheetTitle asChild>
-            <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-md bg-primary text-xs text-primary-foreground">
-                M
-              </span>
+            <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2 font-heading">
+              <Image src="/icons/icon-192.png" alt="" width={24} height={24} className="size-6 shrink-0 rounded-md" />
               MyBilling
             </Link>
           </SheetTitle>

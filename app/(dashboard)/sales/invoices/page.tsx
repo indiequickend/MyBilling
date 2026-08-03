@@ -5,7 +5,7 @@ import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/d
 import { can } from "@/lib/rbac/can";
 import { listInvoices, sumInvoiceTotals } from "@/lib/db/queries/invoices";
 import { invoiceListQuerySchema } from "@/lib/validation/invoices";
-import { INVOICE_STATUS_BADGE_VARIANT, INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
+import { resolveInvoiceStatusDisplay } from "@/lib/constants/invoices";
 import { minorToRupeesString } from "@/lib/utils/money";
 import {
   Table,
@@ -20,7 +20,7 @@ import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
 import {
@@ -130,6 +130,7 @@ export default async function InvoicesPage({
           {items.length === 0 ? <TableEmptyState colSpan={7} message="No invoices found." /> : null}
           {items.map((inv) => {
             const id = String(inv._id);
+            const statusDisplay = resolveInvoiceStatusDisplay(inv.status, inv.dueDate);
             return (
               <TableRow key={id} className="group">
                 <TableCell>
@@ -140,12 +141,12 @@ export default async function InvoicesPage({
                 <TableCell>{new Date(inv.invoiceDate).toLocaleDateString()}</TableCell>
                 <TableCell>{inv.customerSnapshot.displayName}</TableCell>
                 <TableCell>
-                  <Badge variant={INVOICE_STATUS_BADGE_VARIANT[inv.status]}>
-                    {INVOICE_STATUS_LABELS[inv.status]}
-                  </Badge>
+                  <StatusStamp variant={statusDisplay.variant} seed={id}>
+                    {statusDisplay.label}
+                  </StatusStamp>
                 </TableCell>
-                <TableCell>₹{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
-                <TableCell>₹{minorToRupeesString(inv.amountPaidMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(inv.amountPaidMinor)}</TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="outline" size="sm" asChild>
@@ -177,8 +178,8 @@ export default async function InvoicesPage({
           <TableFooter>
             <TableRow className="hover:bg-muted/50">
               <TableCell colSpan={4}>Total</TableCell>
-              <TableCell>₹{minorToRupeesString(totals.totalMinor)}</TableCell>
-              <TableCell>₹{minorToRupeesString(totals.paidMinor)}</TableCell>
+              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(totals.totalMinor)}</TableCell>
+              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(totals.paidMinor)}</TableCell>
               <TableCell />
             </TableRow>
           </TableFooter>

@@ -4,8 +4,8 @@ import { Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findInvoiceById } from "@/lib/db/queries/invoices";
-import { INVOICE_STATUS_BADGE_VARIANT, INVOICE_STATUS_LABELS } from "@/lib/constants/invoices";
-import { Badge } from "@/components/ui/badge";
+import { resolveInvoiceStatusDisplay } from "@/lib/constants/invoices";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelInvoiceButton, DeleteInvoiceButton } from "./InvoiceActionButtons";
 
@@ -32,6 +32,8 @@ export default async function InvoiceDetailLayout({
   const invoice = await findInvoiceById(id, context.activeBusinessId);
   if (!invoice) notFound();
 
+  const statusDisplay = resolveInvoiceStatusDisplay(invoice.status, invoice.dueDate);
+
   const canEdit = can(context.membership, "sales_invoices", "edit") && EDITABLE_STATUSES.includes(invoice.status);
   const canCancel =
     can(context.membership, "sales_invoices", "edit") && CANCELLABLE_STATUSES.includes(invoice.status);
@@ -44,9 +46,9 @@ export default async function InvoiceDetailLayout({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{invoice.docNumber ?? "Draft invoice"}</h1>
-            <Badge variant={INVOICE_STATUS_BADGE_VARIANT[invoice.status]}>
-              {INVOICE_STATUS_LABELS[invoice.status]}
-            </Badge>
+            <StatusStamp variant={statusDisplay.variant} seed={String(invoice._id)}>
+              {statusDisplay.label}
+            </StatusStamp>
           </div>
           <p className="text-sm text-muted-foreground">{invoice.customerSnapshot.displayName}</p>
         </div>

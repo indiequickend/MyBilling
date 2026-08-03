@@ -287,13 +287,38 @@ layer.
 
 ---
 
-## Phase 15 — Design polish pass
+## Phase 15 — Design polish pass: installable, mobile-first PWA
 
-- Invoke the `shadcn` skill and revamp the whole app ui and responsive layout down to mobile web width. ui design should be exactly like swipe
+Revamp the whole app into a lightweight, modern, installable PWA — mobile-first and app-like, not a
+shrunk desktop page. Design direction is deliberately original rather than a Swipe clone: grounded in
+the actual subject matter (Indian shopkeeper bill-books, carbon-duplicate invoice pads, ruled ledgers,
+rubber ink stamps) — a "ledger register" identity, not generic fintech-blue-dashboard styling. Scope is
+the whole app, gated only by existing RBAC. Offline support is limited to installable/fast app-shell
+loads — no offline data reads/writes, no client-side sync queue (consistent with the app's server-DB-backed
+session auth and the no-background-job-infra rule above). POS/thermal-printing (Phase 10) and Online
+Store (Phase 11) are out of scope for this pass.
+
+- **15a — PWA scaffolding + design tokens + fonts**: manifest, icons, hand-rolled service worker
+  (app-shell/static caching only) + registration, offline fallback page, viewport/theme-color meta,
+  `app/globals.css` palette reskin (paper/ink/stamp-red/seal-green/brass/slate tokens, light + dark),
+  Instrument Sans (headings) + IBM Plex Mono (tabular money/GSTIN/doc-number columns) added alongside
+  the existing Geist Sans body font.
+- **15b — Responsive app shell rework**: RBAC-filtered bottom tab bar (Dashboard/Invoices/Payments/
+  Parties/More) below `md`, existing sidebar unchanged at `≥md`; mobile quick-create sheet; Topbar
+  page-title slot; safe-area-inset handling.
+- **15c — `StatusStamp` + priority modules**: ink-stamp status badge (replaces `Badge` at every
+  document-status site) as the signature visual element; deep mobile-first pass on Sales & Invoicing,
+  Payments & Ledgers, Customers/Vendors/Products, Dashboard & Insights, in that order.
+- **15d — Remaining modules**: apply the same tokens/StatusStamp/responsive patterns to projects,
+  expenses/indirect-income, inventory, reports, gst, settings.
+- **15e — Full verification pass**: see Verify below, run end-to-end across the whole app.
 
 **Verify**: key flows (create invoice, record payment, view report) work and look intentional at
 desktop, tablet, and mobile widths; no layout requires horizontal scrolling on a standard mobile
-viewport except wide data tables (which get their own scroll container, not the page body).
+viewport except wide data tables (which get their own scroll container, not the page body); app is
+installable (Lighthouse PWA audit passes, manifest valid, service worker registered) and the RBAC-filtered
+nav (bottom tab bar + More sheet) shows exactly the same items a given role sees in the desktop sidebar,
+no more and no less; `pnpm test` and `pnpm test:e2e` green.
 
 ---
 

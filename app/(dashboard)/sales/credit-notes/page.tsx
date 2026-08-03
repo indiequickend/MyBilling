@@ -18,7 +18,7 @@ import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 
 const TABS = [
@@ -115,9 +115,11 @@ export default async function CreditNotesPage({
                 <TableCell>{new Date(cn.creditNoteDate).toLocaleDateString()}</TableCell>
                 <TableCell>{cn.customerSnapshot.displayName}</TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_BADGE_VARIANT[cn.status]}>{STATUS_LABELS[cn.status]}</Badge>
+                  <StatusStamp variant={STATUS_BADGE_VARIANT[cn.status]} seed={String(cn._id)}>
+                    {STATUS_LABELS[cn.status]}
+                  </StatusStamp>
                 </TableCell>
-                <TableCell>₹{minorToRupeesString(cn.grandTotalMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(cn.grandTotalMinor)}</TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="outline" size="sm" asChild>

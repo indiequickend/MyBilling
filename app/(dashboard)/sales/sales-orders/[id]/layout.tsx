@@ -4,7 +4,7 @@ import { ArrowRightLeft, Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelSalesOrderButton, DeleteSalesOrderButton } from "./SalesOrderActionButtons";
 
@@ -52,9 +52,9 @@ export default async function SalesOrderDetailLayout({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{salesOrder.docNumber ?? "Draft sales order"}</h1>
-            <Badge variant={STATUS_BADGE_VARIANT[salesOrder.status]}>
+            <StatusStamp variant={STATUS_BADGE_VARIANT[salesOrder.status]} seed={String(salesOrder._id)}>
               {STATUS_LABELS[salesOrder.status]}
-            </Badge>
+            </StatusStamp>
           </div>
           <p className="text-sm text-muted-foreground">{salesOrder.customerSnapshot.displayName}</p>
         </div>

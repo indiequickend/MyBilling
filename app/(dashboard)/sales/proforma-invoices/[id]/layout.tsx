@@ -4,7 +4,7 @@ import { Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findProformaInvoiceById } from "@/lib/db/queries/proformaInvoices";
-import { Badge } from "@/components/ui/badge";
+import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelProformaInvoiceButton, DeleteProformaInvoiceButton } from "./ProformaInvoiceActionButtons";
 
@@ -50,9 +50,9 @@ export default async function ProformaInvoiceDetailLayout({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{proformaInvoice.docNumber ?? "Draft proforma invoice"}</h1>
-            <Badge variant={STATUS_BADGE_VARIANT[proformaInvoice.status]}>
+            <StatusStamp variant={STATUS_BADGE_VARIANT[proformaInvoice.status]} seed={String(proformaInvoice._id)}>
               {STATUS_LABELS[proformaInvoice.status]}
-            </Badge>
+            </StatusStamp>
           </div>
           <p className="text-sm text-muted-foreground">{proformaInvoice.customerSnapshot.displayName}</p>
         </div>

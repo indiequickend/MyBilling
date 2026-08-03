@@ -113,11 +113,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   <TableCell>
                     {li.quantity} {li.unit}
                   </TableCell>
-                  <TableCell>₹{minorToRupeesString(li.unitPriceMinor)}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(li.unitPriceMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">
                     {li.taxRatePercent}% (₹{minorToRupeesString(li.cgstMinor + li.sgstMinor + li.igstMinor)})
                   </TableCell>
-                  <TableCell>₹{minorToRupeesString(li.totalMinor)}</TableCell>
+                  <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(li.totalMinor)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -229,7 +229,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   <TableRow key={String(p._id)}>
                     <TableCell>{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
                     <TableCell>{PAYMENT_MODE_LABELS[p.mode]}</TableCell>
-                    <TableCell>₹{minorToRupeesString(p.amountMinor)}</TableCell>
+                    <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.amountMinor)}</TableCell>
                     <TableCell>
                       <Badge variant={p.voidedAt ? "outline" : "success"}>
                         {p.voidedAt ? "Voided" : "Recorded"}

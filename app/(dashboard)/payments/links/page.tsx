@@ -66,7 +66,7 @@ export default async function PaymentLinksPage({
             return (
               <TableRow key={String(link._id)}>
                 <TableCell>{new Date(link.createdAt).toLocaleDateString()}</TableCell>
-                <TableCell>₹{minorToRupeesString(link.amountMinor)}</TableCell>
+                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(link.amountMinor)}</TableCell>
                 <TableCell>{link.note ?? "—"}</TableCell>
                 <TableCell>{new Date(link.expiresAt).toLocaleDateString()}</TableCell>
                 <TableCell>

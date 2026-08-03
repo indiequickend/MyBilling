@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "audit": "pnpm audit --audit-level=high",
-    "migrate:audit-log-permission": "tsx --env-file=.env scripts/backfillAuditLogPermission.ts"
+    "migrate:audit-log-permission": "tsx --env-file=.env scripts/backfillAuditLogPermission.ts",
+    "db:reset": "tsx --env-file=.env scripts/resetDb.ts -- --yes"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
