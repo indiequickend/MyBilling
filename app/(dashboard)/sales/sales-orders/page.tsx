@@ -20,6 +20,8 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,17 +79,19 @@ export default async function SalesOrdersPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Sales Orders</h1>
-        {canCreate ? (
-          <Button asChild>
-            <Link href="/sales/sales-orders/new">
-              <Plus data-icon="inline-start" />
-              New sales order
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Sales Orders"
+        actions={
+          canCreate ? (
+            <Button asChild aria-label="New sales order">
+              <Link href="/sales/sales-orders/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New sales order</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <LinkTabs
         tabs={TABS.map((t) => ({

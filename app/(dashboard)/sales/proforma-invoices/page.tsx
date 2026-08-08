@@ -20,6 +20,8 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,17 +77,19 @@ export default async function ProformaInvoicesPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Proforma Invoices</h1>
-        {canCreate ? (
-          <Button asChild>
-            <Link href="/sales/proforma-invoices/new">
-              <Plus data-icon="inline-start" />
-              New proforma invoice
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Proforma Invoices"
+        actions={
+          canCreate ? (
+            <Button asChild aria-label="New proforma invoice">
+              <Link href="/sales/proforma-invoices/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New proforma invoice</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <LinkTabs
         tabs={TABS.map((t) => ({

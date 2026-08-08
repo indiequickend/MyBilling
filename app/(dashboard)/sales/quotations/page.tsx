@@ -20,6 +20,8 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,17 +86,19 @@ export default async function QuotationsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Quotations</h1>
-        {canCreate ? (
-          <Button asChild>
-            <Link href="/sales/quotations/new">
-              <Plus data-icon="inline-start" />
-              New quotation
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Quotations"
+        actions={
+          canCreate ? (
+            <Button asChild aria-label="New quotation">
+              <Link href="/sales/quotations/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New quotation</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <LinkTabs
         tabs={TABS.map((t) => ({

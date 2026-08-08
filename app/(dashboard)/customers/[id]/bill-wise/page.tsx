@@ -47,7 +47,7 @@ export default async function CustomerBillWisePage({
                     {INVOICE_STATUS_LABELS[bill.status]}
                   </span>
                 </div>
-                <div className="mb-3 grid grid-cols-3 gap-4 text-sm text-muted-foreground">
+                <div className="mb-3 grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-3 sm:gap-4">
                   <span>Total: ₹{minorToRupeesString(bill.grandTotalMinor)}</span>
                   <span>Paid: ₹{minorToRupeesString(bill.amountPaidMinor)}</span>
                   <span>Balance: ₹{minorToRupeesString(bill.balanceMinor)}</span>

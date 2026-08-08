@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/table";
 import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Trash2, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -39,15 +42,17 @@ export default async function NotesTermsPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Notes &amp; Terms</h1>
-        <Button asChild>
-          <Link href="/settings/notes-terms/new">
-            <Plus data-icon="inline-start" />
-            New template
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Notes & Terms"
+        actions={
+          <Button asChild aria-label="New template">
+            <Link href="/settings/notes-terms/new">
+              <Plus data-icon="inline-start" />
+              <ButtonLabel>New template</ButtonLabel>
+            </Link>
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent>
@@ -91,8 +96,9 @@ export default async function NotesTermsPage() {
                   <TableCell className="text-right">
                     <form action={softDeleteNoteTermTemplateAction}>
                       <input type="hidden" name="templateId" value={String(t._id)} />
-                      <Button type="submit" variant="destructive" size="sm">
-                        Delete
+                      <Button type="submit" variant="destructive" size="sm" aria-label="Delete">
+                        <Trash2 data-icon="inline-start" />
+                        <ButtonLabel>Delete</ButtonLabel>
                       </Button>
                     </form>
                   </TableCell>
@@ -123,8 +129,9 @@ export default async function NotesTermsPage() {
                     <TableCell className="text-right">
                       <form action={restoreNoteTermTemplateAction}>
                         <input type="hidden" name="templateId" value={String(t._id)} />
-                        <Button type="submit" variant="outline" size="sm">
-                          Restore
+                        <Button type="submit" variant="outline" size="sm" aria-label="Restore">
+                          <RotateCcw data-icon="inline-start" />
+                          <ButtonLabel>Restore</ButtonLabel>
                         </Button>
                       </form>
                     </TableCell>

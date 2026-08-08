@@ -18,6 +18,7 @@ import {
 import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
 import { softDeleteProductAction } from "../actions";
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,7 +48,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">{product.name}</h1>
           <p className="text-sm text-muted-foreground">
@@ -56,21 +57,21 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             {group ? ` · ${group.name}` : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {canEdit ? (
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild aria-label="Edit">
               <Link href={`/products/${id}/edit`}>
                 <Pencil data-icon="inline-start" />
-                Edit
+                <ButtonLabel>Edit</ButtonLabel>
               </Link>
             </Button>
           ) : null}
           {canDelete && !product.deletedAt ? (
             <form action={softDeleteProductAction}>
               <input type="hidden" name="productId" value={id} />
-              <Button type="submit" variant="destructive">
+              <Button type="submit" variant="destructive" aria-label="Delete">
                 <Trash2 data-icon="inline-start" />
-                Delete
+                <ButtonLabel>Delete</ButtonLabel>
               </Button>
             </form>
           ) : null}

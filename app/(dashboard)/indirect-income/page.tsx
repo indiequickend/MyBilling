@@ -20,6 +20,8 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -59,17 +61,19 @@ export default async function IndirectIncomePage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Indirect Income</h1>
-        {canCreate ? (
-          <Button asChild>
-            <Link href="/indirect-income/new">
-              <Plus data-icon="inline-start" />
-              New entry
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Indirect Income"
+        actions={
+          canCreate ? (
+            <Button asChild aria-label="New entry">
+              <Link href="/indirect-income/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New entry</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <LinkTabs
         tabs={TABS.map((t) => ({

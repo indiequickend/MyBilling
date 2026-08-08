@@ -16,6 +16,9 @@ import {
 } from "@/components/ui/table";
 import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { setDefaultBankAccountAction, restoreBankAccountAction } from "./actions";
@@ -43,15 +46,17 @@ export default async function BanksPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Banks</h1>
-        <Button asChild>
-          <Link href="/settings/banks/new">
-            <Plus data-icon="inline-start" />
-            New account
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Banks"
+        actions={
+          <Button asChild aria-label="New account">
+            <Link href="/settings/banks/new">
+              <Plus data-icon="inline-start" />
+              <ButtonLabel>New account</ButtonLabel>
+            </Link>
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent>
@@ -118,8 +123,9 @@ export default async function BanksPage() {
                     <TableCell className="text-right">
                       <form action={restoreBankAccountAction}>
                         <input type="hidden" name="bankAccountId" value={String(a._id)} />
-                        <Button type="submit" variant="outline" size="sm">
-                          Restore
+                        <Button type="submit" variant="outline" size="sm" aria-label="Restore">
+                          <RotateCcw data-icon="inline-start" />
+                          <ButtonLabel>Restore</ButtonLabel>
                         </Button>
                       </form>
                     </TableCell>

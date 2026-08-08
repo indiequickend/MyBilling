@@ -6,6 +6,8 @@ import { minorToRupeesString } from "@/lib/utils/money";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { Trash2 } from "lucide-react";
 import { softDeleteJournalAction } from "../actions";
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
@@ -32,7 +34,7 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">{journal.docNumber ?? "Journal"}</h1>
           <p className="text-sm text-muted-foreground">
@@ -42,8 +44,9 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
         {canDelete && !journal.deletedAt ? (
           <form action={softDeleteJournalAction}>
             <input type="hidden" name="journalId" value={String(journal._id)} />
-            <Button type="submit" variant="outline" className="text-destructive">
-              Delete
+            <Button type="submit" variant="outline" className="text-destructive" aria-label="Delete">
+              <Trash2 data-icon="inline-start" />
+              <ButtonLabel>Delete</ButtonLabel>
             </Button>
           </form>
         ) : null}

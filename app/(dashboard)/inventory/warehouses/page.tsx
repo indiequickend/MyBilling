@@ -15,6 +15,9 @@ import {
 import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Trash2, RotateCcw } from "lucide-react";
 import {
   setDefaultWarehouseAction,
   softDeleteWarehouseAction,
@@ -39,17 +42,19 @@ export default async function WarehousesPage() {
 
   return (
     <div className="max-w-3xl space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Warehouses</h1>
-        {canEdit ? (
-          <Button asChild>
-            <Link href="/inventory/warehouses/new">
-              <Plus data-icon="inline-start" />
-              New warehouse
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Warehouses"
+        actions={
+          canEdit ? (
+            <Button asChild aria-label="New warehouse">
+              <Link href="/inventory/warehouses/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New warehouse</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <Table>
         <TableHeader>
@@ -90,8 +95,15 @@ export default async function WarehousesPage() {
                 {canEdit ? (
                   <form action={softDeleteWarehouseAction}>
                     <input type="hidden" name="warehouseId" value={String(w._id)} />
-                    <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                      Delete
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      aria-label="Delete"
+                    >
+                      <Trash2 data-icon="inline-start" />
+                      <ButtonLabel>Delete</ButtonLabel>
                     </Button>
                   </form>
                 ) : null}
@@ -119,8 +131,9 @@ export default async function WarehousesPage() {
                     {canEdit ? (
                       <form action={restoreWarehouseAction}>
                         <input type="hidden" name="warehouseId" value={String(w._id)} />
-                        <Button type="submit" variant="outline" size="sm">
-                          Restore
+                        <Button type="submit" variant="outline" size="sm" aria-label="Restore">
+                          <RotateCcw data-icon="inline-start" />
+                          <ButtonLabel>Restore</ButtonLabel>
                         </Button>
                       </form>
                     ) : null}

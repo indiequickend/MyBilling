@@ -7,6 +7,8 @@ import { switchBusinessAction } from "@/app/(dashboard)/businesses/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export default async function BusinessesSettingsPage() {
   const context = await getDashboardContext();
@@ -19,15 +21,17 @@ export default async function BusinessesSettingsPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Businesses</h1>
-        <Button asChild>
-          <Link href="/businesses/new">
-            <Plus data-icon="inline-start" />
-            Add another business
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Businesses"
+        actions={
+          <Button asChild aria-label="Add another business">
+            <Link href="/businesses/new">
+              <Plus data-icon="inline-start" />
+              <ButtonLabel>Add another business</ButtonLabel>
+            </Link>
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="divide-y p-0">

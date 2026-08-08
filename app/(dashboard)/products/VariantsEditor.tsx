@@ -41,7 +41,7 @@ export function VariantsEditor({
       </p>
 
       {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-5 gap-2 rounded-lg border bg-muted/30 p-3">
+        <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border bg-muted/30 p-3 sm:grid-cols-5">
           <input
             name={`variant__${i}__name`}
             value={row.name}

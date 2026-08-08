@@ -23,7 +23,7 @@ export function BatchesEditor({ rows, onChange }: { rows: BatchRow[]; onChange: 
       </p>
 
       {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/30 p-3">
+        <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border bg-muted/30 p-3 sm:grid-cols-3">
           <input
             name={`batch__${i}__batchNumber`}
             value={row.batchNumber}

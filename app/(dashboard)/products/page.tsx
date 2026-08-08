@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Upload, Trash2, RotateCcw } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listProducts } from "@/lib/db/queries/products";
@@ -20,6 +20,8 @@ import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { MasterExportButtons } from "@/components/importExport/MasterExportButtons";
 import { softDeleteProductAction, restoreProductAction } from "./actions";
 
@@ -63,36 +65,38 @@ export default async function ProductsPage({
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Products &amp; Services</h1>
-        <div className="flex items-center gap-4">
-          <Link href="/products/categories" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
-            Categories
-          </Link>
-          <Link href="/products/groups" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
-            Groups
-          </Link>
-          <Link href="/products/price-lists" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
-            Price lists
-          </Link>
-          {canCreate ? (
-            <Button variant="outline" asChild>
-              <Link href="/products/bulk-upload">
-                <Upload data-icon="inline-start" />
-                Bulk upload
-              </Link>
-            </Button>
-          ) : null}
-          {canCreate ? (
-            <Button asChild>
-              <Link href="/products/new">
-                <Plus data-icon="inline-start" />
-                New product
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      </div>
+      <PageHeader
+        title="Products & Services"
+        actions={
+          <>
+            <Link href="/products/categories" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
+              Categories
+            </Link>
+            <Link href="/products/groups" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
+              Groups
+            </Link>
+            <Link href="/products/price-lists" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
+              Price lists
+            </Link>
+            {canCreate ? (
+              <Button variant="outline" asChild className="hidden lg:inline-flex" aria-label="Bulk upload">
+                <Link href="/products/bulk-upload">
+                  <Upload data-icon="inline-start" />
+                  <ButtonLabel>Bulk upload</ButtonLabel>
+                </Link>
+              </Button>
+            ) : null}
+            {canCreate ? (
+              <Button asChild aria-label="New product">
+                <Link href="/products/new">
+                  <Plus data-icon="inline-start" />
+                  <ButtonLabel>New product</ButtonLabel>
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       <LinkTabs
         tabs={[
@@ -164,16 +168,24 @@ export default async function ProductsPage({
                   canDelete ? (
                     <form action={softDeleteProductAction}>
                       <input type="hidden" name="productId" value={String(p._id)} />
-                      <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                        Delete
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        aria-label="Delete"
+                      >
+                        <Trash2 data-icon="inline-start" />
+                        <ButtonLabel>Delete</ButtonLabel>
                       </Button>
                     </form>
                   ) : null
                 ) : (
                   <form action={restoreProductAction}>
                     <input type="hidden" name="productId" value={String(p._id)} />
-                    <Button type="submit" variant="outline" size="sm">
-                      Restore
+                    <Button type="submit" variant="outline" size="sm" aria-label="Restore">
+                      <RotateCcw data-icon="inline-start" />
+                      <ButtonLabel>Restore</ButtonLabel>
                     </Button>
                   </form>
                 )}

@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/table";
 import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Pencil, Trash2, RotateCcw } from "lucide-react";
 import { softDeleteProjectAction, restoreProjectAction } from "./actions";
 
 export default async function ProjectsPage() {
@@ -36,17 +39,19 @@ export default async function ProjectsPage() {
 
   return (
     <div className="max-w-3xl space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Projects</h1>
-        {canCreate ? (
-          <Button asChild>
-            <Link href="/projects/new">
-              <Plus data-icon="inline-start" />
-              New project
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Projects"
+        actions={
+          canCreate ? (
+            <Button asChild aria-label="New project">
+              <Link href="/projects/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New project</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <Table>
         <TableHeader>
@@ -71,8 +76,11 @@ export default async function ProjectsPage() {
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     {canEdit ? (
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/projects/${id}/edit`}>Edit</Link>
+                      <Button variant="outline" size="sm" asChild aria-label="Edit">
+                        <Link href={`/projects/${id}/edit`}>
+                          <Pencil data-icon="inline-start" />
+                          <ButtonLabel>Edit</ButtonLabel>
+                        </Link>
                       </Button>
                     ) : null}
                     {canDelete ? (
@@ -83,8 +91,10 @@ export default async function ProjectsPage() {
                           variant="outline"
                           size="sm"
                           className="text-destructive hover:text-destructive"
+                          aria-label="Delete"
                         >
-                          Delete
+                          <Trash2 data-icon="inline-start" />
+                          <ButtonLabel>Delete</ButtonLabel>
                         </Button>
                       </form>
                     ) : null}
@@ -114,8 +124,9 @@ export default async function ProjectsPage() {
                     {canDelete ? (
                       <form action={restoreProjectAction}>
                         <input type="hidden" name="projectId" value={String(p._id)} />
-                        <Button type="submit" variant="outline" size="sm">
-                          Restore
+                        <Button type="submit" variant="outline" size="sm" aria-label="Restore">
+                          <RotateCcw data-icon="inline-start" />
+                          <ButtonLabel>Restore</ButtonLabel>
                         </Button>
                       </form>
                     ) : null}

@@ -22,6 +22,8 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
 import {
   DropdownMenu,
@@ -84,17 +86,19 @@ export default async function PurchasesPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Purchases</h1>
-        {canCreate ? (
-          <Button asChild>
-            <Link href="/purchases/new">
-              <Plus data-icon="inline-start" />
-              New purchase
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Purchases"
+        actions={
+          canCreate ? (
+            <Button asChild aria-label="New purchase">
+              <Link href="/purchases/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New purchase</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <LinkTabs
         tabs={TABS.map((t) => ({

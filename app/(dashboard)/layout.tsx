@@ -36,8 +36,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
           settings={settings}
           quickCreateItems={quickCreateItems}
         />
-        {/* pb-16 on mobile reserves space for the fixed BottomTabBar so content never sits under it. */}
-        <main className="min-w-0 flex-1 p-4 pb-20 md:p-6 md:pb-6 lg:p-8">{children}</main>
+        {/* pb-16 on mobile reserves space for the fixed BottomTabBar so content never sits under it.
+            overflow-x-hidden is a safety net: no page content should ever be able to widen <body>
+            and break the fixed BottomTabBar's viewport-relative positioning on mobile. */}
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 pb-20 md:p-6 md:pb-6 lg:p-8">{children}</main>
       </div>
       <BottomTabBar items={bottomTabItems} main={main} settings={settings} />
     </div>

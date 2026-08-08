@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/table";
 import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Trash2, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { setDefaultSignatureAction, softDeleteSignatureAction, restoreSignatureAction } from "./actions";
@@ -34,15 +37,17 @@ export default async function SignaturesPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Signatures</h1>
-        <Button asChild>
-          <Link href="/settings/signatures/new">
-            <Plus data-icon="inline-start" />
-            New signature
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Signatures"
+        actions={
+          <Button asChild aria-label="New signature">
+            <Link href="/settings/signatures/new">
+              <Plus data-icon="inline-start" />
+              <ButtonLabel>New signature</ButtonLabel>
+            </Link>
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent>
@@ -83,8 +88,9 @@ export default async function SignaturesPage() {
                   <TableCell className="text-right">
                     <form action={softDeleteSignatureAction}>
                       <input type="hidden" name="signatureId" value={String(s._id)} />
-                      <Button type="submit" variant="destructive" size="sm">
-                        Delete
+                      <Button type="submit" variant="destructive" size="sm" aria-label="Delete">
+                        <Trash2 data-icon="inline-start" />
+                        <ButtonLabel>Delete</ButtonLabel>
                       </Button>
                     </form>
                   </TableCell>
@@ -115,8 +121,9 @@ export default async function SignaturesPage() {
                     <TableCell className="text-right">
                       <form action={restoreSignatureAction}>
                         <input type="hidden" name="signatureId" value={String(s._id)} />
-                        <Button type="submit" variant="outline" size="sm">
-                          Restore
+                        <Button type="submit" variant="outline" size="sm" aria-label="Restore">
+                          <RotateCcw data-icon="inline-start" />
+                          <ButtonLabel>Restore</ButtonLabel>
                         </Button>
                       </form>
                     </TableCell>

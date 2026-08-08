@@ -10,6 +10,8 @@ import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export default async function JournalsPage({
   searchParams,
@@ -32,17 +34,19 @@ export default async function JournalsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Journals</h1>
-        {canCreate ? (
-          <Button asChild>
-            <Link href="/payments/journals/new">
-              <Plus data-icon="inline-start" />
-              New journal
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Journals"
+        actions={
+          canCreate ? (
+            <Button asChild aria-label="New journal">
+              <Link href="/payments/journals/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New journal</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <div className="mb-4">
         <SearchInput defaultValue={q} placeholder="Search narration…" />

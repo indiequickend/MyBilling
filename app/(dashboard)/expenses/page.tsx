@@ -20,6 +20,8 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -59,25 +61,27 @@ export default async function ExpensesPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Expenses</h1>
-        {canCreate ? (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" asChild>
-              <Link href="/expenses/bulk-upload">
-                <Upload data-icon="inline-start" />
-                Bulk upload
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href="/expenses/new">
-                <Plus data-icon="inline-start" />
-                New expense
-              </Link>
-            </Button>
-          </div>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Expenses"
+        actions={
+          canCreate ? (
+            <>
+              <Button variant="outline" asChild className="hidden lg:inline-flex" aria-label="Bulk upload">
+                <Link href="/expenses/bulk-upload">
+                  <Upload data-icon="inline-start" />
+                  <ButtonLabel>Bulk upload</ButtonLabel>
+                </Link>
+              </Button>
+              <Button asChild aria-label="New expense">
+                <Link href="/expenses/new">
+                  <Plus data-icon="inline-start" />
+                  <ButtonLabel>New expense</ButtonLabel>
+                </Link>
+              </Button>
+            </>
+          ) : null
+        }
+      />
 
       <LinkTabs
         tabs={TABS.map((t) => ({

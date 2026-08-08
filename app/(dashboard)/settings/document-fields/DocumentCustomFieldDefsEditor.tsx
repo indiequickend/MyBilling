@@ -66,8 +66,8 @@ export function DocumentCustomFieldDefsEditor({
 
       <div className="space-y-3">
         {rows.map((row, i) => (
-          <div key={i} className="grid grid-cols-12 items-end gap-2 rounded-lg border bg-muted/30 p-3">
-            <label className="col-span-3 block text-xs">
+          <div key={i} className="grid grid-cols-1 items-end gap-2 rounded-lg border bg-muted/30 p-3 sm:grid-cols-12">
+            <label className="block text-xs sm:col-span-3">
               <span className="mb-1 block font-medium text-muted-foreground">Key</span>
               <input
                 name={`documentField__${i}__key`}
@@ -77,7 +77,7 @@ export function DocumentCustomFieldDefsEditor({
                 className={fieldClass}
               />
             </label>
-            <label className="col-span-3 block text-xs">
+            <label className="block text-xs sm:col-span-3">
               <span className="mb-1 block font-medium text-muted-foreground">Label</span>
               <input
                 name={`documentField__${i}__label`}
@@ -87,7 +87,7 @@ export function DocumentCustomFieldDefsEditor({
                 className={fieldClass}
               />
             </label>
-            <label className="col-span-2 block text-xs">
+            <label className="block text-xs sm:col-span-2">
               <span className="mb-1 block font-medium text-muted-foreground">Type</span>
               <select
                 name={`documentField__${i}__type`}
@@ -102,7 +102,7 @@ export function DocumentCustomFieldDefsEditor({
                 ))}
               </select>
             </label>
-            <label className="col-span-3 block text-xs">
+            <label className="block text-xs sm:col-span-3">
               <span className="mb-1 block font-medium text-muted-foreground">Options (if select)</span>
               <input
                 name={`documentField__${i}__options`}
@@ -113,7 +113,7 @@ export function DocumentCustomFieldDefsEditor({
                 className={fieldClass}
               />
             </label>
-            <div className="col-span-1 flex items-center justify-between">
+            <div className="flex items-center justify-between sm:col-span-1">
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Checkbox
                   name={`documentField__${i}__required`}
@@ -128,7 +128,7 @@ export function DocumentCustomFieldDefsEditor({
               variant="ghost"
               size="sm"
               onClick={() => removeRow(i)}
-              className="col-span-12 justify-self-start text-destructive hover:text-destructive"
+              className="justify-self-start text-destructive hover:text-destructive sm:col-span-12"
             >
               <X data-icon="inline-start" />
               Remove field

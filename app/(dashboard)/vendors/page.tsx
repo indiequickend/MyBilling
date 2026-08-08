@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Upload, Users2, Trash2, RotateCcw } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listVendors } from "@/lib/db/queries/vendors";
@@ -19,6 +19,8 @@ import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { PartyAvatar } from "@/components/dashboard/PartyAvatar";
 import { MasterExportButtons } from "@/components/importExport/MasterExportButtons";
 import { RevealField } from "@/components/ui/RevealField";
@@ -61,30 +63,35 @@ export default async function VendorsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Vendors</h1>
-        <div className="flex items-center gap-3">
-          <Button variant="link" asChild className="text-muted-foreground">
-            <Link href="/vendors/groups">Manage groups</Link>
-          </Button>
-          {canCreate ? (
-            <Button variant="outline" asChild>
-              <Link href="/vendors/bulk-upload">
-                <Upload data-icon="inline-start" />
-                Bulk upload
+      <PageHeader
+        title="Vendors"
+        actions={
+          <>
+            <Button variant="link" asChild className="text-muted-foreground" aria-label="Manage groups">
+              <Link href="/vendors/groups">
+                <Users2 data-icon="inline-start" />
+                <ButtonLabel>Manage groups</ButtonLabel>
               </Link>
             </Button>
-          ) : null}
-          {canCreate ? (
-            <Button asChild>
-              <Link href="/vendors/new">
-                <Plus data-icon="inline-start" />
-                New vendor
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            {canCreate ? (
+              <Button variant="outline" asChild className="hidden lg:inline-flex" aria-label="Bulk upload">
+                <Link href="/vendors/bulk-upload">
+                  <Upload data-icon="inline-start" />
+                  <ButtonLabel>Bulk upload</ButtonLabel>
+                </Link>
+              </Button>
+            ) : null}
+            {canCreate ? (
+              <Button asChild aria-label="New vendor">
+                <Link href="/vendors/new">
+                  <Plus data-icon="inline-start" />
+                  <ButtonLabel>New vendor</ButtonLabel>
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       <LinkTabs
         tabs={[
@@ -159,16 +166,24 @@ export default async function VendorsPage({
                     canDelete ? (
                       <form action={softDeleteVendorAction}>
                         <input type="hidden" name="vendorId" value={id} />
-                        <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                          Delete
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          aria-label="Delete"
+                        >
+                          <Trash2 data-icon="inline-start" />
+                          <ButtonLabel>Delete</ButtonLabel>
                         </Button>
                       </form>
                     ) : null
                   ) : (
                     <form action={restoreVendorAction}>
                       <input type="hidden" name="vendorId" value={id} />
-                      <Button type="submit" variant="outline" size="sm">
-                        Restore
+                      <Button type="submit" variant="outline" size="sm" aria-label="Restore">
+                        <RotateCcw data-icon="inline-start" />
+                        <ButtonLabel>Restore</ButtonLabel>
                       </Button>
                     </form>
                   )}
