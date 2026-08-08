@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
-import { listPaymentsTimeline, sumPaymentsTimeline } from "@/lib/db/queries/payments";
+import { listPaymentsTimeline, sumPaymentsTimeline, isPaymentEditable } from "@/lib/db/queries/payments";
 import { listBankAccounts } from "@/lib/db/queries/bankAccounts";
+import { voidPaymentAction } from "./actions";
 import { PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/constants/documentTypes";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -13,6 +15,9 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ButtonLabel } from "@/components/ui/ButtonLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const DOC_LINK_PREFIX: Record<string, string> = {
   invoice: "/sales/invoices",
@@ -46,11 +51,26 @@ export default async function PaymentsTimelinePage({
     sumPaymentsTimeline(context.activeBusinessId, { bankAccountId, direction, search: q }),
   ]);
 
+  const canCreate = can(context.membership, "payments", "create");
+  const canEdit = can(context.membership, "payments", "edit");
+  const canDelete = can(context.membership, "payments", "delete");
+  const showActionsColumn = canEdit || canDelete;
+
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold">Payments Timeline</h1>
-      </div>
+      <PageHeader
+        title="Payments Timeline"
+        actions={
+          canCreate ? (
+            <Button asChild aria-label="New payment">
+              <Link href="/payments/new">
+                <Plus data-icon="inline-start" />
+                <ButtonLabel>New payment</ButtonLabel>
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       <div className="mb-4 grid gap-4 sm:grid-cols-3">
         <Card>
@@ -113,12 +133,16 @@ export default async function PaymentsTimelinePage({
             <TableHead>Mode</TableHead>
             <TableHead>Direction</TableHead>
             <TableHead className="text-right">Amount</TableHead>
+            {showActionsColumn ? <TableHead className="text-right">Actions</TableHead> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.length === 0 ? <TableEmptyState colSpan={7} message="No payments found." /> : null}
+          {items.length === 0 ? (
+            <TableEmptyState colSpan={showActionsColumn ? 8 : 7} message="No payments found." />
+          ) : null}
           {items.map((p) => {
             const linkPrefix = p.linkedDocumentType ? DOC_LINK_PREFIX[p.linkedDocumentType] : undefined;
+            const editable = isPaymentEditable(p);
             return (
               <TableRow key={String(p._id)}>
                 <TableCell>{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
@@ -146,6 +170,37 @@ export default async function PaymentsTimelinePage({
                 <TableCell className="text-right font-medium font-tabular tabular-nums">
                   ₹{minorToRupeesString(p.amountMinor)}
                 </TableCell>
+                {showActionsColumn ? (
+                  <TableCell className="text-right">
+                    {editable ? (
+                      <div className="flex justify-end gap-2">
+                        {canEdit ? (
+                          <Button variant="outline" size="sm" asChild aria-label="Edit payment">
+                            <Link href={`/payments/${String(p._id)}/edit`}>
+                              <Pencil data-icon="inline-start" />
+                            </Link>
+                          </Button>
+                        ) : null}
+                        {canDelete ? (
+                          <form action={voidPaymentAction}>
+                            <input type="hidden" name="paymentId" value={String(p._id)} />
+                            <Button
+                              type="submit"
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              aria-label="Void payment"
+                            >
+                              <Trash2 data-icon="inline-start" />
+                            </Button>
+                          </form>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                ) : null}
               </TableRow>
             );
           })}

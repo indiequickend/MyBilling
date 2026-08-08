@@ -19,7 +19,9 @@ export function CreatePriceListForm() {
       <div className="flex-1">
         <FormField label="Description" name="description" />
       </div>
-      <SubmitButton pendingText="Adding…">Add</SubmitButton>
+      <SubmitButton pendingText="Adding…" className="w-auto shrink-0">
+        Add
+      </SubmitButton>
       <FormError message={state.error} />
     </form>
   );

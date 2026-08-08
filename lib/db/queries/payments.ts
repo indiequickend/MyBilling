@@ -62,7 +62,26 @@ export type PaymentTimelineEntry = {
   linkedDocumentId?: mongoose.Types.ObjectId;
   linkedDocumentNumber?: string;
   createdByUserId: mongoose.Types.ObjectId;
+  /** "gateway" (Razorpay-collected) payments and Expense/Indirect Income-linked payments aren't
+   * editable/voidable from the Payments Timeline — see isPaymentEditable. */
+  source: "manual" | "gateway";
 };
+
+/**
+ * Whether the Payments Timeline's Edit/Void row actions should be offered for this payment.
+ * Excludes "gateway" payments (Razorpay collected these — not ours to hand-edit) and Expense/
+ * Indirect Income-linked payments (their amount/mode/bank account are duplicated onto the
+ * Expense/IndirectIncome document itself, see Expense.ts, so editing or voiding the Payment alone
+ * would desync them; manage those from the Expense/Indirect Income record instead).
+ */
+export function isPaymentEditable(p: {
+  linkedDocumentType?: string | null;
+  source: "manual" | "gateway";
+}): boolean {
+  if (p.source === "gateway") return false;
+  if (p.linkedDocumentType === "expense" || p.linkedDocumentType === "indirect_income") return false;
+  return true;
+}
 
 /** Shared by listPaymentsTimeline/getPaymentsReport — resolves party/bank-account/document names
  * in one batched pass (not per row) to avoid N+1 queries. */
@@ -80,6 +99,7 @@ async function resolvePaymentTimelineNames(
     linkedDocumentType?: string | null;
     linkedDocumentId?: mongoose.Types.ObjectId | null;
     createdByUserId: mongoose.Types.ObjectId;
+    source: "manual" | "gateway";
   }>,
 ): Promise<PaymentTimelineEntry[]> {
   const bankAccountIds = [...new Set(items.map((p) => String(p.bankAccountId)))];
@@ -136,6 +156,7 @@ async function resolvePaymentTimelineNames(
       linkedDocumentId: p.linkedDocumentId ?? undefined,
       linkedDocumentNumber,
       createdByUserId: p.createdByUserId,
+      source: p.source,
     };
   });
 }
@@ -392,6 +413,121 @@ export async function voidPayment(
         target: { type: "payment", id: paymentId },
         before: { voidedAt: null },
         after: { voidedAt: result.payment.voidedAt, amountMinor: result.payment.amountMinor },
+      });
+    }
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+export type UpdatePaymentInput = {
+  amountMinor: number;
+  mode: PaymentMode;
+  bankAccountId: string;
+  paymentDate: Date;
+  referenceNote?: string;
+};
+
+export type UpdatePaymentResult =
+  | { ok: true; payment: InstanceType<typeof Payment> }
+  | {
+      ok: false;
+      reason:
+        | "not_found"
+        | "voided"
+        | "not_editable"
+        | "invalid_bank_account"
+        | "amount_invalid"
+        | "linked_document_not_found";
+    };
+
+class PaymentNotEditableError extends Error {}
+class PaymentAmountInvalidError extends Error {}
+
+/**
+ * Edits a payment's amount/mode/bank account/date/reference note in place — the party and
+ * direction are fixed at creation and never change (a Customer payment recorded backwards is
+ * voided and re-entered, not flipped). Only unlinked (advance/on-account) and Invoice/Purchase-
+ * linked payments qualify (see isPaymentEditable); when linked, an amount change atomically
+ * adjusts the parent document's amountPaidMinor by the delta and re-derives its status, the same
+ * bounds check (can't exceed grandTotalMinor) recordInvoicePayment/recordPurchasePayment apply
+ * when adding a new payment.
+ */
+export async function updatePayment(
+  paymentId: string,
+  businessId: string,
+  input: UpdatePaymentInput,
+  editedByUserId: string,
+): Promise<UpdatePaymentResult> {
+  await connectToDatabase();
+  if (input.amountMinor <= 0) return { ok: false, reason: "amount_invalid" };
+
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  try {
+    let result: UpdatePaymentResult;
+    try {
+      result = await session.withTransaction<UpdatePaymentResult>(async () => {
+        const payment = await Payment.findOne({ _id: paymentId, businessId }).session(session);
+        if (!payment) return { ok: false, reason: "not_found" };
+        if (payment.voidedAt) return { ok: false, reason: "voided" };
+        if (!isPaymentEditable(payment)) throw new PaymentNotEditableError();
+        if (!(await isOwnedBankAccount(input.bankAccountId, businessId))) {
+          return { ok: false, reason: "invalid_bank_account" };
+        }
+
+        const amountDelta = input.amountMinor - payment.amountMinor;
+
+        if (payment.linkedDocumentType === "invoice") {
+          const invoice = await Invoice.findOne({ _id: payment.linkedDocumentId, businessId }).session(session);
+          if (!invoice) throw new LinkedInvoiceNotFoundError();
+          const newPaidMinor = invoice.amountPaidMinor + amountDelta;
+          if (newPaidMinor < 0 || newPaidMinor > invoice.grandTotalMinor) throw new PaymentAmountInvalidError();
+          invoice.amountPaidMinor = newPaidMinor;
+          if ((invoice.status as InvoiceStatus) !== "cancelled") {
+            invoice.status = derivePaymentStatus(invoice.grandTotalMinor, invoice.amountPaidMinor);
+          }
+          await invoice.save({ session });
+        } else if (payment.linkedDocumentType === "purchase") {
+          const purchase = await Purchase.findOne({ _id: payment.linkedDocumentId, businessId }).session(session);
+          if (!purchase) throw new LinkedInvoiceNotFoundError();
+          const newPaidMinor = purchase.amountPaidMinor + amountDelta;
+          if (newPaidMinor < 0 || newPaidMinor > purchase.grandTotalMinor) throw new PaymentAmountInvalidError();
+          purchase.amountPaidMinor = newPaidMinor;
+          if ((purchase.status as DocumentStatus) !== "cancelled") {
+            purchase.status = derivePaymentStatus(purchase.grandTotalMinor, purchase.amountPaidMinor);
+          }
+          await purchase.save({ session });
+        }
+
+        payment.amountMinor = input.amountMinor;
+        payment.mode = input.mode;
+        payment.bankAccountId = new mongoose.Types.ObjectId(input.bankAccountId);
+        payment.paymentDate = input.paymentDate;
+        payment.referenceNote = input.referenceNote;
+        await payment.save({ session });
+
+        return { ok: true, payment };
+      });
+    } catch (err) {
+      if (err instanceof PaymentNotEditableError) return { ok: false, reason: "not_editable" };
+      if (err instanceof PaymentAmountInvalidError) return { ok: false, reason: "amount_invalid" };
+      if (err instanceof LinkedInvoiceNotFoundError) return { ok: false, reason: "linked_document_not_found" };
+      throw err;
+    }
+    if (result.ok) {
+      await recordAuditLog({
+        businessId,
+        userId: editedByUserId,
+        action: "payment.edited",
+        target: { type: "payment", id: paymentId },
+        after: {
+          amountMinor: result.payment.amountMinor,
+          mode: result.payment.mode,
+          bankAccountId: String(result.payment.bankAccountId),
+          paymentDate: result.payment.paymentDate,
+        },
       });
     }
     return result;

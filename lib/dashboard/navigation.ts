@@ -441,7 +441,7 @@ const QUICK_CREATE_CANDIDATES: NavItem[] = [
   { href: "/customers/new", label: "Customer", icon: "customers", moduleKey: "customers", action: "create" },
   // No standalone "record a payment" route exists — payments are recorded from
   // the specific invoice/purchase/expense they settle. Link to the Timeline instead.
-  { href: "/payments", label: "Payments", icon: "payments", moduleKey: "payments", action: "view" },
+  { href: "/payments/new", label: "Payments", icon: "payments", moduleKey: "payments", action: "create" },
 ];
 
 /** RBAC-filtered shortcuts for the mobile quick-create sheet. */

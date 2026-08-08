@@ -105,7 +105,7 @@ export function DocumentPreferencesForm({
         <Section key={s.key} category={s.key} label={s.label} prefs={preferences[s.key]} />
       ))}
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Saving…">Save document preferences</SubmitButton>
       </div>
     </form>

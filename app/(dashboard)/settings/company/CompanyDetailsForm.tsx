@@ -143,7 +143,7 @@ export function CompanyDetailsForm({
         />
       </div>
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Saving…">Save company details</SubmitButton>
       </div>
     </form>

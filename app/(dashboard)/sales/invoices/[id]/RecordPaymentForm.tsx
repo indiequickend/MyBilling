@@ -69,7 +69,7 @@ export function RecordPaymentForm({
         <FormField label="Reference (optional)" name="referenceNote" />
       </FieldGroup>
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Recording…">Record payment</SubmitButton>
       </div>
     </form>

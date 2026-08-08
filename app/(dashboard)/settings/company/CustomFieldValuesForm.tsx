@@ -70,7 +70,7 @@ export function CustomFieldValuesForm({
         })}
       </div>
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Saving…">Save field values</SubmitButton>
       </div>
     </form>

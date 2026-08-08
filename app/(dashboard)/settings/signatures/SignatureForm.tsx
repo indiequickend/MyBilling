@@ -58,7 +58,7 @@ export function SignatureForm({
         </Field>
       </div>
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Saving…">
           {mode === "create" ? "Add signature" : "Save changes"}
         </SubmitButton>

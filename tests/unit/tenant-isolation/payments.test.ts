@@ -7,6 +7,8 @@ import { createInvoice, findInvoiceById } from "@/lib/db/queries/invoices";
 import { createPurchase } from "@/lib/db/queries/purchases";
 import {
   voidPayment,
+  updatePayment,
+  isPaymentEditable,
   getPartyLedger,
   getBillWiseForParty,
   listPaymentsForDocument,
@@ -14,8 +16,12 @@ import {
   listAvailableAdvances,
   applyAdvancePayment,
 } from "@/lib/db/queries/payments";
+import { createExpense } from "@/lib/db/queries/expenses";
+import { createExpenseCategory } from "@/lib/db/queries/expenseCategories";
 import { Invoice } from "@/lib/db/models/Invoice";
 import { Purchase } from "@/lib/db/models/Purchase";
+import { Expense } from "@/lib/db/models/Expense";
+import { ExpenseCategory } from "@/lib/db/models/ExpenseCategory";
 import { Payment } from "@/lib/db/models/Payment";
 import { Customer } from "@/lib/db/models/Customer";
 import { Vendor } from "@/lib/db/models/Vendor";
@@ -347,5 +353,178 @@ describe("advance payments — recordPartyPayment / applyAdvancePayment", () => 
     const allPayments = await Payment.find({ businessId: tenants.businessAId, partyId: customerAId }).lean();
     const totalMinor = allPayments.reduce((sum, p) => sum + p.amountMinor, 0);
     expect(totalMinor).toBe(50_000);
+  });
+});
+
+describe("updatePayment — tenant isolation & cascading", () => {
+  let tenants: TwoTenants;
+  let customerAId: string;
+  let bankAId: string;
+  let invoiceAId: string;
+  let paymentAId: string;
+
+  const lineItems = [
+    {
+      description: "Widget",
+      quantity: 1,
+      unitPriceMinor: 100_000,
+      discountType: "percentage" as const,
+      discountValue: 0,
+      taxRatePercent: 0,
+    },
+  ];
+
+  beforeAll(async () => {
+    tenants = await setupTwoTenants("update-payment");
+    await Business.updateOne(
+      { _id: tenants.businessAId },
+      { $set: { "addresses.billing.state": "Maharashtra" } },
+    );
+
+    const customerA = await createCustomer({ businessId: tenants.businessAId, displayName: "Customer A" });
+    if (!customerA.ok) throw new Error("setup failed");
+    customerAId = String(customerA.customer._id);
+
+    const bankA = await createBankAccount({ businessId: tenants.businessAId, type: "cash", name: "Cash" });
+    bankAId = String(bankA._id);
+
+    const created = await createInvoice({
+      businessId: tenants.businessAId,
+      customerId: customerAId,
+      invoiceDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      reverseCharge: false,
+      lineItems,
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+      payments: [{ amountMinor: 40_000, mode: "cash", bankAccountId: bankAId, paymentDate: new Date() }],
+    });
+    if (!created.ok) throw new Error("setup failed");
+    invoiceAId = String(created.invoice._id);
+    paymentAId = String(created.payments[0]._id);
+  });
+
+  afterAll(async () => {
+    const businessIds = [tenants.businessAId, tenants.businessBId];
+    await Promise.all([
+      Invoice.deleteMany({ businessId: { $in: businessIds } }),
+      Expense.deleteMany({ businessId: { $in: businessIds } }),
+      ExpenseCategory.deleteMany({ businessId: { $in: businessIds } }),
+      Payment.deleteMany({ businessId: { $in: businessIds } }),
+      Customer.deleteMany({ businessId: { $in: businessIds } }),
+      BankAccount.deleteMany({ businessId: { $in: businessIds } }),
+    ]);
+    await teardownTwoTenants(tenants);
+  });
+
+  it("cannot update another business's payment", async () => {
+    const result = await updatePayment(
+      paymentAId,
+      tenants.businessBId,
+      { amountMinor: 50_000, mode: "cash", bankAccountId: bankAId, paymentDate: new Date() },
+      tenants.userBId,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("not_found");
+
+    const invoice = await findInvoiceById(invoiceAId, tenants.businessAId);
+    expect(invoice?.amountPaidMinor).toBe(40_000);
+  });
+
+  it("adjusts the linked invoice's amountPaidMinor by the delta and re-derives status", async () => {
+    const result = await updatePayment(
+      paymentAId,
+      tenants.businessAId,
+      { amountMinor: 100_000, mode: "upi", bankAccountId: bankAId, paymentDate: new Date() },
+      tenants.userAId,
+    );
+    expect(result.ok).toBe(true);
+
+    const invoice = await findInvoiceById(invoiceAId, tenants.businessAId);
+    expect(invoice?.amountPaidMinor).toBe(100_000);
+    expect(invoice?.status).toBe("paid");
+  });
+
+  it("rejects an amount that would push the linked invoice's paid total past its grand total", async () => {
+    const result = await updatePayment(
+      paymentAId,
+      tenants.businessAId,
+      { amountMinor: 999_999, mode: "cash", bankAccountId: bankAId, paymentDate: new Date() },
+      tenants.userAId,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("amount_invalid");
+
+    // Unchanged by the rejected attempt.
+    const invoice = await findInvoiceById(invoiceAId, tenants.businessAId);
+    expect(invoice?.amountPaidMinor).toBe(100_000);
+  });
+
+  it("updates an unlinked advance payment directly with no linked document to cascade to", async () => {
+    const advance = await recordPartyPayment({
+      businessId: tenants.businessAId,
+      partyType: "customer",
+      partyId: customerAId,
+      direction: "in",
+      amountMinor: 10_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      paymentDate: new Date(),
+      createdByUserId: tenants.userAId,
+    });
+    expect(advance.ok).toBe(true);
+    if (!advance.ok) return;
+
+    const result = await updatePayment(
+      String(advance.payment._id),
+      tenants.businessAId,
+      { amountMinor: 15_000, mode: "upi", bankAccountId: bankAId, paymentDate: new Date(), referenceNote: "Edited" },
+      tenants.userAId,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payment.amountMinor).toBe(15_000);
+    expect(result.payment.mode).toBe("upi");
+    expect(result.payment.referenceNote).toBe("Edited");
+  });
+
+  it("rejects editing (and flags as not editable) an Expense-linked payment, since its amount/mode are duplicated onto the Expense record", async () => {
+    const category = await createExpenseCategory({ businessId: tenants.businessAId, name: "Rent" });
+    const expense = await createExpense({
+      businessId: tenants.businessAId,
+      categoryId: String(category._id),
+      amountMinor: 20_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      expenseDate: new Date(),
+      createdByUserId: tenants.userAId,
+    });
+    expect(expense.ok).toBe(true);
+    if (!expense.ok) return;
+
+    const [expensePayment] = await Payment.find({
+      businessId: tenants.businessAId,
+      linkedDocumentType: "expense",
+      linkedDocumentId: expense.expense._id,
+    }).lean();
+    expect(isPaymentEditable({ linkedDocumentType: "expense", source: "manual" })).toBe(false);
+
+    const result = await updatePayment(
+      String(expensePayment._id),
+      tenants.businessAId,
+      { amountMinor: 25_000, mode: "cash", bankAccountId: bankAId, paymentDate: new Date() },
+      tenants.userAId,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("not_editable");
+  });
+
+  it("treats a gateway-sourced payment as not editable", () => {
+    expect(isPaymentEditable({ source: "gateway" })).toBe(false);
+    expect(isPaymentEditable({ source: "manual" })).toBe(true);
   });
 });

@@ -20,7 +20,7 @@ export function ScratchRoleForm() {
         <FormField label="Role name" name="name" required placeholder="e.g. Warehouse Staff" />
       </div>
       <PermissionMatrixFields />
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Creating…">Create role</SubmitButton>
       </div>
     </form>

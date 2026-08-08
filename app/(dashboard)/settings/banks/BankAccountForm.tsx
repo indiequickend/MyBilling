@@ -86,7 +86,7 @@ export function BankAccountForm({
         error={state.fieldErrors?.openingBalanceMinor}
       />
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Saving…">
           {mode === "create" ? "Add account" : "Save changes"}
         </SubmitButton>

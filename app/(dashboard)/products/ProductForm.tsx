@@ -271,7 +271,7 @@ export function ProductForm({
         </Card>
       ) : null}
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Saving…">
           {mode === "create" ? "Create product" : "Save changes"}
         </SubmitButton>

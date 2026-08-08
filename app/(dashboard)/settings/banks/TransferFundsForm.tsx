@@ -62,7 +62,7 @@ export function TransferFundsForm({
 
       <FormField label="Note (optional)" name="note" />
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Transferring…">Transfer funds</SubmitButton>
       </div>
     </form>

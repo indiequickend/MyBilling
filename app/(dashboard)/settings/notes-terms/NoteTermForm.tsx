@@ -107,7 +107,7 @@ export function NoteTermForm({
         <FieldLabel className="font-normal">Active</FieldLabel>
       </Field>
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Saving…">
           {mode === "create" ? "Add template" : "Save changes"}
         </SubmitButton>

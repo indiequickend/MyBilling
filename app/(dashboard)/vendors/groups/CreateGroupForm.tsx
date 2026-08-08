@@ -16,7 +16,9 @@ export function CreateGroupForm() {
       <div className="flex-1">
         <FormField label="New group name" name="name" required />
       </div>
-      <SubmitButton pendingText="Adding…">Add</SubmitButton>
+      <SubmitButton pendingText="Adding…" className="w-auto shrink-0">
+        Add
+      </SubmitButton>
       <FormError message={state.error} />
     </form>
   );

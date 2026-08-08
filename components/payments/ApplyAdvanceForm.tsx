@@ -60,7 +60,7 @@ export function ApplyAdvanceForm({
         </div>
       </FieldGroup>
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Applying…">Apply advance</SubmitButton>
       </div>
     </form>

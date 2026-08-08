@@ -64,7 +64,7 @@ export function DocumentNumberingForm({
         </FieldGroup>
       </FieldSet>
 
-      <div className="max-w-xs">
+      <div className="max-w-lg">
         <SubmitButton pendingText="Saving…">Save numbering settings</SubmitButton>
       </div>
     </form>
