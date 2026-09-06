@@ -13,8 +13,7 @@ import {
   invoiceGroupRowSchema,
   groupInvoiceCsvRows,
   type InvoiceGroupRowInput,
-  type InvoiceCsvRawGroup,
-  type InvoiceImportPaymentInput,
+  type InvoiceCsvRawGroup
 } from "@/lib/validation/invoices";
 import { parseCsvDate } from "@/lib/validation/shared";
 import { findOrCreateCustomerByName } from "@/lib/db/queries/customers";
@@ -120,11 +119,11 @@ export async function bulkUploadInvoicesAction(
           payment.mode === "cash"
             ? await findOrCreateImportBankAccount(context.activeBusinessId, { mode: "cash" })
             : await findOrCreateImportBankAccount(context.activeBusinessId, {
-                mode: "bank",
-                accountNumber: payment.bankAccountNumber,
-                ifsc: payment.bankIfsc,
-                bankName: payment.bankName,
-              });
+              mode: "bank",
+              accountNumber: payment.bankAccountNumber,
+              ifsc: payment.bankIfsc,
+              bankName: payment.bankName,
+            });
         resolvedPayments.push({
           amountMinor: payment.amountMinor,
           mode: payment.mode,
@@ -173,9 +172,8 @@ export async function bulkUploadInvoicesAction(
 
   revalidatePath("/sales/invoices");
   return {
-    success: `Imported ${result.insertedCount} of ${result.totalRows} invoice(s)${
-      result.skippedCount ? `; ${result.skippedCount} skipped` : ""
-    }.`,
+    success: `Imported ${result.insertedCount} of ${result.totalRows} invoice(s)${result.skippedCount ? `; ${result.skippedCount} skipped` : ""
+      }.`,
     rowErrors: result.rowErrors.length > 0 ? result.rowErrors : undefined,
   };
 }
