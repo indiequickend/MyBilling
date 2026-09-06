@@ -47,6 +47,44 @@ export async function createBankAccount(input: BankAccountInput) {
   return BankAccount.create(input);
 }
 
+/**
+ * Finds or creates the bank account a historical payment (from another system, e.g. the invoice
+ * bulk-import) should be recorded against, since every Payment requires a `bankAccountId`. A cash
+ * payment always lands in one shared "Cash" account; a payment with a real account number is
+ * matched/created by that account number (so the same real-world account across many imported
+ * payments reuses one record); anything else (no account number given) falls back to one shared
+ * "Imported Payments" account, same rationale as the "Cash" one.
+ */
+export async function findOrCreateImportBankAccount(
+  businessId: string,
+  params: { mode: "cash" } | { mode: "bank"; accountNumber?: string; ifsc?: string; bankName?: string },
+): Promise<InstanceType<typeof BankAccount>> {
+  await connectToDatabase();
+
+  if (params.mode === "cash") {
+    const existing = await BankAccount.findOne({ businessId, type: "cash", name: "Cash" });
+    if (existing) return existing;
+    return BankAccount.create({ businessId, type: "cash", name: "Cash" });
+  }
+
+  const accountNumber = params.accountNumber?.trim();
+  if (accountNumber) {
+    const existing = await BankAccount.findOne({ businessId, type: "bank", accountNumber });
+    if (existing) return existing;
+    return BankAccount.create({
+      businessId,
+      type: "bank",
+      name: params.bankName?.trim() || "Imported Bank Account",
+      accountNumber,
+      ifsc: params.ifsc?.trim() || undefined,
+    });
+  }
+
+  const existing = await BankAccount.findOne({ businessId, type: "bank", name: "Imported Payments" });
+  if (existing) return existing;
+  return BankAccount.create({ businessId, type: "bank", name: "Imported Payments" });
+}
+
 export async function updateBankAccount(
   bankAccountId: string,
   businessId: string,

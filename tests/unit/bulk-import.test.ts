@@ -86,4 +86,50 @@ describe("runBulkImport", () => {
     expect(result.skippedCount).toBe(100);
     expect(inserted).toHaveLength(0);
   });
+
+  it("surfaces the specific reason for a union-typed field instead of Zod's generic 'Invalid input'", async () => {
+    // Mirrors lib/validation/shared.ts's optionalRupeesToMinorUnits: a union of a literal "" (not
+    // set) and a real parser with a custom message — the shape that made every bad amount cell in
+    // the product bulk-upload report a bare "Invalid input" with no way to tell what was wrong.
+    const unionSchema = z.object({
+      name: z.string(),
+      amount: z
+        .union([z.string(), z.number()])
+        .transform((val) => (typeof val === "string" ? val.trim() : val))
+        .pipe(
+          z.union([
+            z.literal(""),
+            z.string().refine((s) => /^\d+(\.\d{1,2})?$/.test(s), "Enter a valid amount"),
+          ]),
+        ),
+    });
+
+    const result = await runBulkImport<z.infer<typeof unionSchema>, z.infer<typeof unionSchema>>({
+      rows: [{ name: "Row 1", amount: "1,499.00" }],
+      rowSchema: unionSchema,
+      resolveRow: async (data) => ({ ok: true, resolved: data }),
+      insertRow: async () => ({ ok: true }),
+    });
+
+    expect(result.rowErrors).toHaveLength(1);
+    expect(result.rowErrors[0].message).toContain("Enter a valid amount");
+    expect(result.rowErrors[0].message).not.toBe("Invalid input");
+  });
+
+  it("rowNumberOf lets a caller report the original line number for a pre-grouped row", async () => {
+    const grouped = [
+      { sourceLine: 5, name: "Row 5" },
+      { sourceLine: 12, name: "" }, // fails schema validation
+    ];
+
+    const result = await runBulkImport<{ name: string }, { name: string }, { sourceLine: number; name: string }>({
+      rows: grouped,
+      rowSchema: z.object({ name: z.string().min(1, "Name is required") }),
+      rowNumberOf: (row) => row.sourceLine,
+      resolveRow: async (data) => ({ ok: true, resolved: data }),
+      insertRow: async () => ({ ok: true }),
+    });
+
+    expect(result.rowErrors).toEqual([{ row: 12, message: "name: Name is required" }]);
+  });
 });

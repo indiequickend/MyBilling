@@ -109,6 +109,30 @@ export async function createCustomer(input: CustomerInput): Promise<CustomerWrit
   return { ok: true, customer };
 }
 
+/** Finds or creates a customer by exact display name — used by the invoice bulk-upload, which
+ * accepts a free-text customer name column rather than requiring the customer to already exist.
+ * `phone`/`gstin` are only used to fill in a newly-created customer, never to overwrite a match. */
+export async function findOrCreateCustomerByName(
+  businessId: string,
+  name: string,
+  extra?: { phone?: string; gstin?: string },
+): Promise<InstanceType<typeof Customer>> {
+  await connectToDatabase();
+  const trimmed = name.trim();
+  const existing = await Customer.findOne({
+    businessId,
+    displayName: trimmed,
+    deletedAt: { $exists: false },
+  });
+  if (existing) return existing;
+  return Customer.create({
+    businessId,
+    displayName: trimmed,
+    phone: extra?.phone,
+    gstin: extra?.gstin,
+  });
+}
+
 export async function updateCustomer(
   customerId: string,
   businessId: string,

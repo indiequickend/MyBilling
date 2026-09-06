@@ -7,6 +7,7 @@ import {
   rupeesToMinorUnits,
   optionalRupeesToMinorUnits,
   normalizeDiscountValue,
+  gstinSchema,
 } from "@/lib/validation/shared";
 import { parseSerialNumbersText } from "@/lib/validation/inventory";
 
@@ -116,3 +117,206 @@ export const invoiceListQuerySchema = z.object({
   dateTo: optionalTrimmed(30),
   page: z.coerce.number().int().min(1).default(1),
 });
+
+/** One payment entry on a bulk-imported invoice — a raw CSV line's payment columns, already
+ * merged into a group by `groupInvoiceCsvRows`. */
+export const invoiceImportPaymentRowSchema = z.object({
+  amountMinor: rupeesToMinorUnits,
+  // Case-insensitive for the same reason lib/validation/products.ts's `type` column is: a
+  // spreadsheet/export is just as likely to write "Cash" or "UPI" as the exact lowercase value.
+  mode: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim().toLowerCase() : v),
+    z.enum(PAYMENT_MODES),
+  ),
+  date: z.string().trim().min(1, "Payment date is required"),
+  bankAccountNumber: optionalTrimmed(50),
+  bankIfsc: optionalTrimmed(20),
+  bankName: optionalTrimmed(200),
+  referenceNote: optionalTrimmed(200),
+});
+export type InvoiceImportPaymentInput = z.infer<typeof invoiceImportPaymentRowSchema>;
+
+/**
+ * One *grouped* invoice for the bulk-upload format — the output of `groupInvoiceCsvRows`, not a
+ * raw CSV line (one invoice can span several lines, one per payment; see that function's
+ * doc-comment). `subtotalMinor`/`discountAmountMinor`/`totalTaxMinor`/`grandTotalMinor` are stored
+ * on the Invoice exactly as given (see importInvoice in lib/db/queries/invoices.ts) rather than
+ * recomputed, so a migrated invoice's totals always match the system it came from.
+ */
+export const invoiceGroupRowSchema = z.object({
+  docNumber: z.string().trim().min(1, "Invoice number is required").max(100),
+  invoiceDate: z.string().trim().min(1, "Invoice date is required"),
+  dueDate: optionalTrimmed(30),
+  customerName: z.string().trim().min(1, "Customer name is required").max(200),
+  customerPhone: optionalTrimmed(20),
+  customerGstin: gstinSchema,
+  placeOfSupplyState: optionalTrimmed(100),
+  referenceNumber: optionalTrimmed(100),
+  notes: optionalTrimmed(2000),
+  // A higher ceiling than the manual invoice form's own notes/terms fields (also 2000, see
+  // rawInvoiceHeaderSchema above): migrated terms text is typically copied wholesale from
+  // whatever system the invoice is coming from, so it's more likely to be long boilerplate than
+  // something someone hand-types into a form.
+  terms: optionalTrimmed(5000),
+  lineItemDescription: optionalTrimmed(500),
+  subtotalMinor: rupeesToMinorUnits,
+  discountAmountMinor: optionalRupeesToMinorUnits.transform((v) => v ?? 0),
+  taxAmountMinor: optionalRupeesToMinorUnits.transform((v) => v ?? 0),
+  totalAmountMinor: rupeesToMinorUnits,
+  payments: z.array(invoiceImportPaymentRowSchema).max(200).default([]),
+});
+export type InvoiceGroupRowInput = z.infer<typeof invoiceGroupRowSchema>;
+
+/** Raw (pre-validation) shape of one grouped invoice, produced by `groupInvoiceCsvRows` and fed
+ * into `invoiceGroupRowSchema.safeParse`. Every field is a raw string, "" meaning "no row in this
+ * group set it" — same convention as lib/validation/products.ts's ProductCsvRawGroup. */
+export type InvoiceCsvRawGroup = {
+  rowNumber: number;
+  docNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  customerName: string;
+  customerPhone: string;
+  customerGstin: string;
+  placeOfSupplyState: string;
+  referenceNumber: string;
+  notes: string;
+  terms: string;
+  lineItemDescription: string;
+  subtotalMinor: string;
+  discountAmountMinor: string;
+  taxAmountMinor: string;
+  totalAmountMinor: string;
+  payments: Array<{
+    amountMinor: string;
+    mode: string;
+    date: string;
+    bankAccountNumber: string;
+    bankIfsc: string;
+    bankName: string;
+    referenceNote: string;
+  }>;
+};
+
+const INVOICE_LEVEL_CSV_COLUMNS = [
+  "invoiceDate",
+  "dueDate",
+  "customerName",
+  "customerPhone",
+  "customerGstin",
+  "placeOfSupplyState",
+  "referenceNumber",
+  "notes",
+  "terms",
+  "lineItemDescription",
+  "subtotalMinor",
+  "discountAmountMinor",
+  "taxAmountMinor",
+  "totalAmountMinor",
+] as const;
+
+/**
+ * Groups raw invoice bulk-upload CSV lines into one entry per invoice, keyed by `docNumber` —
+ * the same "shared key groups rows into one record" technique as
+ * lib/validation/products.ts's groupProductCsvRows, applied here because one invoice can have
+ * several payments (Swipe-style partial-payment history) the same way one product can have
+ * several variants. A line with a filled-in `paymentAmountMinor` cell contributes one payment;
+ * invoice-level columns are taken from the first line in the group where that column is
+ * non-blank, so they only need to be filled in once per invoice.
+ */
+export function groupInvoiceCsvRows(rows: Record<string, string>[]): InvoiceCsvRawGroup[] {
+  const groups = new Map<string, InvoiceCsvRawGroup>();
+  const filledColumns = new Map<string, Set<string>>();
+  const order: string[] = [];
+
+  rows.forEach((row, i) => {
+    const rowNumber = i + 2; // +1 for 0-index, +1 for the header row
+    const docNumber = (row.docNumber ?? "").trim();
+    const key = docNumber ? docNumber.toLowerCase() : `__unnumbered_${rowNumber}`;
+
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        rowNumber,
+        docNumber,
+        invoiceDate: "",
+        dueDate: "",
+        customerName: "",
+        customerPhone: "",
+        customerGstin: "",
+        placeOfSupplyState: "",
+        referenceNumber: "",
+        notes: "",
+        terms: "",
+        lineItemDescription: "",
+        subtotalMinor: "",
+        discountAmountMinor: "",
+        taxAmountMinor: "",
+        totalAmountMinor: "",
+        payments: [],
+      };
+      groups.set(key, group);
+      filledColumns.set(key, new Set());
+      order.push(key);
+    }
+    const filled = filledColumns.get(key)!;
+
+    for (const col of INVOICE_LEVEL_CSV_COLUMNS) {
+      const value = row[col]?.trim();
+      if (value && !filled.has(col)) {
+        group[col] = value;
+        filled.add(col);
+      }
+    }
+
+    const paymentAmount = row.paymentAmountMinor?.trim();
+    if (paymentAmount) {
+      group.payments.push({
+        amountMinor: paymentAmount,
+        mode: row.paymentMode?.trim() ?? "",
+        date: row.paymentDate?.trim() ?? "",
+        bankAccountNumber: row.paymentBankAccountNumber?.trim() ?? "",
+        bankIfsc: row.paymentBankIfsc?.trim() ?? "",
+        bankName: row.paymentBankName?.trim() ?? "",
+        referenceNote: row.paymentReferenceNote?.trim() ?? "",
+      });
+    }
+  });
+
+  return order.map((key) => groups.get(key)!);
+}
+
+/**
+ * Parses a date cell from the invoice bulk-upload CSV. Accepts DD-MM-YYYY — the source-of-truth
+ * format for a historical-data migration like this: it's what an export like Swipe's produces,
+ * and what Excel round-trips a date column back to when the file is opened/saved on an
+ * Indian-locale machine — with a fallback to plain ISO YYYY-MM-DD. Deliberately does NOT fall
+ * back to `new Date(value)`: for an unambiguous DD-MM-YYYY value like "21-07-2026" that correctly
+ * returns Invalid Date, but for an ambiguous one like "01-04-2026" it silently parses as a
+ * *different*, wrong date (April 1 instead of the intended January 4) instead of failing — the
+ * kind of silent date corruption that must never happen for financial records.
+ */
+export function parseCsvDate(value: string): Date | undefined {
+  const dmy = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(value);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return dateFromParts(Number(y), Number(m), Number(d));
+  }
+  const ymd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
+  if (ymd) {
+    const [, y, m, d] = ymd;
+    return dateFromParts(Number(y), Number(m), Number(d));
+  }
+  return undefined;
+}
+
+function dateFromParts(year: number, month: number, day: number): Date | undefined {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  // Rejects e.g. day 31 in a 30-day month, which Date.UTC would otherwise silently roll over into
+  // the next month instead of treating as invalid.
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return undefined;
+  }
+  return date;
+}

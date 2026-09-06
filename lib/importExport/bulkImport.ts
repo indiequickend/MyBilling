@@ -1,5 +1,7 @@
 import Papa from "papaparse";
-import type { ZodType } from "zod";
+import type { ZodError, ZodType } from "zod";
+
+type ZodIssue = ZodError["issues"][number];
 
 /** Same ceiling as EXPENSE_BULK_UPLOAD_MAX_ROWS, generalized — this app has no background job
  * infrastructure, so an upload is validated and inserted synchronously in one request. */
@@ -58,6 +60,35 @@ function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
+/**
+ * Zod reports a field built from `z.union([...])` (e.g. `optionalRupeesToMinorUnits`, which unions
+ * a literal "" against a real amount parser) as one opaque "Invalid input" issue with the actual,
+ * useful per-branch reasons ("Enter a valid amount", etc.) buried in `issue.errors`. Surfacing the
+ * bare top-level message left every bulk-upload row error saying just "Invalid input" with no way
+ * to tell what was actually wrong with the cell — this recurses into union issues to find the most
+ * specific message instead. Prefers a `custom` issue (an explicit `ctx.addIssue` message, which is
+ * always the human-written one) over a bare type-mismatch from a schema like `z.literal("")`.
+ */
+function describeIssue(issue: ZodIssue): string {
+  if (issue.code === "invalid_union" && Array.isArray(issue.errors)) {
+    const branches = issue.errors as ZodIssue[][];
+    for (const branch of branches) {
+      const custom = branch.find((sub) => sub.code === "custom");
+      if (custom) return describeIssue(custom);
+    }
+    const firstNonEmpty = branches.find((branch) => branch.length > 0);
+    if (firstNonEmpty) return describeIssue(firstNonEmpty[0]);
+  }
+  return issue.message;
+}
+
+/** Prefixes the field name onto the resolved message (e.g. `sellingPriceMinor: Enter a valid
+ * amount`) so a row with several columns still tells the uploader which cell to fix. */
+function formatRowError(issue: ZodIssue): string {
+  const message = describeIssue(issue);
+  return issue.path.length > 0 ? `${issue.path.join(".")}: ${message}` : message;
+}
+
 const INSERT_BATCH_SIZE = 25;
 
 /**
@@ -67,9 +98,13 @@ const INSERT_BATCH_SIZE = 25;
  * Expense bulk-upload precedent (app/(dashboard)/expenses/bulk-upload/actions.ts) which is left
  * untouched. Pass `allOrNothing: true` to reproduce that older behavior instead.
  */
-export async function runBulkImport<RowShape, Resolved>(params: {
-  rows: Record<string, string>[];
+export async function runBulkImport<RowShape, Resolved, RawRow = Record<string, string>>(params: {
+  rows: RawRow[];
   rowSchema: ZodType<RowShape>;
+  /** Maps a raw row to the row number reported in errors. Defaults to `index + 2` (CSV line
+   * number: +1 for 0-index, +1 for the header row) — override when `rows` isn't one entry per
+   * raw CSV line, e.g. a pre-grouped row that carries its own original line number. */
+  rowNumberOf?: (row: RawRow, index: number) => number;
   /** Pass 2 — DB-dependent cross-reference/lookup resolution (not expressible in Zod alone), e.g.
    * resolving a free-text categoryName to an id, auto-creating it if new. */
   resolveRow: (
@@ -86,14 +121,16 @@ export async function runBulkImport<RowShape, Resolved>(params: {
 }): Promise<BulkImportResult> {
   const totalRows = params.rows.length;
   const rowErrors: BulkImportRowError[] = [];
+  const rowNumberOf = params.rowNumberOf ?? ((_row: RawRow, i: number) => i + 2);
 
   // Pass 1 — schema validation.
   const schemaValidated: { rowNumber: number; data: RowShape }[] = [];
   params.rows.forEach((row, i) => {
-    const rowNumber = i + 2; // +1 for 0-index, +1 for the header row
+    const rowNumber = rowNumberOf(row, i);
     const result = params.rowSchema.safeParse(row);
     if (!result.success) {
-      rowErrors.push({ row: rowNumber, message: result.error.issues[0]?.message ?? "Invalid row" });
+      const issue = result.error.issues[0];
+      rowErrors.push({ row: rowNumber, message: issue ? formatRowError(issue) : "Invalid row" });
       return;
     }
     schemaValidated.push({ rowNumber, data: result.data });

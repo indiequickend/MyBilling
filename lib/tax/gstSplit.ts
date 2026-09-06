@@ -32,3 +32,22 @@ export function splitTax(
   const sgstMinor = totalTaxMinor - cgstMinor;
   return { cgstMinor, sgstMinor, igstMinor: 0, totalTaxMinor };
 }
+
+/**
+ * Same CGST+SGST/IGST split as `splitTax`, but for a total tax amount that's already known
+ * (e.g. imported from another system's historical record) rather than derived from a rate —
+ * used by the invoice bulk-import, which stores a migrated invoice's original tax total exactly
+ * instead of recomputing it from a back-derived rate.
+ */
+export function splitKnownTax(
+  totalTaxMinor: number,
+  businessState: string,
+  placeOfSupplyState: string,
+): TaxSplit {
+  if (!isSameState(businessState, placeOfSupplyState)) {
+    return { cgstMinor: 0, sgstMinor: 0, igstMinor: totalTaxMinor, totalTaxMinor };
+  }
+  const cgstMinor = Math.round(totalTaxMinor / 2);
+  const sgstMinor = totalTaxMinor - cgstMinor;
+  return { cgstMinor, sgstMinor, igstMinor: 0, totalTaxMinor };
+}

@@ -18,9 +18,9 @@ export default async function ProductsBulkUploadPage() {
     <div>
       <h1 className="mb-2 text-lg font-semibold">Bulk upload products</h1>
       <p className="mb-6 max-w-2xl text-sm text-muted-foreground">
-        Upload a CSV with one product per row. Up to {BULK_IMPORT_MAX_ROWS} rows per file. Valid rows
-        are imported even if some rows fail — every failed row is listed below with its reason so you
-        can fix and re-upload just those.
+        Upload a CSV with one row per product, or one row per variant. Up to {BULK_IMPORT_MAX_ROWS} rows
+        per file. Valid rows are imported even if some rows fail — every failed row is listed below with
+        its reason so you can fix and re-upload just those.
       </p>
 
       <div className="mb-6 max-w-2xl rounded-lg border bg-muted/30 p-4 text-sm">
@@ -34,6 +34,17 @@ export default async function ProductsBulkUploadPage() {
           <code>type</code> (product or service, default product), <code>hsnOrSac</code>, <code>unit</code>,{" "}
           <code>categoryName</code>, <code>groupName</code>, <code>purchasePriceMinor</code>,{" "}
           <code>priceIsTaxInclusive</code> (yes/no), <code>barcode</code>
+        </p>
+        <p className="mt-2 mb-2 font-medium">Variants</p>
+        <p className="text-muted-foreground">
+          To add variants (e.g. sizes/colors), use one row per variant and repeat the same{" "}
+          <code>name</code> on each of those rows — rows sharing a <code>name</code> are combined into
+          one product instead of becoming separate products. On each variant row, fill in{" "}
+          <code>variantName</code> (e.g. &quot;Red / M&quot;) plus optionally <code>variantSku</code>,{" "}
+          <code>variantBarcode</code>, <code>variantSellingPriceMinor</code>, and{" "}
+          <code>variantPurchasePriceMinor</code>. Product-level columns (price, tax rate, HSN, etc.)
+          only need to be filled in on one of the rows for that product — the rest can be left blank.
+          Rows with no <code>variantName</code> import as plain, variant-less products as usual.
         </p>
         <p className="mt-2 text-muted-foreground">
           A category or group name that doesn&apos;t exist yet is created automatically.

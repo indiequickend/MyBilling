@@ -9,7 +9,12 @@ import {
   runBulkImport,
   BULK_IMPORT_MAX_FILE_BYTES,
 } from "@/lib/importExport/bulkImport";
-import { productRowSchema, type ProductRowInput } from "@/lib/validation/products";
+import {
+  productGroupRowSchema,
+  groupProductCsvRows,
+  type ProductGroupRowInput,
+  type ProductCsvRawGroup,
+} from "@/lib/validation/products";
 import { findOrCreateProductCategoryByName } from "@/lib/db/queries/productCategories";
 import { findOrCreateProductGroupByName } from "@/lib/db/queries/productGroups";
 import { createProduct, type ProductWriteResult } from "@/lib/db/queries/products";
@@ -42,7 +47,7 @@ function productErrorMessage(reason: Exclude<ProductWriteResult, { ok: true }>["
   }
 }
 
-type ResolvedProductRow = ProductRowInput & { categoryId?: string; groupId?: string };
+type ResolvedProductRow = ProductGroupRowInput & { categoryId?: string; groupId?: string };
 
 export async function bulkUploadProductsAction(
   _prev: BulkUploadState,
@@ -63,9 +68,12 @@ export async function bulkUploadProductsAction(
   const parsedCsv = parseCsvRows(text, REQUIRED_COLUMNS);
   if (!parsedCsv.ok) return { error: parsedCsv.error };
 
-  const result = await runBulkImport<ProductRowInput, ResolvedProductRow>({
-    rows: parsedCsv.rows,
-    rowSchema: productRowSchema,
+  const groups = groupProductCsvRows(parsedCsv.rows);
+
+  const result = await runBulkImport<ProductGroupRowInput, ResolvedProductRow, ProductCsvRawGroup>({
+    rows: groups,
+    rowSchema: productGroupRowSchema,
+    rowNumberOf: (group) => group.rowNumber,
     resolveRow: async (data) => {
       const [category, group] = await Promise.all([
         data.categoryName
@@ -96,6 +104,7 @@ export async function bulkUploadProductsAction(
         priceIsTaxInclusive: resolved.priceIsTaxInclusive,
         taxRatePercent: resolved.taxRatePercent,
         barcode: resolved.barcode,
+        variants: resolved.variants,
       });
       if (!created.ok) return { ok: false, message: productErrorMessage(created.reason) };
       return { ok: true };

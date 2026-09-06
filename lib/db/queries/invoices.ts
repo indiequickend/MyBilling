@@ -19,6 +19,7 @@ import {
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, derivePaymentStatus, type LineItemCalcInput } from "@/lib/documents/calc";
+import { splitKnownTax } from "@/lib/tax/gstSplit";
 import type { DiscountTarget, InvoiceStatus } from "@/lib/constants/invoices";
 import type { PaymentMode } from "@/lib/constants/payments";
 import { fireWebhookEvent } from "@/lib/webhooks/dispatch";
@@ -905,4 +906,207 @@ export async function listGstFlaggedInvoices(
     customerDisplayName: inv.customerSnapshot?.displayName ?? "—",
     grandTotalMinor: inv.grandTotalMinor,
   }));
+}
+
+export type ImportInvoicePaymentInput = {
+  amountMinor: number;
+  mode: PaymentMode;
+  bankAccountId: string;
+  paymentDate: Date;
+  referenceNote?: string;
+};
+
+/**
+ * Migrated-data shape for the invoice bulk-import (unlike CreateInvoiceInput, which always
+ * computes totals from line items via computeDocumentTotals): the caller already knows this
+ * invoice's exact historical totals (from whatever system it's being migrated out of) and wants
+ * them stored exactly, not re-derived — re-deriving a tax rate and running it back through the
+ * per-line tax engine risks a paisa of rounding drift from the original record. `docNumber` is
+ * caller-supplied for the same reason (a migrated invoice keeps its original number instead of
+ * drawing a fresh one from this business's own sequence) — the only place in this codebase a
+ * docNumber isn't server-generated; see CLAUDE.md's numbering rule, which this deliberately and
+ * narrowly departs from because the invoice already happened outside this system.
+ */
+export type ImportInvoiceInput = {
+  businessId: string;
+  customerId: string;
+  docNumber: string;
+  invoiceDate: Date;
+  dueDate?: Date;
+  referenceNumber?: string;
+  placeOfSupplyState: string;
+  notes?: string;
+  terms?: string;
+  lineItemDescription: string;
+  /** Pre-discount taxable subtotal, in minor units. */
+  subtotalMinor: number;
+  discountAmountMinor: number;
+  totalTaxMinor: number;
+  grandTotalMinor: number;
+  payments: ImportInvoicePaymentInput[];
+  createdByUserId: string;
+};
+
+export type ImportInvoiceFailureReason =
+  | "customer_not_found"
+  | "business_not_found"
+  | "invalid_bank_account"
+  | "duplicate_doc_number"
+  | "missing_place_of_supply";
+
+export type ImportInvoiceResult =
+  | { ok: true; invoice: InstanceType<typeof Invoice>; payments: InstanceType<typeof Payment>[] }
+  | { ok: false; reason: ImportInvoiceFailureReason };
+
+export async function importInvoice(input: ImportInvoiceInput): Promise<ImportInvoiceResult> {
+  await connectToDatabase();
+
+  const customer = await Customer.findOne({
+    _id: input.customerId,
+    businessId: input.businessId,
+    deletedAt: { $exists: false },
+  });
+  if (!customer) return { ok: false, reason: "customer_not_found" };
+
+  const business = await Business.findOne({ _id: input.businessId, deletedAt: { $exists: false } });
+  if (!business) return { ok: false, reason: "business_not_found" };
+
+  // Invoice.placeOfSupplyState is a required field — an empty string satisfies the input type but
+  // not Mongoose's `required`, which would otherwise surface as a raw ValidationError instead of a
+  // typed, actionable result (this happens for real: a business that hasn't set its own billing
+  // state yet, imported via a CSV row that also leaves placeOfSupplyState blank).
+  if (!input.placeOfSupplyState.trim()) return { ok: false, reason: "missing_place_of_supply" };
+
+  for (const payment of input.payments) {
+    if (!(await isOwnedBankAccount(payment.bankAccountId, input.businessId))) {
+      return { ok: false, reason: "invalid_bank_account" };
+    }
+  }
+
+  // Fast-path uniqueness check outside the transaction — the unique (businessId, docNumber) index
+  // on Invoice is the real guarantee (caught as a 11000 below), this just avoids opening a
+  // transaction for the common case of a genuinely duplicate row.
+  const clash = await Invoice.findOne({ businessId: input.businessId, docNumber: input.docNumber });
+  if (clash) return { ok: false, reason: "duplicate_doc_number" };
+
+  const businessState = business.addresses?.billing?.state ?? "";
+  const taxableAmountMinor = input.subtotalMinor - input.discountAmountMinor;
+  const { cgstMinor, sgstMinor, igstMinor } = splitKnownTax(
+    input.totalTaxMinor,
+    businessState,
+    input.placeOfSupplyState,
+  );
+  const taxRatePercent =
+    taxableAmountMinor > 0 ? Math.round((input.totalTaxMinor / taxableAmountMinor) * 10000) / 100 : 0;
+
+  const lineItem = {
+    description: input.lineItemDescription,
+    unit: "PCS",
+    quantity: 1,
+    unitPriceMinor: input.subtotalMinor,
+    discountType: "amount" as const,
+    discountValue: input.discountAmountMinor,
+    taxRatePercent,
+    cgstMinor,
+    sgstMinor,
+    igstMinor,
+    taxableAmountMinor,
+    // Matches grandTotalMinor exactly (there's only one line item) rather than re-summing
+    // taxableAmountMinor + totalTaxMinor, so the line and the document can never disagree by a
+    // paisa even if the source system's own numbers don't add up to the cent.
+    totalMinor: input.grandTotalMinor,
+  };
+
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  let result: ImportInvoiceResult;
+  try {
+    let txResult!: ImportInvoiceResult;
+    try {
+      await session.withTransaction(async () => {
+        const [invoiceDoc] = await Invoice.create(
+          [
+            {
+              businessId: input.businessId,
+              customerId: customer._id,
+              customerSnapshot: buildCustomerSnapshot(customer),
+              docNumber: input.docNumber,
+              status: "pending",
+              invoiceDate: input.invoiceDate,
+              dueDate: input.dueDate,
+              referenceNumber: input.referenceNumber,
+              placeOfSupplyState: input.placeOfSupplyState,
+              reverseCharge: false,
+              eWayBillFlag: false,
+              eInvoiceFlag: false,
+              tcsApplicable: false,
+              tcsAmountMinor: 0,
+              lineItems: [lineItem],
+              discountType: "amount",
+              discountValue: input.discountAmountMinor,
+              discountTarget: "total",
+              discountAmountMinor: input.discountAmountMinor,
+              roundOff: false,
+              roundOffAmountMinor: 0,
+              subtotalMinor: input.subtotalMinor,
+              totalTaxMinor: input.totalTaxMinor,
+              totalCgstMinor: cgstMinor,
+              totalSgstMinor: sgstMinor,
+              totalIgstMinor: igstMinor,
+              grandTotalMinor: input.grandTotalMinor,
+              amountPaidMinor: 0,
+              customFieldValues: {},
+              notes: input.notes,
+              terms: input.terms,
+              createdByUserId: input.createdByUserId,
+            },
+          ],
+          { session },
+        );
+
+        const createdPayments: InstanceType<typeof Payment>[] = [];
+        for (const split of input.payments) {
+          const payment = await createPayment(
+            {
+              businessId: input.businessId,
+              partyType: "customer",
+              partyId: String(customer._id),
+              direction: "in",
+              amountMinor: split.amountMinor,
+              mode: split.mode,
+              bankAccountId: split.bankAccountId,
+              paymentDate: split.paymentDate,
+              linkedDocumentType: "invoice",
+              linkedDocumentId: String(invoiceDoc._id),
+              referenceNote: split.referenceNote,
+              createdByUserId: input.createdByUserId,
+            },
+            session,
+          );
+          createdPayments.push(payment);
+        }
+
+        const paidMinor = createdPayments.reduce((sum, p) => sum + p.amountMinor, 0);
+        invoiceDoc.amountPaidMinor = paidMinor;
+        invoiceDoc.status = derivePaymentStatus(invoiceDoc.grandTotalMinor, paidMinor);
+        await invoiceDoc.save({ session });
+
+        txResult = { ok: true, invoice: invoiceDoc, payments: createdPayments };
+      });
+      result = txResult;
+    } catch (err) {
+      // A concurrent import racing on the same docNumber lost the pre-check above too.
+      if (err instanceof Error && "code" in err && (err as { code?: number }).code === 11000) {
+        result = { ok: false, reason: "duplicate_doc_number" };
+      } else {
+        throw err;
+      }
+    }
+  } finally {
+    await session.endSession();
+  }
+
+  // Deliberately no fireWebhookEvent here: a bulk import of historical invoices isn't a live
+  // business event any connected webhook subscriber should be notified about.
+  return result;
 }
