@@ -109,6 +109,31 @@ export async function createVendor(input: VendorInput): Promise<VendorWriteResul
   return { ok: true, vendor };
 }
 
+/** Finds or creates a vendor by exact display name — used by the purchase/purchase-order
+ * bulk-upload, which accepts a free-text vendor name column rather than requiring the vendor to
+ * already exist. `phone`/`gstin` are only used to fill in a newly-created vendor, never to
+ * overwrite a match. Mirrors findOrCreateCustomerByName in lib/db/queries/customers.ts. */
+export async function findOrCreateVendorByName(
+  businessId: string,
+  name: string,
+  extra?: { phone?: string; gstin?: string },
+): Promise<InstanceType<typeof Vendor>> {
+  await connectToDatabase();
+  const trimmed = name.trim();
+  const existing = await Vendor.findOne({
+    businessId,
+    displayName: trimmed,
+    deletedAt: { $exists: false },
+  });
+  if (existing) return existing;
+  return Vendor.create({
+    businessId,
+    displayName: trimmed,
+    phone: extra?.phone,
+    gstin: extra?.gstin,
+  });
+}
+
 export async function updateVendor(
   vendorId: string,
   businessId: string,

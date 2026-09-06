@@ -15,6 +15,7 @@ import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, type LineItemCalcInput } from "@/lib/documents/calc";
+import { splitKnownTax } from "@/lib/tax/gstSplit";
 import type { DiscountTarget } from "@/lib/constants/invoices";
 
 export type ProformaInvoiceLineItemWriteInput = {
@@ -433,4 +434,123 @@ export async function sumProformaInvoiceTotals(
     { $group: { _id: null, totalMinor: { $sum: "$grandTotalMinor" } } },
   ]);
   return { totalMinor: agg?.totalMinor ?? 0 };
+}
+
+/**
+ * Migrated-data shape for the proforma-invoice bulk-import — mirrors importInvoice/importPurchase/
+ * importPurchaseOrder: totals stored exactly as given, `docNumber` caller-supplied (the same
+ * narrow, deliberate departure from CLAUDE.md's server-generated-numbering rule). No payments —
+ * a Proforma Invoice never takes them in this app (see ProformaInvoice.ts's doc-comment), matching
+ * Swipe's own export where every proforma invoice is unpaid.
+ */
+export type ImportProformaInvoiceInput = {
+  businessId: string;
+  customerId: string;
+  docNumber: string;
+  proformaDate: Date;
+  dueDate?: Date;
+  referenceNumber?: string;
+  placeOfSupplyState: string;
+  notes?: string;
+  terms?: string;
+  lineItemDescription: string;
+  subtotalMinor: number;
+  discountAmountMinor: number;
+  totalTaxMinor: number;
+  grandTotalMinor: number;
+  createdByUserId: string;
+};
+
+export type ImportProformaInvoiceFailureReason =
+  | "customer_not_found"
+  | "business_not_found"
+  | "duplicate_doc_number"
+  | "missing_place_of_supply";
+
+export type ImportProformaInvoiceResult =
+  | { ok: true; proformaInvoice: InstanceType<typeof ProformaInvoice> }
+  | { ok: false; reason: ImportProformaInvoiceFailureReason };
+
+export async function importProformaInvoice(
+  input: ImportProformaInvoiceInput,
+): Promise<ImportProformaInvoiceResult> {
+  await connectToDatabase();
+
+  const customer = await Customer.findOne({
+    _id: input.customerId,
+    businessId: input.businessId,
+    deletedAt: { $exists: false },
+  });
+  if (!customer) return { ok: false, reason: "customer_not_found" };
+
+  const business = await Business.findOne({ _id: input.businessId, deletedAt: { $exists: false } });
+  if (!business) return { ok: false, reason: "business_not_found" };
+
+  if (!input.placeOfSupplyState.trim()) return { ok: false, reason: "missing_place_of_supply" };
+
+  const clash = await ProformaInvoice.findOne({ businessId: input.businessId, docNumber: input.docNumber });
+  if (clash) return { ok: false, reason: "duplicate_doc_number" };
+
+  const businessState = business.addresses?.billing?.state ?? "";
+  const taxableAmountMinor = input.subtotalMinor - input.discountAmountMinor;
+  const { cgstMinor, sgstMinor, igstMinor } = splitKnownTax(
+    input.totalTaxMinor,
+    businessState,
+    input.placeOfSupplyState,
+  );
+  const taxRatePercent =
+    taxableAmountMinor > 0 ? Math.round((input.totalTaxMinor / taxableAmountMinor) * 10000) / 100 : 0;
+
+  const lineItem = {
+    description: input.lineItemDescription,
+    unit: "PCS",
+    quantity: 1,
+    unitPriceMinor: input.subtotalMinor,
+    discountType: "amount" as const,
+    discountValue: input.discountAmountMinor,
+    taxRatePercent,
+    cgstMinor,
+    sgstMinor,
+    igstMinor,
+    taxableAmountMinor,
+    totalMinor: input.grandTotalMinor,
+  };
+
+  try {
+    const proformaInvoice = await ProformaInvoice.create({
+      businessId: input.businessId,
+      customerId: customer._id,
+      customerSnapshot: buildCustomerSnapshot(customer),
+      docNumber: input.docNumber,
+      status: "open",
+      proformaDate: input.proformaDate,
+      dueDate: input.dueDate,
+      referenceNumber: input.referenceNumber,
+      placeOfSupplyState: input.placeOfSupplyState,
+      reverseCharge: false,
+      lineItems: [lineItem],
+      discountType: "amount",
+      discountValue: input.discountAmountMinor,
+      discountTarget: "total",
+      discountAmountMinor: input.discountAmountMinor,
+      roundOff: false,
+      roundOffAmountMinor: 0,
+      subtotalMinor: input.subtotalMinor,
+      totalTaxMinor: input.totalTaxMinor,
+      totalCgstMinor: cgstMinor,
+      totalSgstMinor: sgstMinor,
+      totalIgstMinor: igstMinor,
+      grandTotalMinor: input.grandTotalMinor,
+      customFieldValues: {},
+      notes: input.notes,
+      terms: input.terms,
+      createdByUserId: input.createdByUserId,
+    });
+    return { ok: true, proformaInvoice };
+  } catch (err) {
+    if (err instanceof Error && "code" in err && (err as { code?: number }).code === 11000) {
+      return { ok: false, reason: "duplicate_doc_number" };
+    }
+    throw err;
+  }
 }

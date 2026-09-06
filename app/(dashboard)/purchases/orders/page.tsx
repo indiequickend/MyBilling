@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Upload } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listPurchaseOrders } from "@/lib/db/queries/purchaseOrders";
@@ -83,12 +83,20 @@ export default async function PurchaseOrdersPage({
         title="Purchase Orders"
         actions={
           canCreate ? (
-            <Button asChild aria-label="New purchase order">
-              <Link href="/purchases/orders/new">
-                <Plus data-icon="inline-start" />
-                <ButtonLabel>New purchase order</ButtonLabel>
-              </Link>
-            </Button>
+            <>
+              <Button variant="outline" asChild className="hidden lg:inline-flex" aria-label="Bulk upload">
+                <Link href="/purchases/orders/bulk-upload">
+                  <Upload data-icon="inline-start" />
+                  <ButtonLabel>Bulk upload</ButtonLabel>
+                </Link>
+              </Button>
+              <Button asChild aria-label="New purchase order">
+                <Link href="/purchases/orders/new">
+                  <Plus data-icon="inline-start" />
+                  <ButtonLabel>New purchase order</ButtonLabel>
+                </Link>
+              </Button>
+            </>
           ) : null
         }
       />

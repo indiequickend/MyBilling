@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { DISCOUNT_TARGETS } from "@/lib/constants/invoices";
-import { objectId, optionalTrimmed, rupeesToMinorUnits, normalizeDiscountValue } from "@/lib/validation/shared";
+import {
+  objectId,
+  optionalTrimmed,
+  rupeesToMinorUnits,
+  optionalRupeesToMinorUnits,
+  normalizeDiscountValue,
+  gstinSchema,
+  fillMissingCsvColumns,
+} from "@/lib/validation/shared";
 
 const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
 
@@ -61,3 +69,48 @@ export const purchaseOrderListQuerySchema = z.object({
   tab: z.enum(["all", "draft", "open", "closed", "cancelled", "deleted"]).default("all"),
   page: z.coerce.number().int().min(1).default(1),
 });
+
+/**
+ * One row of the purchase-order bulk-upload format — no grouping needed here (unlike
+ * invoices/purchases): a Purchase Order never takes payments in this app, so there's no variable
+ * sub-item count driving a one-row-per-payment CSV shape — one CSV row is always one purchase
+ * order. Totals are stored exactly as given (see importPurchaseOrder in
+ * lib/db/queries/purchaseOrders.ts) rather than recomputed.
+ */
+const PURCHASE_ORDER_OPTIONAL_CSV_COLUMNS = [
+  "expectedDeliveryDate",
+  "vendorPhone",
+  "vendorGstin",
+  "placeOfSupplyState",
+  "referenceNumber",
+  "notes",
+  "terms",
+  "lineItemDescription",
+  "discountAmountMinor",
+  "taxAmountMinor",
+] as const;
+
+export const purchaseOrderRowSchema = z.preprocess(
+  (row) =>
+    row && typeof row === "object"
+      ? fillMissingCsvColumns(row as Record<string, string>, PURCHASE_ORDER_OPTIONAL_CSV_COLUMNS)
+      : row,
+  z.object({
+    docNumber: z.string().trim().min(1, "Purchase order number is required").max(100),
+    orderDate: z.string().trim().min(1, "Order date is required"),
+    expectedDeliveryDate: optionalTrimmed(30),
+    vendorName: z.string().trim().min(1, "Vendor name is required").max(200),
+    vendorPhone: optionalTrimmed(20),
+    vendorGstin: gstinSchema,
+    placeOfSupplyState: optionalTrimmed(100),
+    referenceNumber: optionalTrimmed(100),
+    notes: optionalTrimmed(2000),
+    terms: optionalTrimmed(5000),
+    lineItemDescription: optionalTrimmed(500),
+    subtotalMinor: rupeesToMinorUnits,
+    discountAmountMinor: optionalRupeesToMinorUnits.transform((v) => v ?? 0),
+    taxAmountMinor: optionalRupeesToMinorUnits.transform((v) => v ?? 0),
+    totalAmountMinor: rupeesToMinorUnits,
+  }),
+);
+export type PurchaseOrderRowInput = z.infer<typeof purchaseOrderRowSchema>;

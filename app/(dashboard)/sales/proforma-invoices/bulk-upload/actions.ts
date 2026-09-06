@@ -9,25 +9,17 @@ import {
   runBulkImport,
   BULK_IMPORT_MAX_FILE_BYTES,
 } from "@/lib/importExport/bulkImport";
-import {
-  invoiceGroupRowSchema,
-  groupInvoiceCsvRows,
-  type InvoiceGroupRowInput,
-  type InvoiceCsvRawGroup,
-  type InvoiceImportPaymentInput,
-} from "@/lib/validation/invoices";
+import { proformaInvoiceRowSchema, type ProformaInvoiceRowInput } from "@/lib/validation/proformaInvoices";
 import { parseCsvDate } from "@/lib/validation/shared";
 import { findOrCreateCustomerByName } from "@/lib/db/queries/customers";
-import { findOrCreateImportBankAccount } from "@/lib/db/queries/bankAccounts";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import {
-  importInvoice,
-  type ImportInvoiceFailureReason,
-  type ImportInvoicePaymentInput,
-} from "@/lib/db/queries/invoices";
+  importProformaInvoice,
+  type ImportProformaInvoiceFailureReason,
+} from "@/lib/db/queries/proformaInvoices";
 import type { BulkUploadState } from "@/components/importExport/BulkUploadForm";
 
-const REQUIRED_COLUMNS = ["docNumber", "invoiceDate", "customerName", "subtotalMinor", "totalAmountMinor"] as const;
+const REQUIRED_COLUMNS = ["docNumber", "proformaDate", "customerName", "subtotalMinor", "totalAmountMinor"] as const;
 
 async function requireDashboardContext() {
   const context = await getDashboardContext();
@@ -39,36 +31,33 @@ async function requireDashboardContext() {
   };
 }
 
-function importErrorMessage(reason: ImportInvoiceFailureReason): string {
+function importErrorMessage(reason: ImportProformaInvoiceFailureReason): string {
   switch (reason) {
     case "customer_not_found":
       return "Customer could not be found or created.";
     case "business_not_found":
       return "Business not found.";
-    case "invalid_bank_account":
-      return "Could not resolve a bank/cash account for one of the payments.";
     case "duplicate_doc_number":
-      return "An invoice with this number already exists.";
+      return "A proforma invoice with this number already exists.";
     case "missing_place_of_supply":
       return "Could not determine place of supply — set your business's billing state in Settings, or fill in the placeOfSupplyState column for this row.";
   }
 }
 
-type ResolvedInvoiceRow = InvoiceGroupRowInput & {
+type ResolvedProformaInvoiceRow = ProformaInvoiceRowInput & {
   customerId: string;
   placeOfSupplyState: string;
   lineItemDescription: string;
-  invoiceDateParsed: Date;
+  proformaDateParsed: Date;
   dueDateParsed?: Date;
-  resolvedPayments: ImportInvoicePaymentInput[];
 };
 
-export async function bulkUploadInvoicesAction(
+export async function bulkUploadProformaInvoicesAction(
   _prev: BulkUploadState,
   formData: FormData,
 ): Promise<BulkUploadState> {
   const context = await requireDashboardContext();
-  requirePermission(context.membership, "sales_invoices", "create");
+  requirePermission(context.membership, "proforma_invoices", "create");
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -86,16 +75,13 @@ export async function bulkUploadInvoicesAction(
   const parsedCsv = parseCsvRows(text, REQUIRED_COLUMNS);
   if (!parsedCsv.ok) return { error: parsedCsv.error };
 
-  const groups = groupInvoiceCsvRows(parsedCsv.rows);
-
-  const result = await runBulkImport<InvoiceGroupRowInput, ResolvedInvoiceRow, InvoiceCsvRawGroup>({
-    rows: groups,
-    rowSchema: invoiceGroupRowSchema,
-    rowNumberOf: (group) => group.rowNumber,
+  const result = await runBulkImport<ProformaInvoiceRowInput, ResolvedProformaInvoiceRow>({
+    rows: parsedCsv.rows,
+    rowSchema: proformaInvoiceRowSchema,
     resolveRow: async (data) => {
-      const invoiceDateParsed = parseCsvDate(data.invoiceDate);
-      if (!invoiceDateParsed) {
-        return { ok: false, message: `invoiceDate: Enter a valid date (got "${data.invoiceDate}")` };
+      const proformaDateParsed = parseCsvDate(data.proformaDate);
+      if (!proformaDateParsed) {
+        return { ok: false, message: `proformaDate: Enter a valid date (got "${data.proformaDate}")` };
       }
       let dueDateParsed: Date | undefined;
       if (data.dueDate) {
@@ -110,49 +96,24 @@ export async function bulkUploadInvoicesAction(
         gstin: data.customerGstin,
       });
 
-      const resolvedPayments: ImportInvoicePaymentInput[] = [];
-      for (const payment of data.payments) {
-        const paymentDate = parseCsvDate(payment.date);
-        if (!paymentDate) {
-          return { ok: false, message: `payments: Enter a valid payment date (got "${payment.date}")` };
-        }
-        const bankAccount =
-          payment.mode === "cash"
-            ? await findOrCreateImportBankAccount(context.activeBusinessId, { mode: "cash" })
-            : await findOrCreateImportBankAccount(context.activeBusinessId, {
-                mode: "bank",
-                accountNumber: payment.bankAccountNumber,
-                ifsc: payment.bankIfsc,
-                bankName: payment.bankName,
-              });
-        resolvedPayments.push({
-          amountMinor: payment.amountMinor,
-          mode: payment.mode,
-          bankAccountId: String(bankAccount._id),
-          paymentDate,
-          referenceNote: payment.referenceNote,
-        });
-      }
-
       return {
         ok: true,
         resolved: {
           ...data,
           customerId: String(customer._id),
           placeOfSupplyState: data.placeOfSupplyState || businessState,
-          lineItemDescription: data.lineItemDescription || "Imported invoice",
-          invoiceDateParsed,
+          lineItemDescription: data.lineItemDescription || "Imported proforma invoice",
+          proformaDateParsed,
           dueDateParsed,
-          resolvedPayments,
         },
       };
     },
     insertRow: async (resolved) => {
-      const created = await importInvoice({
+      const created = await importProformaInvoice({
         businessId: context.activeBusinessId,
         customerId: resolved.customerId,
         docNumber: resolved.docNumber,
-        invoiceDate: resolved.invoiceDateParsed,
+        proformaDate: resolved.proformaDateParsed,
         dueDate: resolved.dueDateParsed,
         referenceNumber: resolved.referenceNumber,
         placeOfSupplyState: resolved.placeOfSupplyState,
@@ -163,7 +124,6 @@ export async function bulkUploadInvoicesAction(
         discountAmountMinor: resolved.discountAmountMinor,
         totalTaxMinor: resolved.taxAmountMinor,
         grandTotalMinor: resolved.totalAmountMinor,
-        payments: resolved.resolvedPayments,
         createdByUserId: context.membership.userId,
       });
       if (!created.ok) return { ok: false, message: importErrorMessage(created.reason) };
@@ -171,9 +131,9 @@ export async function bulkUploadInvoicesAction(
     },
   });
 
-  revalidatePath("/sales/invoices");
+  revalidatePath("/sales/proforma-invoices");
   return {
-    success: `Imported ${result.insertedCount} of ${result.totalRows} invoice(s)${
+    success: `Imported ${result.insertedCount} of ${result.totalRows} proforma invoice(s)${
       result.skippedCount ? `; ${result.skippedCount} skipped` : ""
     }.`,
     rowErrors: result.rowErrors.length > 0 ? result.rowErrors : undefined,

@@ -4,6 +4,63 @@ import { z } from "zod";
 export const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
 
 /**
+ * Parses a date cell from a bulk-upload CSV (invoices, purchases, purchase orders, proforma
+ * invoices, payments — any historical-data migration). Accepts DD-MM-YYYY — the source-of-truth
+ * format for a migration like this: it's what an export like Swipe's produces, and what Excel
+ * round-trips a date column back to when the file is opened/saved on an Indian-locale machine —
+ * with a fallback to plain ISO YYYY-MM-DD. Deliberately does NOT fall back to `new Date(value)`:
+ * for an unambiguous DD-MM-YYYY value like "21-07-2026" that correctly returns Invalid Date, but
+ * for an ambiguous one like "01-04-2026" it silently parses as a *different*, wrong date (April 1
+ * instead of the intended January 4) instead of failing — the kind of silent date corruption that
+ * must never happen for financial records.
+ */
+export function parseCsvDate(value: string): Date | undefined {
+  const dmy = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(value);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return dateFromParts(Number(y), Number(m), Number(d));
+  }
+  const ymd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
+  if (ymd) {
+    const [, y, m, d] = ymd;
+    return dateFromParts(Number(y), Number(m), Number(d));
+  }
+  return undefined;
+}
+
+/**
+ * Fills in "" for any of `columns` missing entirely from a raw CSV row object, so a flat
+ * (non-grouped) bulk-upload row schema behaves the same whether an optional column's cell is
+ * blank or the column header is absent altogether. Needed because `optionalRupeesToMinorUnits`
+ * (used for optional money columns) requires its input to be a string or number — a genuinely
+ * missing key is `undefined`, which fails that union — while `optionalTrimmed` already tolerates
+ * `undefined` via its own `.optional()`. Grouped bulk-upload formats (see
+ * lib/validation/invoices.ts's ProductCsvRawGroup-style raw groups) don't need this: their
+ * grouping function already builds every field from an explicit "" default.
+ */
+export function fillMissingCsvColumns<T extends readonly string[]>(
+  row: Record<string, string>,
+  columns: T,
+): Record<string, string> {
+  const filled: Record<string, string> = { ...row };
+  for (const col of columns) {
+    if (!(col in filled)) filled[col] = "";
+  }
+  return filled;
+}
+
+function dateFromParts(year: number, month: number, day: number): Date | undefined {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  // Rejects e.g. day 31 in a 30-day month, which Date.UTC would otherwise silently roll over into
+  // the next month instead of treating as invalid.
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return undefined;
+  }
+  return date;
+}
+
+/**
  * Forms collect money as a rupees string (e.g. "1234.50"); CLAUDE.md requires
  * storage as an integer minor unit (paise). Accepts up to 2 decimal places.
  */

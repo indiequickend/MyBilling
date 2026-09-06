@@ -1010,3 +1010,80 @@ export async function applyAdvancePayment(input: ApplyAdvancePaymentInput): Prom
     await session.endSession();
   }
 }
+
+/**
+ * Migrated-data shape for the standalone payments bulk-import: an unlinked/advance payment (see
+ * recordPartyPayment above) whose receipt number is caller-supplied instead of drawn from this
+ * business's own sequence — the same narrow, deliberate departure from CLAUDE.md's
+ * server-generated-numbering rule used by importInvoice/importPurchase, because this payment
+ * already happened outside this system and needs its own stable, trackable reference number.
+ * `partyType`/`partyId` are both optional, matching Payment.ts's own "Expense/Indirect Income
+ * payments have no linked Customer/Vendor" precedent — used for payments this migration can't
+ * confidently attribute to a specific party.
+ */
+export type ImportStandalonePaymentInput = {
+  businessId: string;
+  voucherNumber: string;
+  partyType?: "customer" | "vendor";
+  partyId?: string;
+  direction: "in" | "out";
+  amountMinor: number;
+  mode: PaymentMode;
+  bankAccountId: string;
+  paymentDate: Date;
+  referenceNote?: string;
+  createdByUserId: string;
+};
+
+export type ImportStandalonePaymentFailureReason =
+  | "party_not_found"
+  | "invalid_bank_account"
+  | "duplicate_voucher_number";
+
+export type ImportStandalonePaymentResult =
+  | { ok: true; payment: InstanceType<typeof Payment> }
+  | { ok: false; reason: ImportStandalonePaymentFailureReason };
+
+export async function importStandalonePayment(
+  input: ImportStandalonePaymentInput,
+): Promise<ImportStandalonePaymentResult> {
+  await connectToDatabase();
+
+  if (input.partyType && input.partyId) {
+    const PartyModel = input.partyType === "customer" ? Customer : Vendor;
+    const party = await PartyModel.findOne({
+      _id: input.partyId,
+      businessId: input.businessId,
+      deletedAt: { $exists: false },
+    });
+    if (!party) return { ok: false, reason: "party_not_found" };
+  }
+  if (!(await isOwnedBankAccount(input.bankAccountId, input.businessId))) {
+    return { ok: false, reason: "invalid_bank_account" };
+  }
+
+  const clash = await Payment.findOne({ businessId: input.businessId, docNumber: input.voucherNumber });
+  if (clash) return { ok: false, reason: "duplicate_voucher_number" };
+
+  try {
+    const payment = await Payment.create({
+      businessId: input.businessId,
+      docNumber: input.voucherNumber,
+      partyType: input.partyType,
+      partyId: input.partyId,
+      direction: input.direction,
+      amountMinor: input.amountMinor,
+      mode: input.mode,
+      bankAccountId: input.bankAccountId,
+      paymentDate: input.paymentDate,
+      referenceNote: input.referenceNote,
+      createdByUserId: input.createdByUserId,
+    });
+    return { ok: true, payment };
+  } catch (err) {
+    if (err instanceof Error && "code" in err && (err as { code?: number }).code === 11000) {
+      return { ok: false, reason: "duplicate_voucher_number" };
+    }
+    throw err;
+  }
+}

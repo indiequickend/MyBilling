@@ -10,24 +10,23 @@ import {
   BULK_IMPORT_MAX_FILE_BYTES,
 } from "@/lib/importExport/bulkImport";
 import {
-  invoiceGroupRowSchema,
-  groupInvoiceCsvRows,
-  type InvoiceGroupRowInput,
-  type InvoiceCsvRawGroup,
-  type InvoiceImportPaymentInput,
-} from "@/lib/validation/invoices";
+  purchaseGroupRowSchema,
+  groupPurchaseCsvRows,
+  type PurchaseGroupRowInput,
+  type PurchaseCsvRawGroup,
+} from "@/lib/validation/purchases";
 import { parseCsvDate } from "@/lib/validation/shared";
-import { findOrCreateCustomerByName } from "@/lib/db/queries/customers";
+import { findOrCreateVendorByName } from "@/lib/db/queries/vendors";
 import { findOrCreateImportBankAccount } from "@/lib/db/queries/bankAccounts";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import {
-  importInvoice,
-  type ImportInvoiceFailureReason,
-  type ImportInvoicePaymentInput,
-} from "@/lib/db/queries/invoices";
+  importPurchase,
+  type ImportPurchaseFailureReason,
+  type ImportPurchasePaymentInput,
+} from "@/lib/db/queries/purchases";
 import type { BulkUploadState } from "@/components/importExport/BulkUploadForm";
 
-const REQUIRED_COLUMNS = ["docNumber", "invoiceDate", "customerName", "subtotalMinor", "totalAmountMinor"] as const;
+const REQUIRED_COLUMNS = ["docNumber", "purchaseDate", "vendorName", "subtotalMinor", "totalAmountMinor"] as const;
 
 async function requireDashboardContext() {
   const context = await getDashboardContext();
@@ -39,36 +38,36 @@ async function requireDashboardContext() {
   };
 }
 
-function importErrorMessage(reason: ImportInvoiceFailureReason): string {
+function importErrorMessage(reason: ImportPurchaseFailureReason): string {
   switch (reason) {
-    case "customer_not_found":
-      return "Customer could not be found or created.";
+    case "vendor_not_found":
+      return "Vendor could not be found or created.";
     case "business_not_found":
       return "Business not found.";
     case "invalid_bank_account":
       return "Could not resolve a bank/cash account for one of the payments.";
     case "duplicate_doc_number":
-      return "An invoice with this number already exists.";
+      return "A purchase with this number already exists.";
     case "missing_place_of_supply":
       return "Could not determine place of supply — set your business's billing state in Settings, or fill in the placeOfSupplyState column for this row.";
   }
 }
 
-type ResolvedInvoiceRow = InvoiceGroupRowInput & {
-  customerId: string;
+type ResolvedPurchaseRow = PurchaseGroupRowInput & {
+  vendorId: string;
   placeOfSupplyState: string;
   lineItemDescription: string;
-  invoiceDateParsed: Date;
+  purchaseDateParsed: Date;
   dueDateParsed?: Date;
-  resolvedPayments: ImportInvoicePaymentInput[];
+  resolvedPayments: ImportPurchasePaymentInput[];
 };
 
-export async function bulkUploadInvoicesAction(
+export async function bulkUploadPurchasesAction(
   _prev: BulkUploadState,
   formData: FormData,
 ): Promise<BulkUploadState> {
   const context = await requireDashboardContext();
-  requirePermission(context.membership, "sales_invoices", "create");
+  requirePermission(context.membership, "purchases", "create");
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -86,16 +85,16 @@ export async function bulkUploadInvoicesAction(
   const parsedCsv = parseCsvRows(text, REQUIRED_COLUMNS);
   if (!parsedCsv.ok) return { error: parsedCsv.error };
 
-  const groups = groupInvoiceCsvRows(parsedCsv.rows);
+  const groups = groupPurchaseCsvRows(parsedCsv.rows);
 
-  const result = await runBulkImport<InvoiceGroupRowInput, ResolvedInvoiceRow, InvoiceCsvRawGroup>({
+  const result = await runBulkImport<PurchaseGroupRowInput, ResolvedPurchaseRow, PurchaseCsvRawGroup>({
     rows: groups,
-    rowSchema: invoiceGroupRowSchema,
+    rowSchema: purchaseGroupRowSchema,
     rowNumberOf: (group) => group.rowNumber,
     resolveRow: async (data) => {
-      const invoiceDateParsed = parseCsvDate(data.invoiceDate);
-      if (!invoiceDateParsed) {
-        return { ok: false, message: `invoiceDate: Enter a valid date (got "${data.invoiceDate}")` };
+      const purchaseDateParsed = parseCsvDate(data.purchaseDate);
+      if (!purchaseDateParsed) {
+        return { ok: false, message: `purchaseDate: Enter a valid date (got "${data.purchaseDate}")` };
       }
       let dueDateParsed: Date | undefined;
       if (data.dueDate) {
@@ -105,12 +104,12 @@ export async function bulkUploadInvoicesAction(
         }
       }
 
-      const customer = await findOrCreateCustomerByName(context.activeBusinessId, data.customerName, {
-        phone: data.customerPhone,
-        gstin: data.customerGstin,
+      const vendor = await findOrCreateVendorByName(context.activeBusinessId, data.vendorName, {
+        phone: data.vendorPhone,
+        gstin: data.vendorGstin,
       });
 
-      const resolvedPayments: ImportInvoicePaymentInput[] = [];
+      const resolvedPayments: ImportPurchasePaymentInput[] = [];
       for (const payment of data.payments) {
         const paymentDate = parseCsvDate(payment.date);
         if (!paymentDate) {
@@ -138,21 +137,21 @@ export async function bulkUploadInvoicesAction(
         ok: true,
         resolved: {
           ...data,
-          customerId: String(customer._id),
+          vendorId: String(vendor._id),
           placeOfSupplyState: data.placeOfSupplyState || businessState,
-          lineItemDescription: data.lineItemDescription || "Imported invoice",
-          invoiceDateParsed,
+          lineItemDescription: data.lineItemDescription || "Imported purchase",
+          purchaseDateParsed,
           dueDateParsed,
           resolvedPayments,
         },
       };
     },
     insertRow: async (resolved) => {
-      const created = await importInvoice({
+      const created = await importPurchase({
         businessId: context.activeBusinessId,
-        customerId: resolved.customerId,
+        vendorId: resolved.vendorId,
         docNumber: resolved.docNumber,
-        invoiceDate: resolved.invoiceDateParsed,
+        purchaseDate: resolved.purchaseDateParsed,
         dueDate: resolved.dueDateParsed,
         referenceNumber: resolved.referenceNumber,
         placeOfSupplyState: resolved.placeOfSupplyState,
@@ -171,9 +170,9 @@ export async function bulkUploadInvoicesAction(
     },
   });
 
-  revalidatePath("/sales/invoices");
+  revalidatePath("/purchases");
   return {
-    success: `Imported ${result.insertedCount} of ${result.totalRows} invoice(s)${
+    success: `Imported ${result.insertedCount} of ${result.totalRows} purchase(s)${
       result.skippedCount ? `; ${result.skippedCount} skipped` : ""
     }.`,
     rowErrors: result.rowErrors.length > 0 ? result.rowErrors : undefined,

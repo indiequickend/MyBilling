@@ -285,38 +285,3 @@ export function groupInvoiceCsvRows(rows: Record<string, string>[]): InvoiceCsvR
 
   return order.map((key) => groups.get(key)!);
 }
-
-/**
- * Parses a date cell from the invoice bulk-upload CSV. Accepts DD-MM-YYYY — the source-of-truth
- * format for a historical-data migration like this: it's what an export like Swipe's produces,
- * and what Excel round-trips a date column back to when the file is opened/saved on an
- * Indian-locale machine — with a fallback to plain ISO YYYY-MM-DD. Deliberately does NOT fall
- * back to `new Date(value)`: for an unambiguous DD-MM-YYYY value like "21-07-2026" that correctly
- * returns Invalid Date, but for an ambiguous one like "01-04-2026" it silently parses as a
- * *different*, wrong date (April 1 instead of the intended January 4) instead of failing — the
- * kind of silent date corruption that must never happen for financial records.
- */
-export function parseCsvDate(value: string): Date | undefined {
-  const dmy = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(value);
-  if (dmy) {
-    const [, d, m, y] = dmy;
-    return dateFromParts(Number(y), Number(m), Number(d));
-  }
-  const ymd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
-  if (ymd) {
-    const [, y, m, d] = ymd;
-    return dateFromParts(Number(y), Number(m), Number(d));
-  }
-  return undefined;
-}
-
-function dateFromParts(year: number, month: number, day: number): Date | undefined {
-  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
-  const date = new Date(Date.UTC(year, month - 1, day));
-  // Rejects e.g. day 31 in a 30-day month, which Date.UTC would otherwise silently roll over into
-  // the next month instead of treating as invalid.
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
-    return undefined;
-  }
-  return date;
-}

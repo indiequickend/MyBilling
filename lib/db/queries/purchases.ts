@@ -18,6 +18,7 @@ import {
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, derivePaymentStatus, type LineItemCalcInput } from "@/lib/documents/calc";
+import { splitKnownTax } from "@/lib/tax/gstSplit";
 import type { DiscountTarget } from "@/lib/constants/invoices";
 import type { DocumentStatus } from "@/lib/constants/documents";
 import type { PaymentMode } from "@/lib/constants/payments";
@@ -713,4 +714,190 @@ export async function sumPurchaseTotals(
   const totalMinor: number = agg?.totalMinor ?? 0;
   const paidMinor: number = agg?.paidMinor ?? 0;
   return { totalMinor, paidMinor, pendingMinor: totalMinor - paidMinor };
+}
+
+export type ImportPurchasePaymentInput = {
+  amountMinor: number;
+  mode: PaymentMode;
+  bankAccountId: string;
+  paymentDate: Date;
+  referenceNote?: string;
+};
+
+/**
+ * Migrated-data shape for the purchase bulk-import — mirrors importInvoice in
+ * lib/db/queries/invoices.ts (vendor-side instead of customer-side): totals are stored exactly as
+ * given rather than recomputed from a back-derived tax rate, and `docNumber` is caller-supplied
+ * (the one deliberate, narrow departure from CLAUDE.md's server-generated-numbering rule, because
+ * this purchase already happened outside this system).
+ */
+export type ImportPurchaseInput = {
+  businessId: string;
+  vendorId: string;
+  docNumber: string;
+  purchaseDate: Date;
+  dueDate?: Date;
+  referenceNumber?: string;
+  placeOfSupplyState: string;
+  notes?: string;
+  terms?: string;
+  lineItemDescription: string;
+  /** Pre-discount taxable subtotal, in minor units. */
+  subtotalMinor: number;
+  discountAmountMinor: number;
+  totalTaxMinor: number;
+  grandTotalMinor: number;
+  payments: ImportPurchasePaymentInput[];
+  createdByUserId: string;
+};
+
+export type ImportPurchaseFailureReason =
+  | "vendor_not_found"
+  | "business_not_found"
+  | "invalid_bank_account"
+  | "duplicate_doc_number"
+  | "missing_place_of_supply";
+
+export type ImportPurchaseResult =
+  | { ok: true; purchase: InstanceType<typeof Purchase>; payments: InstanceType<typeof Payment>[] }
+  | { ok: false; reason: ImportPurchaseFailureReason };
+
+export async function importPurchase(input: ImportPurchaseInput): Promise<ImportPurchaseResult> {
+  await connectToDatabase();
+
+  const vendor = await Vendor.findOne({
+    _id: input.vendorId,
+    businessId: input.businessId,
+    deletedAt: { $exists: false },
+  });
+  if (!vendor) return { ok: false, reason: "vendor_not_found" };
+
+  const business = await Business.findOne({ _id: input.businessId, deletedAt: { $exists: false } });
+  if (!business) return { ok: false, reason: "business_not_found" };
+
+  if (!input.placeOfSupplyState.trim()) return { ok: false, reason: "missing_place_of_supply" };
+
+  for (const payment of input.payments) {
+    if (!(await isOwnedBankAccount(payment.bankAccountId, input.businessId))) {
+      return { ok: false, reason: "invalid_bank_account" };
+    }
+  }
+
+  const clash = await Purchase.findOne({ businessId: input.businessId, docNumber: input.docNumber });
+  if (clash) return { ok: false, reason: "duplicate_doc_number" };
+
+  const businessState = business.addresses?.billing?.state ?? "";
+  const taxableAmountMinor = input.subtotalMinor - input.discountAmountMinor;
+  const { cgstMinor, sgstMinor, igstMinor } = splitKnownTax(
+    input.totalTaxMinor,
+    businessState,
+    input.placeOfSupplyState,
+  );
+  const taxRatePercent =
+    taxableAmountMinor > 0 ? Math.round((input.totalTaxMinor / taxableAmountMinor) * 10000) / 100 : 0;
+
+  const lineItem = {
+    description: input.lineItemDescription,
+    unit: "PCS",
+    quantity: 1,
+    unitPriceMinor: input.subtotalMinor,
+    discountType: "amount" as const,
+    discountValue: input.discountAmountMinor,
+    taxRatePercent,
+    cgstMinor,
+    sgstMinor,
+    igstMinor,
+    taxableAmountMinor,
+    totalMinor: input.grandTotalMinor,
+  };
+
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  let result: ImportPurchaseResult;
+  try {
+    let txResult!: ImportPurchaseResult;
+    try {
+      await session.withTransaction(async () => {
+        const [purchaseDoc] = await Purchase.create(
+          [
+            {
+              businessId: input.businessId,
+              vendorId: vendor._id,
+              vendorSnapshot: buildVendorSnapshot(vendor),
+              docNumber: input.docNumber,
+              status: "pending",
+              purchaseDate: input.purchaseDate,
+              dueDate: input.dueDate,
+              referenceNumber: input.referenceNumber,
+              placeOfSupplyState: input.placeOfSupplyState,
+              reverseCharge: false,
+              tdsApplicable: false,
+              tdsAmountMinor: 0,
+              tcsApplicable: false,
+              tcsAmountMinor: 0,
+              lineItems: [lineItem],
+              discountType: "amount",
+              discountValue: input.discountAmountMinor,
+              discountTarget: "total",
+              discountAmountMinor: input.discountAmountMinor,
+              roundOff: false,
+              roundOffAmountMinor: 0,
+              subtotalMinor: input.subtotalMinor,
+              totalTaxMinor: input.totalTaxMinor,
+              totalCgstMinor: cgstMinor,
+              totalSgstMinor: sgstMinor,
+              totalIgstMinor: igstMinor,
+              grandTotalMinor: input.grandTotalMinor,
+              amountPaidMinor: 0,
+              customFieldValues: {},
+              notes: input.notes,
+              terms: input.terms,
+              createdByUserId: input.createdByUserId,
+            },
+          ],
+          { session },
+        );
+
+        const createdPayments: InstanceType<typeof Payment>[] = [];
+        for (const split of input.payments) {
+          const payment = await createPayment(
+            {
+              businessId: input.businessId,
+              partyType: "vendor",
+              partyId: String(vendor._id),
+              direction: "out",
+              amountMinor: split.amountMinor,
+              mode: split.mode,
+              bankAccountId: split.bankAccountId,
+              paymentDate: split.paymentDate,
+              linkedDocumentType: "purchase",
+              linkedDocumentId: String(purchaseDoc._id),
+              referenceNote: split.referenceNote,
+              createdByUserId: input.createdByUserId,
+            },
+            session,
+          );
+          createdPayments.push(payment);
+        }
+
+        const paidMinor = createdPayments.reduce((sum, p) => sum + p.amountMinor, 0);
+        purchaseDoc.amountPaidMinor = paidMinor;
+        purchaseDoc.status = derivePaymentStatus(purchaseDoc.grandTotalMinor, paidMinor);
+        await purchaseDoc.save({ session });
+
+        txResult = { ok: true, purchase: purchaseDoc, payments: createdPayments };
+      });
+      result = txResult;
+    } catch (err) {
+      if (err instanceof Error && "code" in err && (err as { code?: number }).code === 11000) {
+        result = { ok: false, reason: "duplicate_doc_number" };
+      } else {
+        throw err;
+      }
+    }
+  } finally {
+    await session.endSession();
+  }
+
+  return result;
 }

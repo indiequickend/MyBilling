@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listPaymentsTimeline, sumPaymentsTimeline, isPaymentEditable } from "@/lib/db/queries/payments";
@@ -62,12 +62,20 @@ export default async function PaymentsTimelinePage({
         title="Payments Timeline"
         actions={
           canCreate ? (
-            <Button asChild aria-label="New payment">
-              <Link href="/payments/new">
-                <Plus data-icon="inline-start" />
-                <ButtonLabel>New payment</ButtonLabel>
-              </Link>
-            </Button>
+            <>
+              <Button variant="outline" asChild className="hidden lg:inline-flex" aria-label="Bulk upload">
+                <Link href="/payments/bulk-upload">
+                  <Upload data-icon="inline-start" />
+                  <ButtonLabel>Bulk upload</ButtonLabel>
+                </Link>
+              </Button>
+              <Button asChild aria-label="New payment">
+                <Link href="/payments/new">
+                  <Plus data-icon="inline-start" />
+                  <ButtonLabel>New payment</ButtonLabel>
+                </Link>
+              </Button>
+            </>
           ) : null
         }
       />

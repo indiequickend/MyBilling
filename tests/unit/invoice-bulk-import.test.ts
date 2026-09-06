@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { groupInvoiceCsvRows, invoiceGroupRowSchema, parseCsvDate } from "@/lib/validation/invoices";
+import { groupInvoiceCsvRows, invoiceGroupRowSchema } from "@/lib/validation/invoices";
+import { parseCsvDate } from "@/lib/validation/shared";
 
 describe("parseCsvDate", () => {
   it("parses an unambiguous DD-MM-YYYY date (day > 12)", () => {

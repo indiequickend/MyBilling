@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { DISCOUNT_TARGETS } from "@/lib/constants/invoices";
 import { PAYMENT_MODES } from "@/lib/constants/payments";
-import { objectId, optionalTrimmed, rupeesToMinorUnits, optionalRupeesToMinorUnits } from "@/lib/validation/shared";
+import {
+  objectId,
+  optionalTrimmed,
+  rupeesToMinorUnits,
+  optionalRupeesToMinorUnits,
+  gstinSchema,
+} from "@/lib/validation/shared";
 import { parseSerialNumbersText } from "@/lib/validation/inventory";
 
 const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
@@ -150,3 +156,156 @@ export const purchaseListQuerySchema = z.object({
   dateTo: optionalTrimmed(30),
   page: z.coerce.number().int().min(1).default(1),
 });
+
+/** One payment entry on a bulk-imported purchase — mirrors invoiceImportPaymentRowSchema in
+ * lib/validation/invoices.ts (vendor-side money-out instead of customer-side money-in). */
+export const purchaseImportPaymentRowSchema = z.object({
+  amountMinor: rupeesToMinorUnits,
+  mode: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim().toLowerCase() : v),
+    z.enum(PAYMENT_MODES),
+  ),
+  date: z.string().trim().min(1, "Payment date is required"),
+  bankAccountNumber: optionalTrimmed(50),
+  bankIfsc: optionalTrimmed(20),
+  bankName: optionalTrimmed(200),
+  referenceNote: optionalTrimmed(200),
+});
+export type PurchaseImportPaymentInput = z.infer<typeof purchaseImportPaymentRowSchema>;
+
+/**
+ * One *grouped* purchase for the bulk-upload format — the output of `groupPurchaseCsvRows`, not a
+ * raw CSV line (one purchase can span several lines, one per payment). Mirrors
+ * invoiceGroupRowSchema in lib/validation/invoices.ts: totals are stored on the Purchase exactly
+ * as given (see importPurchase in lib/db/queries/purchases.ts) rather than recomputed.
+ */
+export const purchaseGroupRowSchema = z.object({
+  docNumber: z.string().trim().min(1, "Purchase number is required").max(100),
+  purchaseDate: z.string().trim().min(1, "Purchase date is required"),
+  dueDate: optionalTrimmed(30),
+  vendorName: z.string().trim().min(1, "Vendor name is required").max(200),
+  vendorPhone: optionalTrimmed(20),
+  vendorGstin: gstinSchema,
+  placeOfSupplyState: optionalTrimmed(100),
+  referenceNumber: optionalTrimmed(100),
+  notes: optionalTrimmed(2000),
+  terms: optionalTrimmed(5000),
+  lineItemDescription: optionalTrimmed(500),
+  subtotalMinor: rupeesToMinorUnits,
+  discountAmountMinor: optionalRupeesToMinorUnits.transform((v) => v ?? 0),
+  taxAmountMinor: optionalRupeesToMinorUnits.transform((v) => v ?? 0),
+  totalAmountMinor: rupeesToMinorUnits,
+  payments: z.array(purchaseImportPaymentRowSchema).max(200).default([]),
+});
+export type PurchaseGroupRowInput = z.infer<typeof purchaseGroupRowSchema>;
+
+/** Raw (pre-validation) shape of one grouped purchase — see ProductCsvRawGroup/InvoiceCsvRawGroup
+ * for the "" -> "not set" convention this relies on. */
+export type PurchaseCsvRawGroup = {
+  rowNumber: number;
+  docNumber: string;
+  purchaseDate: string;
+  dueDate: string;
+  vendorName: string;
+  vendorPhone: string;
+  vendorGstin: string;
+  placeOfSupplyState: string;
+  referenceNumber: string;
+  notes: string;
+  terms: string;
+  lineItemDescription: string;
+  subtotalMinor: string;
+  discountAmountMinor: string;
+  taxAmountMinor: string;
+  totalAmountMinor: string;
+  payments: Array<{
+    amountMinor: string;
+    mode: string;
+    date: string;
+    bankAccountNumber: string;
+    bankIfsc: string;
+    bankName: string;
+    referenceNote: string;
+  }>;
+};
+
+const PURCHASE_LEVEL_CSV_COLUMNS = [
+  "purchaseDate",
+  "dueDate",
+  "vendorName",
+  "vendorPhone",
+  "vendorGstin",
+  "placeOfSupplyState",
+  "referenceNumber",
+  "notes",
+  "terms",
+  "lineItemDescription",
+  "subtotalMinor",
+  "discountAmountMinor",
+  "taxAmountMinor",
+  "totalAmountMinor",
+] as const;
+
+/** Groups raw purchase bulk-upload CSV lines into one entry per purchase, keyed by `docNumber` —
+ * see groupInvoiceCsvRows in lib/validation/invoices.ts for the full rationale (same technique). */
+export function groupPurchaseCsvRows(rows: Record<string, string>[]): PurchaseCsvRawGroup[] {
+  const groups = new Map<string, PurchaseCsvRawGroup>();
+  const filledColumns = new Map<string, Set<string>>();
+  const order: string[] = [];
+
+  rows.forEach((row, i) => {
+    const rowNumber = i + 2;
+    const docNumber = (row.docNumber ?? "").trim();
+    const key = docNumber ? docNumber.toLowerCase() : `__unnumbered_${rowNumber}`;
+
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        rowNumber,
+        docNumber,
+        purchaseDate: "",
+        dueDate: "",
+        vendorName: "",
+        vendorPhone: "",
+        vendorGstin: "",
+        placeOfSupplyState: "",
+        referenceNumber: "",
+        notes: "",
+        terms: "",
+        lineItemDescription: "",
+        subtotalMinor: "",
+        discountAmountMinor: "",
+        taxAmountMinor: "",
+        totalAmountMinor: "",
+        payments: [],
+      };
+      groups.set(key, group);
+      filledColumns.set(key, new Set());
+      order.push(key);
+    }
+    const filled = filledColumns.get(key)!;
+
+    for (const col of PURCHASE_LEVEL_CSV_COLUMNS) {
+      const value = row[col]?.trim();
+      if (value && !filled.has(col)) {
+        group[col] = value;
+        filled.add(col);
+      }
+    }
+
+    const paymentAmount = row.paymentAmountMinor?.trim();
+    if (paymentAmount) {
+      group.payments.push({
+        amountMinor: paymentAmount,
+        mode: row.paymentMode?.trim() ?? "",
+        date: row.paymentDate?.trim() ?? "",
+        bankAccountNumber: row.paymentBankAccountNumber?.trim() ?? "",
+        bankIfsc: row.paymentBankIfsc?.trim() ?? "",
+        bankName: row.paymentBankName?.trim() ?? "",
+        referenceNote: row.paymentReferenceNote?.trim() ?? "",
+      });
+    }
+  });
+
+  return order.map((key) => groups.get(key)!);
+}

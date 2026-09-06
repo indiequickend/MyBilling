@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { DISCOUNT_TARGETS } from "@/lib/constants/invoices";
-import { objectId, optionalTrimmed, rupeesToMinorUnits, normalizeDiscountValue } from "@/lib/validation/shared";
+import {
+  objectId,
+  optionalTrimmed,
+  rupeesToMinorUnits,
+  optionalRupeesToMinorUnits,
+  normalizeDiscountValue,
+  gstinSchema,
+  fillMissingCsvColumns,
+} from "@/lib/validation/shared";
 
 const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
 
@@ -63,3 +71,48 @@ export const proformaInvoiceListQuerySchema = z.object({
   tab: z.enum(["all", "draft", "open", "cancelled", "deleted"]).default("all"),
   page: z.coerce.number().int().min(1).default(1),
 });
+
+/**
+ * One row of the proforma-invoice bulk-upload format — no grouping needed (see
+ * purchaseOrderRowSchema in lib/validation/purchaseOrders.ts): a Proforma Invoice never takes
+ * payments in this app, so one CSV row is always one proforma invoice. Totals are stored exactly
+ * as given (see importProformaInvoice in lib/db/queries/proformaInvoices.ts) rather than
+ * recomputed.
+ */
+const PROFORMA_INVOICE_OPTIONAL_CSV_COLUMNS = [
+  "dueDate",
+  "customerPhone",
+  "customerGstin",
+  "placeOfSupplyState",
+  "referenceNumber",
+  "notes",
+  "terms",
+  "lineItemDescription",
+  "discountAmountMinor",
+  "taxAmountMinor",
+] as const;
+
+export const proformaInvoiceRowSchema = z.preprocess(
+  (row) =>
+    row && typeof row === "object"
+      ? fillMissingCsvColumns(row as Record<string, string>, PROFORMA_INVOICE_OPTIONAL_CSV_COLUMNS)
+      : row,
+  z.object({
+    docNumber: z.string().trim().min(1, "Proforma invoice number is required").max(100),
+    proformaDate: z.string().trim().min(1, "Proforma date is required"),
+    dueDate: optionalTrimmed(30),
+    customerName: z.string().trim().min(1, "Customer name is required").max(200),
+    customerPhone: optionalTrimmed(20),
+    customerGstin: gstinSchema,
+    placeOfSupplyState: optionalTrimmed(100),
+    referenceNumber: optionalTrimmed(100),
+    notes: optionalTrimmed(2000),
+    terms: optionalTrimmed(5000),
+    lineItemDescription: optionalTrimmed(500),
+    subtotalMinor: rupeesToMinorUnits,
+    discountAmountMinor: optionalRupeesToMinorUnits.transform((v) => v ?? 0),
+    taxAmountMinor: optionalRupeesToMinorUnits.transform((v) => v ?? 0),
+    totalAmountMinor: rupeesToMinorUnits,
+  }),
+);
+export type ProformaInvoiceRowInput = z.infer<typeof proformaInvoiceRowSchema>;
