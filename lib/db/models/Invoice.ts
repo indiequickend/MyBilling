@@ -22,10 +22,12 @@ const invoiceSchema = new Schema(
     // Snapshotted at save time — an invoice's printed party details must not silently change if
     // the Customer record is edited afterward.
     customerSnapshot: { type: customerSnapshotSchema, required: true },
-    // Set only when this Invoice was created via "Convert to Invoice" from a Quotation or Sales
-    // Order — traceability only, mirrors Purchase.sourcePurchaseOrderId. At most one is ever set.
+    // Set only when this Invoice was created via "Convert to Invoice" from a Quotation, Sales
+    // Order, or Proforma Invoice — traceability only, mirrors Purchase.sourcePurchaseOrderId. At
+    // most one is ever set.
     sourceQuotationId: { type: Schema.Types.ObjectId, ref: "Quotation" },
     sourceSalesOrderId: { type: Schema.Types.ObjectId, ref: "SalesOrder" },
+    sourceProformaInvoiceId: { type: Schema.Types.ObjectId, ref: "ProformaInvoice" },
     // Optional Project bucket (project_spec.md Projects) — see lib/db/queries/projects.ts.
     projectId: { type: Schema.Types.ObjectId, ref: "Project" },
 
@@ -67,7 +69,7 @@ const invoiceSchema = new Schema(
     // Minor units (paise) when discountType is "amount"; a raw 0-100 percent when "percentage" —
     // see lib/documents/calc.ts for the shared interpretation.
     discountValue: { type: Number, required: true, default: 0 },
-    discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "total" },
+    discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "net_amount" },
     discountAmountMinor: { type: Number, required: true, default: 0 },
 
     roundOff: { type: Boolean, required: true, default: true },
@@ -127,6 +129,7 @@ export type InvoiceDoc = {
   customerSnapshot: InvoiceCustomerSnapshot;
   sourceQuotationId?: mongoose.Types.ObjectId;
   sourceSalesOrderId?: mongoose.Types.ObjectId;
+  sourceProformaInvoiceId?: mongoose.Types.ObjectId;
   projectId?: mongoose.Types.ObjectId;
   docNumber?: string;
   seriesKey?: string;

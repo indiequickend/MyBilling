@@ -1,12 +1,25 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { X, MessageSquarePlus } from "lucide-react";
-import { computeLineItem } from "@/lib/documents/calc";
+import {
+  computeLineItem,
+  computeDocumentTotals,
+  type LineItemCalcInput,
+} from "@/lib/documents/calc";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import type { DiscountTarget } from "@/lib/constants/invoices";
 
 export type LineItemRow = {
   productId: string;
@@ -74,20 +87,35 @@ type ProductSearchResult = {
 const fieldClass =
   "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-function rowPreviewTotal(row: LineItemRow, businessState: string, placeOfSupplyState: string): string {
+/** Mirrors normalizeDiscountValue's convention (lib/validation/shared.ts): a percentage discount
+ * is a raw 0-100 number, an amount discount is a rupee string converted to minor units — same
+ * rule for a line's own discount and the document-level one. */
+function toLineItemCalcInput(row: LineItemRow): LineItemCalcInput | null {
   const quantity = Number(row.quantity);
   const unitPriceMinor = Math.round(Number(row.unitPriceMinor || "0") * 100);
+  if (!Number.isFinite(quantity) || !Number.isFinite(unitPriceMinor)) return null;
   const discountValue =
     row.discountType === "percentage"
       ? Number(row.discountValue || "0")
       : Math.round(Number(row.discountValue || "0") * 100);
   const taxRatePercent = Number(row.taxRatePercent || "0");
-  if (!Number.isFinite(quantity) || !Number.isFinite(unitPriceMinor)) return "0.00";
-  const result = computeLineItem(
-    { quantity, unitPriceMinor, discountType: row.discountType, discountValue, taxRatePercent },
-    businessState,
-    placeOfSupplyState,
-  );
+  return {
+    quantity,
+    unitPriceMinor,
+    discountType: row.discountType,
+    discountValue,
+    taxRatePercent,
+  };
+}
+
+function rowPreviewTotal(
+  row: LineItemRow,
+  businessState: string,
+  placeOfSupplyState: string,
+): string {
+  const input = toLineItemCalcInput(row);
+  if (!input) return "0.00";
+  const result = computeLineItem(input, businessState, placeOfSupplyState);
   return minorToRupeesString(result.totalMinor);
 }
 
@@ -145,17 +173,28 @@ function ProductSearchBox({
   }
 
   return (
-    <div className="relative">
-      <input
-        value={query}
-        onChange={(e) => search(e.target.value)}
-        onFocus={() => results.length > 0 && setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Search product/service, or type a custom item name…"
-        className={fieldClass}
-      />
-      {open && results.length > 0 ? (
-        <ul className="absolute z-10 mt-1 max-h-56 w-full min-w-72 overflow-auto rounded-lg border bg-popover text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10">
+    // The results list is a Radix Popover (portalled to document.body) rather than a plain
+    // absolutely-positioned <ul> — this box lives inside a Card, which clips overflow, so a
+    // plain absolute dropdown got cropped at the card's edge instead of floating above it.
+    <Popover open={open && results.length > 0} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <input
+          value={query}
+          onChange={(e) => search(e.target.value)}
+          onFocus={() => results.length > 0 && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Search product/service, or type a custom item name…"
+          className={fieldClass}
+        />
+      </PopoverAnchor>
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        className="max-h-56 w-(--radix-popper-anchor-width) min-w-72 overflow-auto p-0"
+      >
+        <ul>
           {results.map((p, i) => (
             <li key={`${p.id}__${p.variantId}__${i}`}>
               <button
@@ -168,21 +207,21 @@ function ProductSearchBox({
                   setResults([]);
                   setOpen(false);
                 }}
-                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted"
+                className="hover:bg-muted flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
               >
                 <span>
                   {p.name}
                   {p.barcode ? <span className="text-muted-foreground"> · {p.barcode}</span> : null}
                 </span>
-                <span className="shrink-0 text-muted-foreground">
+                <span className="text-muted-foreground shrink-0">
                   ₹{minorToRupeesString(p.sellingPriceMinor)}
                 </span>
               </button>
             </li>
           ))}
         </ul>
-      ) : null}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -193,6 +232,12 @@ export function LineItemsEditor({
   trackItcEligibility = false,
   warehouses = [],
   defaultWarehouseId,
+  discountType = "percentage",
+  discountValue = "0",
+  discountTarget = "net_amount",
+  roundOff = false,
+  tcsApplicable = false,
+  tcsAmountMinor = "",
 }: {
   defaultRows: LineItemRow[];
   businessState: string;
@@ -202,6 +247,15 @@ export function LineItemsEditor({
   /** When empty, no stock-tracked product can be added yet — the business has no warehouse. */
   warehouses?: Array<{ id: string; name: string }>;
   defaultWarehouseId?: string;
+  /** Live mirror of the parent form's Discount &amp; round-off / TCS fields, so the totals
+   * summary below the table stays in sync as the user types — see FormField's onChange and
+   * SelectField/Checkbox's onValueChange/onCheckedChange in the calling form. */
+  discountType?: "amount" | "percentage";
+  discountValue?: string;
+  discountTarget?: DiscountTarget;
+  roundOff?: boolean;
+  tcsApplicable?: boolean;
+  tcsAmountMinor?: string;
 }) {
   const [rows, setRows] = useState<LineItemRow[]>(defaultRows);
   const [stagingProduct, setStagingProduct] = useState<ProductSearchResult | null>(null);
@@ -229,11 +283,42 @@ export function LineItemsEditor({
 
   const columnCount = 8 + (trackItcEligibility ? 1 : 0);
 
+  const totals = useMemo(() => {
+    const lineInputs = rows
+      .map(toLineItemCalcInput)
+      .filter((input): input is LineItemCalcInput => input !== null);
+    const parsedDiscountValue =
+      discountType === "percentage"
+        ? Number(discountValue || "0")
+        : Math.round(Number(discountValue || "0") * 100);
+    return computeDocumentTotals(
+      lineInputs,
+      {
+        type: discountType,
+        value: Number.isFinite(parsedDiscountValue) ? parsedDiscountValue : 0,
+        target: discountTarget,
+      },
+      roundOff,
+      businessState,
+      placeOfSupplyState,
+    );
+  }, [
+    rows,
+    discountType,
+    discountValue,
+    discountTarget,
+    roundOff,
+    businessState,
+    placeOfSupplyState,
+  ]);
+
+  const parsedTcsAmountMinor = tcsApplicable ? Math.round(Number(tcsAmountMinor || "0") * 100) : 0;
+
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-12 items-end gap-2 rounded-lg border bg-muted/20 p-3">
+      <div className="bg-muted/20 grid grid-cols-12 items-end gap-2 rounded-lg border p-3">
         <div className="col-span-12 sm:col-span-6">
-          <label className="mb-1 block text-xs text-muted-foreground">Item name</label>
+          <label className="text-muted-foreground mb-1 block text-xs">Item name</label>
           <ProductSearchBox
             key={searchBoxKey}
             onSelect={(p) => {
@@ -247,7 +332,7 @@ export function LineItemsEditor({
           />
         </div>
         <div className="col-span-6 sm:col-span-3">
-          <label className="mb-1 block text-xs text-muted-foreground">Quantity</label>
+          <label className="text-muted-foreground mb-1 block text-xs">Quantity</label>
           <input
             type="number"
             min="0"
@@ -270,254 +355,334 @@ export function LineItemsEditor({
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No line items yet — search or type a name above.</p>
+        <p className="text-muted-foreground text-sm">
+          No line items yet — search or type a name above.
+        </p>
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-40">Item</TableHead>
-                <TableHead className="w-24">HSN/SAC</TableHead>
-                <TableHead className="w-28">Qty / Unit</TableHead>
-                <TableHead className="w-28">Price</TableHead>
-                <TableHead className="w-36">Discount</TableHead>
-                <TableHead className="w-20">Tax %</TableHead>
-                {trackItcEligibility ? <TableHead className="w-16">ITC</TableHead> : null}
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="w-8" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row, i) => (
-                <Fragment key={i}>
-                  <TableRow>
-                    <TableCell className="whitespace-normal">
-                      <input
-                        name={`lineItem__${i}__description`}
-                        value={row.description}
-                        readOnly
-                        aria-label="Item name (set when added, not editable here)"
-                        className={`cursor-default bg-muted/50 ${fieldClass}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setOpenNotes((prev) => ({ ...prev, [i]: !prev[i] }))}
-                        className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        <MessageSquarePlus className="size-3" />
-                        {row.notes || openNotes[i] ? "Note" : "Add note"}
-                      </button>
-                      <input type="hidden" name={`lineItem__${i}__productId`} value={row.productId} />
-                      <input type="hidden" name={`lineItem__${i}__variantId`} value={row.variantId} />
-                    </TableCell>
-                    <TableCell>
-                      <input
-                        name={`lineItem__${i}__hsnOrSac`}
-                        value={row.hsnOrSac}
-                        onChange={(e) => update(i, { hsnOrSac: e.target.value })}
-                        placeholder="HSN/SAC"
-                        className={fieldClass}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
+        <>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-40">Item</TableHead>
+                  <TableHead className="w-24">HSN/SAC</TableHead>
+                  <TableHead className="w-28">Qty / Unit</TableHead>
+                  <TableHead className="w-28">Price</TableHead>
+                  <TableHead className="w-36">Discount</TableHead>
+                  <TableHead className="w-20">Tax %</TableHead>
+                  {trackItcEligibility ? <TableHead className="w-16">ITC</TableHead> : null}
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="w-8" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row, i) => (
+                  <Fragment key={i}>
+                    <TableRow>
+                      <TableCell className="whitespace-normal">
+                        <p className="text-sm font-medium">{row.description}</p>
                         <input
-                          name={`lineItem__${i}__quantity`}
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={row.quantity}
-                          onChange={(e) => update(i, { quantity: e.target.value })}
-                          placeholder="Qty"
-                          required
-                          className={`w-14 ${fieldClass}`}
+                          type="hidden"
+                          name={`lineItem__${i}__description`}
+                          value={row.description}
                         />
-                        <input
-                          name={`lineItem__${i}__unit`}
-                          value={row.unit}
-                          onChange={(e) => update(i, { unit: e.target.value })}
-                          placeholder="Unit"
-                          className={fieldClass}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <input
-                        name={`lineItem__${i}__unitPriceMinor`}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={row.unitPriceMinor}
-                        onChange={(e) => update(i, { unitPriceMinor: e.target.value })}
-                        placeholder="Unit price"
-                        required
-                        className={fieldClass}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <select
-                          name={`lineItem__${i}__discountType`}
-                          value={row.discountType}
-                          onChange={(e) =>
-                            update(i, { discountType: e.target.value as LineItemRow["discountType"] })
-                          }
-                          className={fieldClass}
+                        <button
+                          type="button"
+                          onClick={() => setOpenNotes((prev) => ({ ...prev, [i]: !prev[i] }))}
+                          className="text-muted-foreground hover:text-foreground mt-1 flex items-center gap-1 text-xs"
                         >
-                          <option value="percentage">%</option>
-                          <option value="amount">₹</option>
-                        </select>
+                          <MessageSquarePlus className="size-3" />
+                          {row.notes || openNotes[i] ? "Note" : "Add note"}
+                        </button>
                         <input
-                          name={`lineItem__${i}__discountValue`}
+                          type="hidden"
+                          name={`lineItem__${i}__productId`}
+                          value={row.productId}
+                        />
+                        <input
+                          type="hidden"
+                          name={`lineItem__${i}__variantId`}
+                          value={row.variantId}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <input
+                          name={`lineItem__${i}__hsnOrSac`}
+                          value={row.hsnOrSac}
+                          onChange={(e) => update(i, { hsnOrSac: e.target.value })}
+                          placeholder="HSN/SAC"
+                          className={fieldClass}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <input
+                            name={`lineItem__${i}__quantity`}
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={row.quantity}
+                            onChange={(e) => update(i, { quantity: e.target.value })}
+                            placeholder="Qty"
+                            required
+                            className={`w-14 ${fieldClass}`}
+                          />
+                          <input
+                            name={`lineItem__${i}__unit`}
+                            value={row.unit}
+                            onChange={(e) => update(i, { unit: e.target.value })}
+                            placeholder="Unit"
+                            className={fieldClass}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <input
+                          name={`lineItem__${i}__unitPriceMinor`}
                           type="number"
                           min="0"
                           step="0.01"
-                          value={row.discountValue}
-                          onChange={(e) => update(i, { discountValue: e.target.value })}
-                          className={`w-16 ${fieldClass}`}
+                          value={row.unitPriceMinor}
+                          onChange={(e) => update(i, { unitPriceMinor: e.target.value })}
+                          placeholder="Unit price"
+                          required
+                          className={fieldClass}
                         />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <input
-                        name={`lineItem__${i}__taxRatePercent`}
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={row.taxRatePercent}
-                        onChange={(e) => update(i, { taxRatePercent: e.target.value })}
-                        placeholder="Tax %"
-                        className={fieldClass}
-                      />
-                    </TableCell>
-                    {trackItcEligibility ? (
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <select
+                            name={`lineItem__${i}__discountType`}
+                            value={row.discountType}
+                            onChange={(e) =>
+                              update(i, {
+                                discountType: e.target.value as LineItemRow["discountType"],
+                              })
+                            }
+                            className={fieldClass}
+                          >
+                            <option value="percentage">%</option>
+                            <option value="amount">₹</option>
+                          </select>
+                          <input
+                            name={`lineItem__${i}__discountValue`}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={row.discountValue}
+                            onChange={(e) => update(i, { discountValue: e.target.value })}
+                            className={`w-16 ${fieldClass}`}
+                          />
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <input
-                          type="checkbox"
-                          name={`lineItem__${i}__itcEligible`}
-                          checked={row.itcEligible ?? true}
-                          onChange={(e) => update(i, { itcEligible: e.target.checked })}
-                          className="size-4 rounded border-input"
+                          name={`lineItem__${i}__taxRatePercent`}
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={row.taxRatePercent}
+                          onChange={(e) => update(i, { taxRatePercent: e.target.value })}
+                          placeholder="Tax %"
+                          className={fieldClass}
                         />
                       </TableCell>
-                    ) : null}
-                    <TableCell className="text-right font-medium">
-                      ₹{rowPreviewTotal(row, businessState, placeOfSupplyState)}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => {
-                          setRows((prev) => prev.filter((_, idx) => idx !== i));
-                          setOpenNotes((prev) => {
-                            const rest = { ...prev };
-                            delete rest[i];
-                            return rest;
-                          });
-                        }}
-                        aria-label="Remove line item"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <X />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                  {row.notes || openNotes[i] ? (
-                    <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={columnCount} className="whitespace-normal bg-muted/20">
-                        <Textarea
-                          name={`lineItem__${i}__notes`}
-                          value={row.notes}
-                          onChange={(e) => update(i, { notes: e.target.value })}
-                          placeholder="Note for this line item (e.g. check-in/check-out dates) — printed on the PDF…"
-                          className="min-h-12 text-sm"
-                        />
+                      {trackItcEligibility ? (
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            name={`lineItem__${i}__itcEligible`}
+                            checked={row.itcEligible ?? true}
+                            onChange={(e) => update(i, { itcEligible: e.target.checked })}
+                            className="border-input size-4 rounded"
+                          />
+                        </TableCell>
+                      ) : null}
+                      <TableCell className="text-right font-medium">
+                        ₹{rowPreviewTotal(row, businessState, placeOfSupplyState)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => {
+                            setRows((prev) => prev.filter((_, idx) => idx !== i));
+                            setOpenNotes((prev) => {
+                              const rest = { ...prev };
+                              delete rest[i];
+                              return rest;
+                            });
+                          }}
+                          aria-label="Remove line item"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X />
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    <tr className="hidden">
-                      <td>
-                        <input type="hidden" name={`lineItem__${i}__notes`} value={row.notes} />
-                      </td>
-                    </tr>
-                  )}
-                  {row.stockTrackingEnabled ? (
-                    <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={columnCount} className="whitespace-normal bg-accent-mint/20">
-                        <div className="grid gap-2 sm:grid-cols-3">
-                          <div>
-                            <label className="mb-1 block text-xs text-muted-foreground">Warehouse</label>
-                            <select
-                              name={`lineItem__${i}__warehouseId`}
-                              value={row.warehouseId}
-                              onChange={(e) => update(i, { warehouseId: e.target.value })}
-                              required
-                              className={fieldClass}
-                            >
-                              <option value="">Select warehouse…</option>
-                              {warehouses.map((w) => (
-                                <option key={w.id} value={w.id}>
-                                  {w.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          {row.batchTracked ? (
+                    {row.notes || openNotes[i] ? (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={columnCount} className="bg-muted/20 whitespace-normal">
+                          <Textarea
+                            name={`lineItem__${i}__notes`}
+                            value={row.notes}
+                            onChange={(e) => update(i, { notes: e.target.value })}
+                            placeholder="Note for this line item (e.g. check-in/check-out dates) — printed on the PDF…"
+                            className="min-h-12 text-sm"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <tr className="hidden">
+                        <td>
+                          <input type="hidden" name={`lineItem__${i}__notes`} value={row.notes} />
+                        </td>
+                      </tr>
+                    )}
+                    {row.stockTrackingEnabled ? (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell
+                          colSpan={columnCount}
+                          className="bg-accent-mint/20 whitespace-normal"
+                        >
+                          <div className="grid gap-2 sm:grid-cols-3">
                             <div>
-                              <label className="mb-1 block text-xs text-muted-foreground">Batch</label>
+                              <label className="text-muted-foreground mb-1 block text-xs">
+                                Warehouse
+                              </label>
                               <select
-                                name={`lineItem__${i}__batchId`}
-                                value={row.batchId}
-                                onChange={(e) => update(i, { batchId: e.target.value })}
+                                name={`lineItem__${i}__warehouseId`}
+                                value={row.warehouseId}
+                                onChange={(e) => update(i, { warehouseId: e.target.value })}
                                 required
                                 className={fieldClass}
                               >
-                                <option value="">Select batch…</option>
-                                {(row.availableBatches ?? []).map((b) => (
-                                  <option key={b.id} value={b.id}>
-                                    {b.label}
+                                <option value="">Select warehouse…</option>
+                                {warehouses.map((w) => (
+                                  <option key={w.id} value={w.id}>
+                                    {w.name}
                                   </option>
                                 ))}
                               </select>
                             </div>
-                          ) : (
-                            <input type="hidden" name={`lineItem__${i}__batchId`} value="" />
-                          )}
-                          {row.serialTracked ? (
-                            <div>
-                              <label className="mb-1 block text-xs text-muted-foreground">
-                                Serial numbers (one per line, {row.quantity || 0} needed)
-                              </label>
-                              <Textarea
+                            {row.batchTracked ? (
+                              <div>
+                                <label className="text-muted-foreground mb-1 block text-xs">
+                                  Batch
+                                </label>
+                                <select
+                                  name={`lineItem__${i}__batchId`}
+                                  value={row.batchId}
+                                  onChange={(e) => update(i, { batchId: e.target.value })}
+                                  required
+                                  className={fieldClass}
+                                >
+                                  <option value="">Select batch…</option>
+                                  {(row.availableBatches ?? []).map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                      {b.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : (
+                              <input type="hidden" name={`lineItem__${i}__batchId`} value="" />
+                            )}
+                            {row.serialTracked ? (
+                              <div>
+                                <label className="text-muted-foreground mb-1 block text-xs">
+                                  Serial numbers (one per line, {row.quantity || 0} needed)
+                                </label>
+                                <Textarea
+                                  name={`lineItem__${i}__serialNumbersText`}
+                                  value={row.serialNumbersText}
+                                  onChange={(e) => update(i, { serialNumbersText: e.target.value })}
+                                  className="min-h-8 text-sm"
+                                />
+                              </div>
+                            ) : (
+                              <input
+                                type="hidden"
                                 name={`lineItem__${i}__serialNumbersText`}
-                                value={row.serialNumbersText}
-                                onChange={(e) => update(i, { serialNumbersText: e.target.value })}
-                                className="min-h-8 text-sm"
+                                value=""
                               />
-                            </div>
-                          ) : (
-                            <input type="hidden" name={`lineItem__${i}__serialNumbersText`} value="" />
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    <tr className="hidden">
-                      <td>
-                        <input type="hidden" name={`lineItem__${i}__warehouseId`} value="" />
-                        <input type="hidden" name={`lineItem__${i}__batchId`} value="" />
-                        <input type="hidden" name={`lineItem__${i}__serialNumbersText`} value="" />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <tr className="hidden">
+                        <td>
+                          <input type="hidden" name={`lineItem__${i}__warehouseId`} value="" />
+                          <input type="hidden" name={`lineItem__${i}__batchId`} value="" />
+                          <input
+                            type="hidden"
+                            name={`lineItem__${i}__serialNumbersText`}
+                            value=""
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex justify-end">
+            <div className="bg-muted/20 w-full max-w-xs space-y-1.5 rounded-lg border p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>₹{minorToRupeesString(totals.subtotalMinor)}</span>
+              </div>
+              {totals.discountAmountMinor > 0 ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span>-₹{minorToRupeesString(totals.discountAmountMinor)}</span>
+                </div>
+              ) : null}
+              {totals.totalIgstMinor > 0 ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">IGST</span>
+                  <span>₹{minorToRupeesString(totals.totalIgstMinor)}</span>
+                </div>
+              ) : null}
+              {totals.totalCgstMinor > 0 ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">CGST</span>
+                  <span>₹{minorToRupeesString(totals.totalCgstMinor)}</span>
+                </div>
+              ) : null}
+              {totals.totalSgstMinor > 0 ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SGST</span>
+                  <span>₹{minorToRupeesString(totals.totalSgstMinor)}</span>
+                </div>
+              ) : null}
+              {totals.roundOffAmountMinor !== 0 ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Round off</span>
+                  <span>
+                    {totals.roundOffAmountMinor > 0 ? "+" : "-"}₹
+                    {minorToRupeesString(Math.abs(totals.roundOffAmountMinor))}
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
+                <span>Grand total</span>
+                <span>₹{minorToRupeesString(totals.grandTotalMinor)}</span>
+              </div>
+              {parsedTcsAmountMinor > 0 ? (
+                <div className="text-muted-foreground flex justify-between pt-1 text-xs">
+                  <span>TCS (collected separately)</span>
+                  <span>₹{minorToRupeesString(parsedTcsAmountMinor)}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

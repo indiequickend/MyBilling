@@ -54,7 +54,7 @@ const quotationSchema = new Schema(
 
     discountType: { type: String, enum: ["amount", "percentage"], required: true, default: "percentage" },
     discountValue: { type: Number, required: true, default: 0 },
-    discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "total" },
+    discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "net_amount" },
     discountAmountMinor: { type: Number, required: true, default: 0 },
 
     roundOff: { type: Boolean, required: true, default: true },

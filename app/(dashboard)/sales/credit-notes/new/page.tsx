@@ -121,7 +121,7 @@ export default async function NewCreditNotePage({
           roundOff: invoice.roundOff,
           discountType: "percentage",
           discountValue: "0",
-          discountTarget: "total",
+          discountTarget: "net_amount",
           lineItems,
         }}
       />

@@ -17,7 +17,7 @@ describe("item reports and bill-wise item report — tenant isolation", () => {
   let customerAId: string;
   let vendorAId: string;
   let customerBId: string;
-  let vendorBId: string;
+  // let vendorBId: string;
 
   beforeAll(async () => {
     tenants = await setupTwoTenants("item-reports");

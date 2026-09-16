@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
+import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -118,10 +119,11 @@ export function IndirectIncomeForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="customerId">Customer (optional)</FieldLabel>
-                <SelectField
+                <ComboboxField
                   name="customerId"
                   defaultValue={defaultValues?.customerId}
                   placeholder="None"
+                  searchPlaceholder="Search customers…"
                   options={[{ value: "", label: "None" }, ...customers.map((c) => ({ value: c.id, label: c.label }))]}
                 />
               </Field>

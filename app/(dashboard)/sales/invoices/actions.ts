@@ -29,9 +29,10 @@ import {
   type InvoicePaymentSplitWriteInput,
 } from "@/lib/db/queries/invoices";
 import { applyAdvancePayment } from "@/lib/db/queries/payments";
-// Only the "Convert to Invoice" flow (Quotation/Sales Order features) ever sets these.
+// Only the "Convert to Invoice" flow (Quotation/Sales Order/Proforma Invoice features) ever sets these.
 import { markQuotationClosed } from "@/lib/db/queries/quotations";
 import { markSalesOrderClosed } from "@/lib/db/queries/salesOrders";
+import { markProformaInvoiceClosed } from "@/lib/db/queries/proformaInvoices";
 import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type InvoiceFormState = { error?: string; fieldErrors?: Record<string, string> };
@@ -182,6 +183,7 @@ async function parseInvoiceForm(
   const h = headerParsed.data;
   const sourceQuotationId = String(formData.get("sourceQuotationId") ?? "") || undefined;
   const sourceSalesOrderId = String(formData.get("sourceSalesOrderId") ?? "") || undefined;
+  const sourceProformaInvoiceId = String(formData.get("sourceProformaInvoiceId") ?? "") || undefined;
   const input: InvoiceWriteInput = {
     businessId,
     customerId: h.customerId,
@@ -205,6 +207,7 @@ async function parseInvoiceForm(
     projectId: h.projectId,
     sourceQuotationId,
     sourceSalesOrderId,
+    sourceProformaInvoiceId,
     tcsApplicable: h.tcsApplicable,
     tcsSectionCode: h.tcsSectionCode,
     tcsRatePercent: h.tcsRatePercent,
@@ -254,6 +257,10 @@ export async function saveInvoiceAction(
     if (result.ok && parsed.input.sourceSalesOrderId) {
       await markSalesOrderClosed(parsed.input.sourceSalesOrderId, context.activeBusinessId);
       revalidatePath("/sales/sales-orders");
+    }
+    if (result.ok && parsed.input.sourceProformaInvoiceId) {
+      await markProformaInvoiceClosed(parsed.input.sourceProformaInvoiceId, context.activeBusinessId);
+      revalidatePath("/sales/proforma-invoices");
     }
   } else {
     requirePermission(context.membership, "sales_invoices", "edit");

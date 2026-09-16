@@ -75,7 +75,7 @@ const purchaseSchema = new Schema(
     // Minor units (paise) when discountType is "amount"; a raw 0-100 percent when "percentage" —
     // see lib/documents/calc.ts for the shared interpretation.
     discountValue: { type: Number, required: true, default: 0 },
-    discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "total" },
+    discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "net_amount" },
     discountAmountMinor: { type: Number, required: true, default: 0 },
 
     roundOff: { type: Boolean, required: true, default: true },

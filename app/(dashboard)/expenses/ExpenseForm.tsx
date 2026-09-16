@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
+import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -133,10 +134,11 @@ export function ExpenseForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="vendorId">Vendor (optional)</FieldLabel>
-                <SelectField
+                <ComboboxField
                   name="vendorId"
                   defaultValue={defaultValues?.vendorId}
                   placeholder="None"
+                  searchPlaceholder="Search vendors…"
                   options={[{ value: "", label: "None" }, ...vendors.map((v) => ({ value: v.id, label: v.label }))]}
                 />
               </Field>

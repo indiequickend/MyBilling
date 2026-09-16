@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
+import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -113,12 +114,27 @@ export function PurchaseForm({
   const showPayments = mode === "create" || editableStatus === "draft";
   const placeOfSupplyState = defaultValues?.placeOfSupplyState ?? businessState;
 
+  // Mirrors the Discount/round-off/TCS fields below so the line items totals summary stays live
+  // as the user types, without turning those fields into fully controlled inputs.
+  const [discountType, setDiscountType] = useState<"amount" | "percentage">(
+    defaultValues?.discountType ?? "percentage",
+  );
+  const [discountValue, setDiscountValue] = useState(defaultValues?.discountValue ?? "0");
+  const [discountTarget, setDiscountTarget] = useState(defaultValues?.discountTarget ?? "net_amount");
+  const [roundOff, setRoundOff] = useState(defaultValues?.roundOff ?? true);
+  const [tcsApplicable, setTcsApplicable] = useState(defaultValues?.tcsApplicable ?? false);
+  const [tcsAmountMinor, setTcsAmountMinor] = useState(defaultValues?.tcsAmountMinor ?? "");
+
   return (
     <form action={formAction} className="space-y-6">
       <FormError message={state.error} />
       {purchaseId ? <input type="hidden" name="purchaseId" value={purchaseId} /> : null}
       {defaultValues?.sourcePurchaseOrderId ? (
-        <input type="hidden" name="sourcePurchaseOrderId" value={defaultValues.sourcePurchaseOrderId} />
+        <input
+          type="hidden"
+          name="sourcePurchaseOrderId"
+          value={defaultValues.sourcePurchaseOrderId}
+        />
       ) : null}
 
       <Card>
@@ -127,15 +143,16 @@ export function PurchaseForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field data-invalid={state.fieldErrors?.vendorId ? true : undefined}>
                 <FieldLabel htmlFor="vendorId">Vendor</FieldLabel>
-                <SelectField
+                <ComboboxField
                   name="vendorId"
                   defaultValue={defaultValues?.vendorId}
                   placeholder="Select a vendor…"
+                  searchPlaceholder="Search vendors…"
                   options={vendors.map((v) => ({ value: v.id, label: v.label }))}
                   required
                 />
                 {state.fieldErrors?.vendorId ? (
-                  <p className="text-sm text-destructive">{state.fieldErrors.vendorId}</p>
+                  <p className="text-destructive text-sm">{state.fieldErrors.vendorId}</p>
                 ) : null}
               </Field>
               <FormField
@@ -248,6 +265,12 @@ export function PurchaseForm({
             trackItcEligibility={trackItcEligibility}
             warehouses={warehouses}
             defaultWarehouseId={defaultWarehouseId}
+            discountType={discountType}
+            discountValue={discountValue}
+            discountTarget={discountTarget}
+            roundOff={roundOff}
+            tcsApplicable={tcsApplicable}
+            tcsAmountMinor={tcsAmountMinor}
           />
         </CardContent>
       </Card>
@@ -268,6 +291,7 @@ export function PurchaseForm({
                   { value: "percentage", label: "Percentage" },
                   { value: "amount", label: "Amount" },
                 ]}
+                onValueChange={(v) => setDiscountType(v as "amount" | "percentage")}
               />
             </Field>
             <FormField
@@ -275,18 +299,28 @@ export function PurchaseForm({
               name="discountValue"
               type="number"
               defaultValue={defaultValues?.discountValue ?? "0"}
+              onChange={setDiscountValue}
             />
             <Field>
               <FieldLabel htmlFor="discountTarget">Applies to</FieldLabel>
               <SelectField
                 name="discountTarget"
-                defaultValue={defaultValues?.discountTarget ?? "total"}
+                defaultValue={defaultValues?.discountTarget ?? "net_amount"}
                 placeholder="Applies to"
-                options={DISCOUNT_TARGETS.map((t) => ({ value: t, label: DISCOUNT_TARGET_LABELS[t] }))}
+                options={DISCOUNT_TARGETS.map((t) => ({
+                  value: t,
+                  label: DISCOUNT_TARGET_LABELS[t],
+                }))}
+                onValueChange={(v) => setDiscountTarget(v as (typeof DISCOUNT_TARGETS)[number])}
               />
             </Field>
             <Field orientation="horizontal" className="pt-6">
-              <Checkbox id="roundOff" name="roundOff" defaultChecked={defaultValues?.roundOff ?? true} />
+              <Checkbox
+                id="roundOff"
+                name="roundOff"
+                defaultChecked={defaultValues?.roundOff ?? true}
+                onCheckedChange={(checked) => setRoundOff(checked === true)}
+              />
               <FieldLabel htmlFor="roundOff" className="font-normal">
                 Round off total
               </FieldLabel>
@@ -340,6 +374,7 @@ export function PurchaseForm({
                   id="tcsApplicable"
                   name="tcsApplicable"
                   defaultChecked={defaultValues?.tcsApplicable}
+                  onCheckedChange={(checked) => setTcsApplicable(checked === true)}
                 />
                 <FieldLabel htmlFor="tcsApplicable" className="font-normal">
                   TCS paid to this vendor
@@ -364,6 +399,7 @@ export function PurchaseForm({
                   type="number"
                   defaultValue={defaultValues?.tcsAmountMinor}
                   error={state.fieldErrors?.tcsAmountMinor}
+                  onChange={setTcsAmountMinor}
                 />
               </div>
             </div>
@@ -380,7 +416,10 @@ export function PurchaseForm({
                 name="noteTemplateId"
                 defaultValue={defaultValues?.noteTemplateId}
                 placeholder="None"
-                options={[{ value: "", label: "None" }, ...noteTemplates.map((t) => ({ value: t.id, label: t.label }))]}
+                options={[
+                  { value: "", label: "None" },
+                  ...noteTemplates.map((t) => ({ value: t.id, label: t.label })),
+                ]}
               />
             </Field>
             <Field>
@@ -389,7 +428,10 @@ export function PurchaseForm({
                 name="termTemplateId"
                 defaultValue={defaultValues?.termTemplateId}
                 placeholder="None"
-                options={[{ value: "", label: "None" }, ...termTemplates.map((t) => ({ value: t.id, label: t.label }))]}
+                options={[
+                  { value: "", label: "None" },
+                  ...termTemplates.map((t) => ({ value: t.id, label: t.label })),
+                ]}
               />
             </Field>
           </div>
@@ -414,7 +456,10 @@ export function PurchaseForm({
               name="bankAccountId"
               defaultValue={defaultValues?.bankAccountId}
               placeholder="None"
-              options={[{ value: "", label: "None" }, ...bankAccounts.map((a) => ({ value: a.id, label: a.name }))]}
+              options={[
+                { value: "", label: "None" },
+                ...bankAccounts.map((a) => ({ value: a.id, label: a.name })),
+              ]}
             />
           </Field>
         </CardContent>
@@ -429,7 +474,10 @@ export function PurchaseForm({
                 name="projectId"
                 defaultValue={defaultValues?.projectId}
                 placeholder="None"
-                options={[{ value: "", label: "None" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+                options={[
+                  { value: "", label: "None" },
+                  ...projects.map((p) => ({ value: p.id, label: p.name })),
+                ]}
               />
             </Field>
           </CardContent>
@@ -450,7 +498,7 @@ export function PurchaseForm({
         </Card>
       ) : null}
 
-      <div className="sticky bottom-0 z-20 flex items-center gap-3 border-t bg-background/95 py-3 backdrop-blur-sm">
+      <div className="bg-background/95 sticky bottom-0 z-20 flex items-center gap-3 border-t py-3 backdrop-blur-sm">
         {canDraft ? <SubmitIntentButton intent="draft">Save as Draft</SubmitIntentButton> : null}
         <SubmitIntentButton intent="finalize_print">Save &amp; Print</SubmitIntentButton>
         <SubmitIntentButton intent="finalize" variant="default">

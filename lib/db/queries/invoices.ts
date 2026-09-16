@@ -90,6 +90,7 @@ export type InvoiceWriteInput = {
   bankAccountId?: string;
   sourceQuotationId?: string;
   sourceSalesOrderId?: string;
+  sourceProformaInvoiceId?: string;
   projectId?: string;
 };
 
@@ -243,6 +244,7 @@ function buildInvoiceSetFields(input: InvoiceWriteInput, prepared: PreparedInvoi
     customerSnapshot: buildCustomerSnapshot(prepared.customer),
     sourceQuotationId: input.sourceQuotationId,
     sourceSalesOrderId: input.sourceSalesOrderId,
+    sourceProformaInvoiceId: input.sourceProformaInvoiceId,
     invoiceDate: input.invoiceDate,
     dueDate: input.dueDate,
     referenceNumber: input.referenceNumber,

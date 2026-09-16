@@ -10,6 +10,7 @@ import { listProjects } from "@/lib/db/queries/projects";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findQuotationById } from "@/lib/db/queries/quotations";
 import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
+import { findProformaInvoiceById } from "@/lib/db/queries/proformaInvoices";
 import { mapLineItemsForConversion, extractConvertibleHeader } from "@/lib/documents/conversion";
 import { InvoiceForm } from "../InvoiceForm";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
@@ -60,11 +61,13 @@ export default async function NewInvoicePage({
     required: d.required,
   }));
 
-  // "Convert to Invoice" arrives here as /sales/invoices/new?fromQuotation=<id> or
-  // ?fromSalesOrder=<id> — pre-fill the form from the source's fields; the user can still edit
-  // everything before saving. Whole-document conversion only (no partial-quantity conversion).
+  // "Convert to Invoice" arrives here as /sales/invoices/new?fromQuotation=<id>,
+  // ?fromSalesOrder=<id>, or ?fromProformaInvoice=<id> — pre-fill the form from the source's
+  // fields; the user can still edit everything before saving. Whole-document conversion only (no
+  // partial-quantity conversion).
   const sourceQuotationId = sp.fromQuotation;
   const sourceSalesOrderId = sp.fromSalesOrder;
+  const sourceProformaInvoiceId = sp.fromProformaInvoice;
   const sourceQuotation = sourceQuotationId
     ? await findQuotationById(sourceQuotationId, context.activeBusinessId)
     : null;
@@ -77,8 +80,14 @@ export default async function NewInvoicePage({
   if (sourceSalesOrderId && (!sourceSalesOrder || sourceSalesOrder.status !== "open")) {
     redirect("/sales/sales-orders");
   }
+  const sourceProformaInvoice = sourceProformaInvoiceId
+    ? await findProformaInvoiceById(sourceProformaInvoiceId, context.activeBusinessId)
+    : null;
+  if (sourceProformaInvoiceId && (!sourceProformaInvoice || sourceProformaInvoice.status !== "open")) {
+    redirect("/sales/proforma-invoices");
+  }
 
-  const source = sourceSalesOrder ?? sourceQuotation;
+  const source = sourceSalesOrder ?? sourceProformaInvoice ?? sourceQuotation;
   const lineItemsFromSource: LineItemRow[] | undefined = source
     ? mapLineItemsForConversion(source.lineItems)
     : undefined;
@@ -122,11 +131,12 @@ export default async function NewInvoicePage({
           bankAccountId: defaultBank ? String(defaultBank._id) : "",
           discountType: headerFromSource?.discountType ?? salesPrefs.defaultDiscountType,
           discountValue: headerFromSource?.discountValue ?? "0",
-          discountTarget: headerFromSource?.discountTarget ?? "total",
+          discountTarget: headerFromSource?.discountTarget ?? "net_amount",
           customFieldValues: headerFromSource?.customFieldValues ?? {},
           lineItems: lineItemsFromSource ?? [],
           sourceQuotationId: sourceQuotation ? String(sourceQuotation._id) : undefined,
           sourceSalesOrderId: sourceSalesOrder ? String(sourceSalesOrder._id) : undefined,
+          sourceProformaInvoiceId: sourceProformaInvoice ? String(sourceProformaInvoice._id) : undefined,
         }}
       />
     </div>

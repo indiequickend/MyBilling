@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { Download, Pencil } from "lucide-react";
+import { ArrowRightLeft, Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findProformaInvoiceById } from "@/lib/db/queries/proformaInvoices";
@@ -11,10 +11,11 @@ import { CancelProformaInvoiceButton, DeleteProformaInvoiceButton } from "./Prof
 const EDITABLE_STATUSES = ["draft", "open"];
 const CANCELLABLE_STATUSES = ["draft", "open"];
 const DELETABLE_STATUSES = ["draft", "cancelled"];
-const STATUS_LABELS = { draft: "Draft", open: "Open", cancelled: "Cancelled" } as const;
+const STATUS_LABELS = { draft: "Draft", open: "Open", closed: "Closed", cancelled: "Cancelled" } as const;
 const STATUS_BADGE_VARIANT = {
   draft: "outline",
   open: "warning",
+  closed: "success",
   cancelled: "danger",
 } as const;
 
@@ -43,6 +44,7 @@ export default async function ProformaInvoiceDetailLayout({
     can(context.membership, "proforma_invoices", "edit") && CANCELLABLE_STATUSES.includes(proformaInvoice.status);
   const canDelete =
     can(context.membership, "proforma_invoices", "delete") && DELETABLE_STATUSES.includes(proformaInvoice.status);
+  const canConvert = proformaInvoice.status === "open" && can(context.membership, "sales_invoices", "create");
 
   return (
     <div>
@@ -64,6 +66,14 @@ export default async function ProformaInvoiceDetailLayout({
                 <Download data-icon="inline-start" />
                 Download PDF
               </a>
+            </Button>
+          ) : null}
+          {canConvert ? (
+            <Button asChild>
+              <Link href={`/sales/invoices/new?fromProformaInvoice=${id}`}>
+                <ArrowRightLeft data-icon="inline-start" />
+                Convert to Invoice
+              </Link>
             </Button>
           ) : null}
           {canEdit ? (

@@ -76,7 +76,7 @@ export default async function NewProformaInvoicePage() {
           bankAccountId: defaultBank ? String(defaultBank._id) : "",
           discountType: conversionPrefs.defaultDiscountType,
           discountValue: "0",
-          discountTarget: "total",
+          discountTarget: "net_amount",
           customFieldValues: {},
           lineItems: [],
         }}

@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
+import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,15 @@ export function SalesOrderForm({
   const canDraft = mode === "create" || editableStatus === "draft";
   const placeOfSupplyState = defaultValues?.placeOfSupplyState ?? businessState;
 
+  // Mirrors the Discount/round-off fields below so the line items totals summary stays live as
+  // the user types, without turning those fields into fully controlled inputs.
+  const [discountType, setDiscountType] = useState<"amount" | "percentage">(
+    defaultValues?.discountType ?? "percentage",
+  );
+  const [discountValue, setDiscountValue] = useState(defaultValues?.discountValue ?? "0");
+  const [discountTarget, setDiscountTarget] = useState(defaultValues?.discountTarget ?? "net_amount");
+  const [roundOff, setRoundOff] = useState(defaultValues?.roundOff ?? true);
+
   return (
     <form action={formAction} className="space-y-6">
       <FormError message={state.error} />
@@ -102,15 +112,16 @@ export function SalesOrderForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field data-invalid={state.fieldErrors?.customerId ? true : undefined}>
                 <FieldLabel htmlFor="customerId">Customer</FieldLabel>
-                <SelectField
+                <ComboboxField
                   name="customerId"
                   defaultValue={defaultValues?.customerId}
                   placeholder="Select a customer…"
+                  searchPlaceholder="Search customers…"
                   options={customers.map((c) => ({ value: c.id, label: c.label }))}
                   required
                 />
                 {state.fieldErrors?.customerId ? (
-                  <p className="text-sm text-destructive">{state.fieldErrors.customerId}</p>
+                  <p className="text-destructive text-sm">{state.fieldErrors.customerId}</p>
                 ) : null}
               </Field>
               <FormField
@@ -212,6 +223,10 @@ export function SalesOrderForm({
             defaultRows={defaultValues?.lineItems ?? []}
             businessState={businessState}
             placeOfSupplyState={placeOfSupplyState}
+            discountType={discountType}
+            discountValue={discountValue}
+            discountTarget={discountTarget}
+            roundOff={roundOff}
           />
         </CardContent>
       </Card>
@@ -232,6 +247,7 @@ export function SalesOrderForm({
                   { value: "percentage", label: "Percentage" },
                   { value: "amount", label: "Amount" },
                 ]}
+                onValueChange={(v) => setDiscountType(v as "amount" | "percentage")}
               />
             </Field>
             <FormField
@@ -239,18 +255,28 @@ export function SalesOrderForm({
               name="discountValue"
               type="number"
               defaultValue={defaultValues?.discountValue ?? "0"}
+              onChange={setDiscountValue}
             />
             <Field>
               <FieldLabel htmlFor="discountTarget">Applies to</FieldLabel>
               <SelectField
                 name="discountTarget"
-                defaultValue={defaultValues?.discountTarget ?? "total"}
+                defaultValue={defaultValues?.discountTarget ?? "net_amount"}
                 placeholder="Applies to"
-                options={DISCOUNT_TARGETS.map((t) => ({ value: t, label: DISCOUNT_TARGET_LABELS[t] }))}
+                options={DISCOUNT_TARGETS.map((t) => ({
+                  value: t,
+                  label: DISCOUNT_TARGET_LABELS[t],
+                }))}
+                onValueChange={(v) => setDiscountTarget(v as (typeof DISCOUNT_TARGETS)[number])}
               />
             </Field>
             <Field orientation="horizontal" className="pt-6">
-              <Checkbox id="roundOff" name="roundOff" defaultChecked={defaultValues?.roundOff ?? true} />
+              <Checkbox
+                id="roundOff"
+                name="roundOff"
+                defaultChecked={defaultValues?.roundOff ?? true}
+                onCheckedChange={(checked) => setRoundOff(checked === true)}
+              />
               <FieldLabel htmlFor="roundOff" className="font-normal">
                 Round off total
               </FieldLabel>
@@ -268,7 +294,10 @@ export function SalesOrderForm({
                 name="noteTemplateId"
                 defaultValue={defaultValues?.noteTemplateId}
                 placeholder="None"
-                options={[{ value: "", label: "None" }, ...noteTemplates.map((t) => ({ value: t.id, label: t.label }))]}
+                options={[
+                  { value: "", label: "None" },
+                  ...noteTemplates.map((t) => ({ value: t.id, label: t.label })),
+                ]}
               />
             </Field>
             <Field>
@@ -277,7 +306,10 @@ export function SalesOrderForm({
                 name="termTemplateId"
                 defaultValue={defaultValues?.termTemplateId}
                 placeholder="None"
-                options={[{ value: "", label: "None" }, ...termTemplates.map((t) => ({ value: t.id, label: t.label }))]}
+                options={[
+                  { value: "", label: "None" },
+                  ...termTemplates.map((t) => ({ value: t.id, label: t.label })),
+                ]}
               />
             </Field>
           </div>
@@ -294,7 +326,7 @@ export function SalesOrderForm({
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-0 z-20 flex items-center gap-3 border-t bg-background/95 py-3 backdrop-blur-sm">
+      <div className="bg-background/95 sticky bottom-0 z-20 flex items-center gap-3 border-t py-3 backdrop-blur-sm">
         {canDraft ? <SubmitIntentButton intent="draft">Save as Draft</SubmitIntentButton> : null}
         <SubmitIntentButton intent="finalize" variant="default">
           {canDraft ? "Save" : "Save changes"}

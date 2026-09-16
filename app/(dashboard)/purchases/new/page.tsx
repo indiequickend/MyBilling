@@ -109,7 +109,7 @@ export default async function NewPurchasePage({
           bankAccountId: defaultBank ? String(defaultBank._id) : "",
           discountType: headerFromPO?.discountType ?? purchasePrefs.defaultDiscountType,
           discountValue: headerFromPO?.discountValue ?? "0",
-          discountTarget: headerFromPO?.discountTarget ?? "total",
+          discountTarget: headerFromPO?.discountTarget ?? "net_amount",
           customFieldValues: {},
           lineItems: lineItemsFromPO ?? [],
           sourcePurchaseOrderId: sourcePO ? String(sourcePO._id) : undefined,

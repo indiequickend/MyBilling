@@ -3,7 +3,7 @@ import { addressSchema, type AddressSubdoc } from "@/lib/db/models/shared/addres
 import { documentLineItemSchema, type DocumentLineItemDoc } from "@/lib/db/models/shared/lineItem";
 import { DISCOUNT_TARGETS, type DiscountTarget } from "@/lib/constants/invoices";
 
-export const PROFORMA_INVOICE_STATUSES = ["draft", "open", "cancelled"] as const;
+export const PROFORMA_INVOICE_STATUSES = ["draft", "open", "closed", "cancelled"] as const;
 export type ProformaInvoiceStatus = (typeof PROFORMA_INVOICE_STATUSES)[number];
 
 const customerSnapshotSchema = new Schema(
@@ -19,8 +19,9 @@ const customerSnapshotSchema = new Schema(
 /**
  * A non-legal preview invoice — same header/line-item/custom-field/signature/bank shape as
  * Invoice, but no payments (no amountPaidMinor, no linked Payment records) and no
- * eWayBillFlag/eInvoiceFlag (those only apply to a real, billable Invoice). Standalone document
- * this phase: no "convert to Invoice" action (see build_phases.md Phase 5 decision).
+ * eWayBillFlag/eInvoiceFlag (those only apply to a real, billable Invoice). Can be converted to
+ * an Invoice (see lib/documents/conversion.ts) — status moves to "closed" once converted, mirrors
+ * SalesOrder's closed state.
  */
 const proformaInvoiceSchema = new Schema(
   {
@@ -51,7 +52,7 @@ const proformaInvoiceSchema = new Schema(
 
     discountType: { type: String, enum: ["amount", "percentage"], required: true, default: "percentage" },
     discountValue: { type: Number, required: true, default: 0 },
-    discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "total" },
+    discountTarget: { type: String, enum: DISCOUNT_TARGETS, required: true, default: "net_amount" },
     discountAmountMinor: { type: Number, required: true, default: 0 },
 
     roundOff: { type: Boolean, required: true, default: true },

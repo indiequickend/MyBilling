@@ -11,6 +11,7 @@ import { Journal } from "@/lib/db/models/Journal";
 import { SalesOrder } from "@/lib/db/models/SalesOrder";
 import { Quotation } from "@/lib/db/models/Quotation";
 import { PurchaseOrder } from "@/lib/db/models/PurchaseOrder";
+import { ProformaInvoice } from "@/lib/db/models/ProformaInvoice";
 import { Customer } from "@/lib/db/models/Customer";
 import { Vendor } from "@/lib/db/models/Vendor";
 import { sumCreditNoteTotals } from "@/lib/db/queries/creditNotes";
@@ -407,7 +408,7 @@ export async function getTdsTcsReport(
   return rows.sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
-export type ConversionSourceType = "quotation" | "sales_order" | "purchase_order";
+export type ConversionSourceType = "quotation" | "sales_order" | "purchase_order" | "proforma_invoice";
 export type ConversionTargetType = "invoice" | "sales_order" | "purchase";
 
 export type ConversionHistoryEntry = {
@@ -423,9 +424,9 @@ export type ConversionHistoryEntry = {
 
 /**
  * Derives conversion history from the reference fields Invoice/SalesOrder/Purchase already carry
- * (sourceQuotationId, sourceSalesOrderId, sourcePurchaseOrderId) — conversion in this app is a UI
- * pre-fill (lib/documents/conversion.ts), not a persisted clone, so there is no separate
- * conversion-log collection to query.
+ * (sourceQuotationId, sourceSalesOrderId, sourceProformaInvoiceId, sourcePurchaseOrderId) —
+ * conversion in this app is a UI pre-fill (lib/documents/conversion.ts), not a persisted clone,
+ * so there is no separate conversion-log collection to query.
  */
 export async function getDocumentConversionHistory(
   businessId: string,
@@ -438,10 +439,14 @@ export async function getDocumentConversionHistory(
     Invoice.find({
       businessId,
       deletedAt: { $exists: false },
-      $or: [{ sourceQuotationId: { $exists: true } }, { sourceSalesOrderId: { $exists: true } }],
+      $or: [
+        { sourceQuotationId: { $exists: true } },
+        { sourceSalesOrderId: { $exists: true } },
+        { sourceProformaInvoiceId: { $exists: true } },
+      ],
       ...(range ? { createdAt: range } : {}),
     })
-      .select("docNumber createdAt sourceQuotationId sourceSalesOrderId lineItems")
+      .select("docNumber createdAt sourceQuotationId sourceSalesOrderId sourceProformaInvoiceId lineItems")
       .lean(),
     SalesOrder.find({
       businessId,
@@ -470,12 +475,18 @@ export async function getDocumentConversionHistory(
   const sourceSalesOrderIds = [
     ...new Set(invoices.filter((i) => i.sourceSalesOrderId).map((i) => String(i.sourceSalesOrderId))),
   ];
+  const sourceProformaInvoiceIds = [
+    ...new Set(invoices.filter((i) => i.sourceProformaInvoiceId).map((i) => String(i.sourceProformaInvoiceId))),
+  ];
   const purchaseOrderIds = [...new Set(purchases.map((p) => String(p.sourcePurchaseOrderId)))];
 
-  const [quotations, sourceSalesOrders, purchaseOrders] = await Promise.all([
+  const [quotations, sourceSalesOrders, sourceProformaInvoices, purchaseOrders] = await Promise.all([
     quotationIds.length ? Quotation.find({ _id: { $in: quotationIds } }).select("docNumber").lean() : [],
     sourceSalesOrderIds.length
       ? SalesOrder.find({ _id: { $in: sourceSalesOrderIds } }).select("docNumber").lean()
+      : [],
+    sourceProformaInvoiceIds.length
+      ? ProformaInvoice.find({ _id: { $in: sourceProformaInvoiceIds } }).select("docNumber").lean()
       : [],
     purchaseOrderIds.length
       ? PurchaseOrder.find({ _id: { $in: purchaseOrderIds } }).select("docNumber").lean()
@@ -485,6 +496,9 @@ export async function getDocumentConversionHistory(
   const quotationNumber = new Map(quotations.map((q) => [String(q._id), q.docNumber as string | undefined]));
   const salesOrderNumber = new Map(
     sourceSalesOrders.map((s) => [String(s._id), s.docNumber as string | undefined]),
+  );
+  const proformaInvoiceNumber = new Map(
+    sourceProformaInvoices.map((pi) => [String(pi._id), pi.docNumber as string | undefined]),
   );
   const purchaseOrderNumber = new Map(
     purchaseOrders.map((po) => [String(po._id), po.docNumber as string | undefined]),
@@ -509,6 +523,18 @@ export async function getDocumentConversionHistory(
         sourceType: "sales_order",
         sourceId: String(inv.sourceSalesOrderId),
         sourceDocNumber: salesOrderNumber.get(String(inv.sourceSalesOrderId)),
+        targetType: "invoice",
+        targetId: String(inv._id),
+        targetDocNumber: inv.docNumber,
+        convertedAt: inv.createdAt,
+        lineItemCount: inv.lineItems.length,
+      });
+    }
+    if (inv.sourceProformaInvoiceId) {
+      entries.push({
+        sourceType: "proforma_invoice",
+        sourceId: String(inv.sourceProformaInvoiceId),
+        sourceDocNumber: proformaInvoiceNumber.get(String(inv.sourceProformaInvoiceId)),
         targetType: "invoice",
         targetId: String(inv._id),
         targetDocNumber: inv.docNumber,

@@ -5,6 +5,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError } from "@/components/auth/AuthCard";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
+import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { PAYMENT_MODES, PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
 
@@ -67,9 +68,10 @@ export function PartyPaymentForm({
       {parties ? (
         <Field>
           <FieldLabel htmlFor={partyIdFieldName}>{partyType === "customer" ? "Customer" : "Vendor"}</FieldLabel>
-          <SelectField
+          <ComboboxField
             name={partyIdFieldName}
             placeholder={`Select a ${partyType}…`}
+            searchPlaceholder={`Search ${partyType === "customer" ? "customers" : "vendors"}…`}
             required
             options={parties.map((p) => ({ value: p.id, label: p.label }))}
           />

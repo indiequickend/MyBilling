@@ -63,7 +63,7 @@ export default async function NewPurchaseOrderPage() {
           termTemplateId: defaultTermTemplate ? String(defaultTermTemplate._id) : "",
           discountType: purchasePrefs.defaultDiscountType,
           discountValue: "0",
-          discountTarget: "total",
+          discountTarget: "net_amount",
           customFieldValues: {},
           lineItems: [],
         }}

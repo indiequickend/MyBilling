@@ -85,7 +85,7 @@ export default async function NewSalesOrderPage({
           termTemplateId: defaultTermTemplate ? String(defaultTermTemplate._id) : "",
           discountType: headerFromQuotation?.discountType ?? salesOrderPrefs.defaultDiscountType,
           discountValue: headerFromQuotation?.discountValue ?? "0",
-          discountTarget: headerFromQuotation?.discountTarget ?? "total",
+          discountTarget: headerFromQuotation?.discountTarget ?? "net_amount",
           customFieldValues: {},
           lineItems: lineItemsFromQuotation ?? [],
           sourceQuotationId: sourceQuotation ? String(sourceQuotation._id) : undefined,

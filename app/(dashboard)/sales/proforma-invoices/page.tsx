@@ -34,13 +34,15 @@ const TABS = [
   { key: "all", label: "All" },
   { key: "draft", label: "Drafts" },
   { key: "open", label: "Open" },
+  { key: "closed", label: "Closed" },
   { key: "cancelled", label: "Cancelled" },
 ] as const;
 
-const STATUS_LABELS = { draft: "Draft", open: "Open", cancelled: "Cancelled" } as const;
+const STATUS_LABELS = { draft: "Draft", open: "Open", closed: "Closed", cancelled: "Cancelled" } as const;
 const STATUS_BADGE_VARIANT = {
   draft: "outline",
   open: "warning",
+  closed: "success",
   cancelled: "danger",
 } as const;
 

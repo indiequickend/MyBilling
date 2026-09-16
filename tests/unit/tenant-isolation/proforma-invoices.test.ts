@@ -8,6 +8,7 @@ import {
   cancelProformaInvoice,
   softDeleteProformaInvoice,
   restoreProformaInvoice,
+  markProformaInvoiceClosed,
   findProformaInvoiceById,
   listProformaInvoices,
   type ProformaInvoiceWriteInput,
@@ -141,6 +142,24 @@ describe("proforma invoices — tenant isolation", () => {
     if (!created.ok) throw new Error("setup failed");
     const result = await cancelProformaInvoice(String(created.proformaInvoice._id), tenants.businessAId);
     expect(result.ok).toBe(false);
+  });
+
+  it("markProformaInvoiceClosed cannot close another business's proforma invoice", async () => {
+    const created = await createProformaInvoice({
+      ...baseInput(tenants.businessBId, customerBId),
+      createdByUserId: tenants.userBId,
+      finalize: true,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const id = String(created.proformaInvoice._id);
+
+    await markProformaInvoiceClosed(id, tenants.businessAId);
+    const stillOpen = await findProformaInvoiceById(id, tenants.businessBId);
+    expect(stillOpen?.status).toBe("open");
+
+    await markProformaInvoiceClosed(id, tenants.businessBId);
+    const nowClosed = await findProformaInvoiceById(id, tenants.businessBId);
+    expect(nowClosed?.status).toBe("closed");
   });
 
   it("softDeleteProformaInvoice refuses to delete an open proforma invoice but succeeds after cancelling it", async () => {

@@ -33,7 +33,7 @@ describe("projects — tenant isolation", () => {
   let customerAId: string;
   let vendorAId: string;
   let bankAId: string;
-  let bankBId: string;
+  // let bankBId: string;
   let categoryAId: string;
 
   const baseLineItems = [

@@ -63,7 +63,7 @@ export default async function NewQuotationPage() {
           termTemplateId: defaultTermTemplate ? String(defaultTermTemplate._id) : "",
           discountType: conversionPrefs.defaultDiscountType,
           discountValue: "0",
-          discountTarget: "total",
+          discountTarget: "net_amount",
           customFieldValues: {},
           lineItems: [],
         }}

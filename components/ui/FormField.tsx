@@ -10,6 +10,7 @@ export function FormField({
   autoComplete,
   placeholder,
   error,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -19,6 +20,9 @@ export function FormField({
   autoComplete?: string;
   placeholder?: string;
   error?: string;
+  /** Fires alongside the field's own uncontrolled state — for a parent that needs to mirror the
+   * live value (e.g. a totals preview) without turning this into a controlled input. */
+  onChange?: (value: string) => void;
 }) {
   return (
     <Field data-invalid={error ? true : undefined}>
@@ -32,6 +36,7 @@ export function FormField({
         autoComplete={autoComplete}
         placeholder={placeholder}
         aria-invalid={error ? true : undefined}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
       />
       <FieldError>{error}</FieldError>
     </Field>

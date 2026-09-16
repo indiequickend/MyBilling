@@ -119,7 +119,7 @@ export default async function NewDebitNotePage({
           roundOff: purchase.roundOff,
           discountType: "percentage",
           discountValue: "0",
-          discountTarget: "total",
+          discountTarget: "net_amount",
           lineItems,
         }}
       />

@@ -10,6 +10,7 @@ const SOURCE_LABELS: Record<ConversionHistoryEntry["sourceType"], string> = {
   quotation: "Quotation",
   sales_order: "Sales Order",
   purchase_order: "Purchase Order",
+  proforma_invoice: "Proforma Invoice",
 };
 const TARGET_LABELS: Record<ConversionHistoryEntry["targetType"], string> = {
   invoice: "Invoice",

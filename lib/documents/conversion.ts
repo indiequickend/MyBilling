@@ -5,13 +5,15 @@ import type { DiscountTarget } from "@/lib/constants/invoices";
 
 /**
  * Pure, no-I/O helpers shared by every "convert this document into another type" pre-fill page
- * (Quotation -> Invoice, Quotation -> Sales Order, Sales Order -> Invoice, Purchase Order ->
- * Purchase). Conversion in this app is a UI pre-fill, not a persisted clone: the target's own
- * `new/page.tsx` reads the source document server-side, calls these helpers to build the create
- * form's `defaultValues`, and the user can still edit everything before saving — the actual
- * create still goes through the target's normal createX/finalizeXDraft path so numbering stays
- * correct. Once the target document is saved, the caller's save action marks the source closed
- * (markQuotationClosed/markSalesOrderClosed/markPurchaseOrderClosed).
+ * (Quotation -> Invoice, Quotation -> Sales Order, Sales Order -> Invoice, Proforma Invoice ->
+ * Invoice, Purchase Order -> Purchase). Conversion in this app is a UI pre-fill, not a persisted
+ * clone: the target's own `new/page.tsx` reads the source document server-side, calls these
+ * helpers to build the create form's `defaultValues`, and the user can still edit everything
+ * before saving — the actual create still goes through the target's normal
+ * createX/finalizeXDraft path so numbering stays correct (the target always gets its own
+ * server-generated document number; nothing about the source's numbering carries over). Once the
+ * target document is saved, the caller's save action marks the source closed
+ * (markQuotationClosed/markSalesOrderClosed/markProformaInvoiceClosed/markPurchaseOrderClosed).
  */
 
 type ConvertibleLineItem = {

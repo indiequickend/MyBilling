@@ -12,6 +12,7 @@ import { createExpense } from "@/lib/db/queries/expenses";
 import { createIndirectIncome } from "@/lib/db/queries/indirectIncome";
 import { createQuotation } from "@/lib/db/queries/quotations";
 import { createPurchaseOrder } from "@/lib/db/queries/purchaseOrders";
+import { createProformaInvoice } from "@/lib/db/queries/proformaInvoices";
 import {
   getProfitAndLoss,
   getDayBook,
@@ -28,6 +29,7 @@ import { Expense } from "@/lib/db/models/Expense";
 import { IndirectIncome } from "@/lib/db/models/IndirectIncome";
 import { Quotation } from "@/lib/db/models/Quotation";
 import { PurchaseOrder } from "@/lib/db/models/PurchaseOrder";
+import { ProformaInvoice } from "@/lib/db/models/ProformaInvoice";
 import { Customer } from "@/lib/db/models/Customer";
 import { Vendor } from "@/lib/db/models/Vendor";
 import { Business } from "@/lib/db/models/Business";
@@ -41,9 +43,9 @@ describe("reports — tenant isolation and correctness", () => {
   let customerBId: string;
   let vendorBId: string;
   let categoryAId: string;
-  let categoryBId: string;
+  // let categoryBId: string;
   let bankAId: string;
-  let bankBId: string;
+  // let bankBId: string;
 
   // P&L period — Sales(A) 118,000 - Returns 11,800 = Net Sales 106,200;
   // Purchases(A) 35,400 - Returns 5,900 = Net Purchases 29,500; Expenses 20,000; Indirect Income 8,000.
@@ -541,6 +543,56 @@ describe("reports — tenant isolation and correctness", () => {
       sourcePurchaseOrderId: String(purchaseOrderA.purchaseOrder._id),
     });
     if (!purchaseFromOrderA.ok) throw new Error("setup failed");
+
+    const proformaInvoiceA = await createProformaInvoice({
+      businessId: tenants.businessAId,
+      customerId: customerAId,
+      proformaDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      reverseCharge: false,
+      lineItems: [
+        {
+          description: "Previewed item",
+          quantity: 1,
+          unitPriceMinor: 15_000,
+          discountType: "percentage",
+          discountValue: 0,
+          taxRatePercent: 18,
+        },
+      ],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+    });
+    if (!proformaInvoiceA.ok) throw new Error("setup failed");
+    const invoiceFromProformaInvoiceA = await createInvoice({
+      businessId: tenants.businessAId,
+      customerId: customerAId,
+      invoiceDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      reverseCharge: false,
+      lineItems: [
+        {
+          description: "Previewed item",
+          quantity: 1,
+          unitPriceMinor: 15_000,
+          discountType: "percentage",
+          discountValue: 0,
+          taxRatePercent: 18,
+        },
+      ],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+      sourceProformaInvoiceId: String(proformaInvoiceA.proformaInvoice._id),
+    });
+    if (!invoiceFromProformaInvoiceA.ok) throw new Error("setup failed");
   });
 
   afterAll(async () => {
@@ -554,6 +606,7 @@ describe("reports — tenant isolation and correctness", () => {
       IndirectIncome.deleteMany({ businessId: { $in: businessIds } }),
       Quotation.deleteMany({ businessId: { $in: businessIds } }),
       PurchaseOrder.deleteMany({ businessId: { $in: businessIds } }),
+      ProformaInvoice.deleteMany({ businessId: { $in: businessIds } }),
       Customer.deleteMany({ businessId: { $in: businessIds } }),
       Vendor.deleteMany({ businessId: { $in: businessIds } }),
       ExpenseCategory.deleteMany({ businessId: { $in: businessIds } }),
@@ -605,7 +658,7 @@ describe("reports — tenant isolation and correctness", () => {
     expect(rowsA.every((r) => r.amountMinor !== 900)).toBe(true);
   });
 
-  it("getDocumentConversionHistory derives entries from sourceQuotationId/sourcePurchaseOrderId, scoped per business", async () => {
+  it("getDocumentConversionHistory derives entries from sourceQuotationId/sourcePurchaseOrderId/sourceProformaInvoiceId, scoped per business", async () => {
     const historyA = await getDocumentConversionHistory(tenants.businessAId);
     const fromQuotation = historyA.find((e) => e.sourceType === "quotation" && e.targetType === "invoice");
     expect(fromQuotation).toBeDefined();
@@ -617,6 +670,13 @@ describe("reports — tenant isolation and correctness", () => {
     );
     expect(fromPurchaseOrder).toBeDefined();
     expect(fromPurchaseOrder?.sourceDocNumber).toMatch(/^PO-/);
+
+    const fromProformaInvoice = historyA.find(
+      (e) => e.sourceType === "proforma_invoice" && e.targetType === "invoice",
+    );
+    expect(fromProformaInvoice).toBeDefined();
+    expect(fromProformaInvoice?.sourceDocNumber).toMatch(/^PI-/);
+    expect(fromProformaInvoice?.lineItemCount).toBe(1);
 
     const historyB = await getDocumentConversionHistory(tenants.businessBId);
     expect(historyB).toHaveLength(0);

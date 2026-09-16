@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
+import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -104,10 +105,11 @@ export function ProformaInvoiceForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field data-invalid={state.fieldErrors?.customerId ? true : undefined}>
                 <FieldLabel htmlFor="customerId">Customer</FieldLabel>
-                <SelectField
+                <ComboboxField
                   name="customerId"
                   defaultValue={defaultValues?.customerId}
                   placeholder="Select a customer…"
+                  searchPlaceholder="Search customers…"
                   options={customers.map((c) => ({ value: c.id, label: c.label }))}
                   required
                 />
@@ -246,7 +248,7 @@ export function ProformaInvoiceForm({
               <FieldLabel htmlFor="discountTarget">Applies to</FieldLabel>
               <SelectField
                 name="discountTarget"
-                defaultValue={defaultValues?.discountTarget ?? "total"}
+                defaultValue={defaultValues?.discountTarget ?? "net_amount"}
                 placeholder="Applies to"
                 options={DISCOUNT_TARGETS.map((t) => ({ value: t, label: DISCOUNT_TARGET_LABELS[t] }))}
               />

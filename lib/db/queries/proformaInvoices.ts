@@ -365,6 +365,18 @@ export async function softDeleteProformaInvoice(
   return { ok: true, proformaInvoice: updated };
 }
 
+/** Called once the source proforma invoice's Invoice has been created — see
+ * sales/invoices/actions.ts. Silently no-ops if the proforma invoice is already
+ * closed/cancelled/foreign, since the created Invoice is the source of truth once it exists;
+ * this is traceability bookkeeping only. Mirrors markSalesOrderClosed/markQuotationClosed. */
+export async function markProformaInvoiceClosed(proformaInvoiceId: string, businessId: string): Promise<void> {
+  await connectToDatabase();
+  await ProformaInvoice.findOneAndUpdate(
+    { _id: proformaInvoiceId, businessId, status: "open" },
+    { $set: { status: "closed" } },
+  );
+}
+
 export async function restoreProformaInvoice(proformaInvoiceId: string, businessId: string) {
   await connectToDatabase();
   return ProformaInvoice.findOneAndUpdate(
@@ -382,7 +394,7 @@ export async function findProformaInvoiceById(proformaInvoiceId: string, busines
 export type ProformaInvoiceListParams = {
   search?: string;
   customerId?: string;
-  tab?: "all" | "draft" | "open" | "cancelled" | "deleted";
+  tab?: "all" | "draft" | "open" | "closed" | "cancelled" | "deleted";
   page?: number;
   pageSize?: number;
 };
