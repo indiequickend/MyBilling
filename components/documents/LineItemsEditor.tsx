@@ -77,6 +77,7 @@ type ProductSearchResult = {
   hsnOrSac: string;
   unit: string;
   sellingPriceMinor: number;
+  purchasePriceMinor: number;
   priceIsTaxInclusive: boolean;
   taxRatePercent: number;
   barcode: string;
@@ -123,7 +124,9 @@ function productToLineItem(
   product: ProductSearchResult,
   quantity: string,
   defaultWarehouseId?: string,
+  usePurchasePrice?: boolean,
 ): LineItemRow {
+  const priceMinor = usePurchasePrice ? product.purchasePriceMinor : product.sellingPriceMinor;
   return {
     ...BLANK_LINE_ITEM,
     productId: product.id,
@@ -135,8 +138,8 @@ function productToLineItem(
     taxRatePercent: String(product.taxRatePercent),
     unitPriceMinor: minorToRupeesString(
       product.priceIsTaxInclusive
-        ? Math.round((product.sellingPriceMinor * 100) / (100 + product.taxRatePercent))
-        : product.sellingPriceMinor,
+        ? Math.round((priceMinor * 100) / (100 + product.taxRatePercent))
+        : priceMinor,
     ),
     warehouseId: product.stockTracking.enabled ? (defaultWarehouseId ?? "") : "",
     stockTrackingEnabled: product.stockTracking.enabled,
@@ -149,9 +152,11 @@ function productToLineItem(
 function ProductSearchBox({
   onSelect,
   onQueryChange,
+  usePurchasePrice,
 }: {
   onSelect: (product: ProductSearchResult) => void;
   onQueryChange: (query: string) => void;
+  usePurchasePrice?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProductSearchResult[]>([]);
@@ -214,7 +219,7 @@ function ProductSearchBox({
                   {p.barcode ? <span className="text-muted-foreground"> · {p.barcode}</span> : null}
                 </span>
                 <span className="text-muted-foreground shrink-0">
-                  ₹{minorToRupeesString(p.sellingPriceMinor)}
+                  ₹{minorToRupeesString(usePurchasePrice ? p.purchasePriceMinor : p.sellingPriceMinor)}
                 </span>
               </button>
             </li>
@@ -230,6 +235,7 @@ export function LineItemsEditor({
   businessState,
   placeOfSupplyState,
   trackItcEligibility = false,
+  usePurchasePrice = false,
   warehouses = [],
   defaultWarehouseId,
   discountType = "percentage",
@@ -244,6 +250,10 @@ export function LineItemsEditor({
   placeOfSupplyState: string;
   /** Purchases-only: shows a per-line ITC-eligible checkbox (default checked) when true. */
   trackItcEligibility?: boolean;
+  /** Purchases/purchase-orders-only: seeds a newly added line's unit price from the product's
+   * purchase price (falling back through the variant override the same way selling price does)
+   * instead of its selling price. */
+  usePurchasePrice?: boolean;
   /** When empty, no stock-tracked product can be added yet — the business has no warehouse. */
   warehouses?: Array<{ id: string; name: string }>;
   defaultWarehouseId?: string;
@@ -272,7 +282,12 @@ export function LineItemsEditor({
     const trimmedText = stagingText.trim();
     if (!stagingProduct && !trimmedText) return;
     const newRow = stagingProduct
-      ? productToLineItem(stagingProduct, stagingQuantity || "1", defaultWarehouseId)
+      ? productToLineItem(
+          stagingProduct,
+          stagingQuantity || "1",
+          defaultWarehouseId,
+          usePurchasePrice,
+        )
       : { ...BLANK_LINE_ITEM, description: trimmedText, quantity: stagingQuantity || "1" };
     setRows((prev) => [...prev, newRow]);
     setStagingProduct(null);
@@ -329,6 +344,7 @@ export function LineItemsEditor({
               setStagingText(q);
               setStagingProduct(null);
             }}
+            usePurchasePrice={usePurchasePrice}
           />
         </div>
         <div className="col-span-6 sm:col-span-3">

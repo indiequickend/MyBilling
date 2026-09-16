@@ -263,6 +263,7 @@ export function PurchaseForm({
             businessState={businessState}
             placeOfSupplyState={placeOfSupplyState}
             trackItcEligibility={trackItcEligibility}
+            usePurchasePrice
             warehouses={warehouses}
             defaultWarehouseId={defaultWarehouseId}
             discountType={discountType}

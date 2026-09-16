@@ -221,6 +221,7 @@ export function PurchaseOrderForm({
             defaultRows={defaultValues?.lineItems ?? []}
             businessState={businessState}
             placeOfSupplyState={placeOfSupplyState}
+            usePurchasePrice
             discountType={discountType}
             discountValue={discountValue}
             discountTarget={discountTarget}
