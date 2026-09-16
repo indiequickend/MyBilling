@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { IndirectIncome, type IndirectIncomeStatus } from "@/lib/db/models/IndirectIncome";
 import { Customer } from "@/lib/db/models/Customer";
+import { Payment } from "@/lib/db/models/Payment";
 import { isOwnedExpenseCategory } from "@/lib/db/queries/expenseCategories";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { createPayment } from "@/lib/db/queries/payments";
@@ -27,6 +28,7 @@ export type IndirectIncomeWriteFailureReason =
   | "invalid_bank_account"
   | "invalid_customer"
   | "not_found"
+  | "not_editable"
   | "not_cancellable"
   | "not_deletable";
 
@@ -34,6 +36,7 @@ export type IndirectIncomeWriteResult =
   | { ok: true; indirectIncome: InstanceType<typeof IndirectIncome> }
   | { ok: false; reason: IndirectIncomeWriteFailureReason };
 
+const EDITABLE_STATUSES: IndirectIncomeStatus[] = ["recorded"];
 const CANCELLABLE_STATUSES: IndirectIncomeStatus[] = ["recorded"];
 const DELETABLE_STATUSES: IndirectIncomeStatus[] = ["cancelled"];
 
@@ -108,23 +111,146 @@ export async function createIndirectIncome(
   }
 }
 
+/**
+ * Edits a "recorded" indirect income entry's fields, including its linked Payment (created
+ * alongside it in createIndirectIncome) — mirrors updateExpense in lib/db/queries/expenses.ts:
+ * the Payment's amount/mode/bank account are duplicated from this record at creation time (see
+ * isPaymentEditable in lib/db/queries/payments.ts), so they must be kept in sync rather than
+ * edited independently. A cancelled entry's payment is already voided and stays that way — not
+ * editable. Transactional so the record and its Payment always change together.
+ */
+export async function updateIndirectIncome(
+  indirectIncomeId: string,
+  businessId: string,
+  input: Omit<IndirectIncomeWriteInput, "businessId">,
+): Promise<IndirectIncomeWriteResult> {
+  await connectToDatabase();
+
+  if (!(await isOwnedExpenseCategory(input.categoryId, businessId))) {
+    return { ok: false, reason: "invalid_category" };
+  }
+  if (!(await isOwnedBankAccount(input.bankAccountId, businessId))) {
+    return { ok: false, reason: "invalid_bank_account" };
+  }
+  if (input.customerId) {
+    const customer = await Customer.findOne({
+      _id: input.customerId,
+      businessId,
+      deletedAt: { $exists: false },
+    });
+    if (!customer) return { ok: false, reason: "invalid_customer" };
+  }
+
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  try {
+    let result: IndirectIncomeWriteResult = { ok: false, reason: "not_editable" };
+    await session.withTransaction(async () => {
+      const indirectIncome = await IndirectIncome.findOne({
+        _id: indirectIncomeId,
+        businessId,
+        deletedAt: { $exists: false },
+        status: { $in: EDITABLE_STATUSES },
+      }).session(session);
+      if (!indirectIncome) {
+        result = { ok: false, reason: "not_editable" };
+        return;
+      }
+
+      indirectIncome.categoryId = new mongoose.Types.ObjectId(input.categoryId);
+      indirectIncome.amountMinor = input.amountMinor;
+      indirectIncome.mode = input.mode;
+      indirectIncome.bankAccountId = new mongoose.Types.ObjectId(input.bankAccountId);
+      indirectIncome.customerId = input.customerId ? new mongoose.Types.ObjectId(input.customerId) : undefined;
+      indirectIncome.sourceName = input.sourceName;
+      indirectIncome.description = input.description;
+      indirectIncome.incomeDate = input.incomeDate;
+      await indirectIncome.save({ session });
+
+      const paymentSet: Record<string, unknown> = {
+        amountMinor: input.amountMinor,
+        mode: input.mode,
+        bankAccountId: new mongoose.Types.ObjectId(input.bankAccountId),
+        paymentDate: input.incomeDate,
+      };
+      const paymentUnset: Record<string, string> = {};
+      if (input.customerId) {
+        paymentSet.partyType = "customer";
+        paymentSet.partyId = new mongoose.Types.ObjectId(input.customerId);
+      } else {
+        paymentUnset.partyType = "";
+        paymentUnset.partyId = "";
+      }
+      await Payment.updateOne(
+        {
+          businessId,
+          linkedDocumentType: "indirect_income",
+          linkedDocumentId: indirectIncome._id,
+          voidedAt: { $exists: false },
+        },
+        {
+          $set: paymentSet,
+          ...(Object.keys(paymentUnset).length > 0 ? { $unset: paymentUnset } : {}),
+        },
+        { session },
+      );
+
+      result = { ok: true, indirectIncome };
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+/**
+ * Cancelling an indirect income also voids its linked Payment (created alongside it in
+ * createIndirectIncome) — mirrors cancelExpense's fix in lib/db/queries/expenses.ts: money
+ * movement is voided, never hard-deleted, and a cancelled/deleted record whose payment stays live
+ * would otherwise go on showing up forever in the Payments Timeline as a phantom transaction.
+ * Transactional so the status flip and the void always land together.
+ */
 export async function cancelIndirectIncome(
   indirectIncomeId: string,
   businessId: string,
 ): Promise<IndirectIncomeWriteResult> {
   await connectToDatabase();
-  const updated = await IndirectIncome.findOneAndUpdate(
-    {
-      _id: indirectIncomeId,
-      businessId,
-      deletedAt: { $exists: false },
-      status: { $in: CANCELLABLE_STATUSES },
-    },
-    { $set: { status: "cancelled" } },
-    { returnDocument: "after" },
-  );
-  if (!updated) return { ok: false, reason: "not_cancellable" };
-  return { ok: true, indirectIncome: updated };
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  try {
+    let result: IndirectIncomeWriteResult = { ok: false, reason: "not_cancellable" };
+    await session.withTransaction(async () => {
+      const indirectIncome = await IndirectIncome.findOne({
+        _id: indirectIncomeId,
+        businessId,
+        deletedAt: { $exists: false },
+        status: { $in: CANCELLABLE_STATUSES },
+      }).session(session);
+      if (!indirectIncome) {
+        result = { ok: false, reason: "not_cancellable" };
+        return;
+      }
+
+      indirectIncome.status = "cancelled";
+      await indirectIncome.save({ session });
+
+      await Payment.updateMany(
+        {
+          businessId,
+          linkedDocumentType: "indirect_income",
+          linkedDocumentId: indirectIncome._id,
+          voidedAt: { $exists: false },
+        },
+        { $set: { voidedAt: new Date() } },
+        { session },
+      );
+
+      result = { ok: true, indirectIncome };
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }
 
 export async function softDeleteIndirectIncome(

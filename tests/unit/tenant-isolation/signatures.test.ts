@@ -3,6 +3,7 @@ import { setupTwoTenants, teardownTwoTenants, type TwoTenants } from "../helpers
 import {
   listSignatures,
   findSignatureById,
+  findDefaultSignature,
   createSignature,
   updateSignature,
   setDefaultSignature,
@@ -61,6 +62,22 @@ describe("signatures — tenant isolation", () => {
     await setDefaultSignature(signatureAId, tenants.businessAId);
     const bAfter = await findSignatureById(signatureBId, tenants.businessBId);
     expect(bAfter?.isDefault).toBe(false);
+  });
+
+  it("findDefaultSignature returns only the caller's own business's default (used as the PDF fallback)", async () => {
+    await setDefaultSignature(signatureAId, tenants.businessAId);
+    const defaultA = await findDefaultSignature(tenants.businessAId);
+    expect(String(defaultA?._id)).toBe(signatureAId);
+
+    // Business B never set a default — findDefaultSignature returns null, not A's.
+    const defaultB = await findDefaultSignature(tenants.businessBId);
+    expect(defaultB).toBeNull();
+
+    await setDefaultSignature(signatureBId, tenants.businessBId);
+    const defaultBAfter = await findDefaultSignature(tenants.businessBId);
+    expect(String(defaultBAfter?._id)).toBe(signatureBId);
+    // Setting B's default never disturbs A's.
+    expect(String((await findDefaultSignature(tenants.businessAId))?._id)).toBe(signatureAId);
   });
 
   it("soft-delete moves a signature out of the active list without hard-deleting it", async () => {

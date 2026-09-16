@@ -61,6 +61,7 @@ export type CreditNoteWriteFailureReason =
   | "invoice_not_eligible"
   | "business_not_found"
   | "not_found"
+  | "not_editable"
   | "not_cancellable"
   | "not_deletable"
   | "insufficient_stock";
@@ -218,6 +219,187 @@ export async function createCreditNote(input: CreateCreditNoteInput): Promise<Cr
   } finally {
     await session.endSession();
   }
+}
+
+/** Everything except `linkedInvoiceId` — a credit note's linked invoice (and thus its customer)
+ * is fixed at creation and never changes on edit, matching the form (shown as read-only text). */
+export type CreditNoteUpdateInput = Omit<CreditNoteWriteInput, "linkedInvoiceId" | "businessId">;
+
+type PreparedCreditNoteEdit = {
+  ok: true;
+  business: InstanceType<typeof Business>;
+  totals: ReturnType<typeof computeDocumentTotals>;
+  lineItemDocs: CreditNoteLineItemDoc[];
+};
+
+/** Shared by updateCreditNote/finalizeCreditNoteDraft: recompute totals for a line-item edit,
+ * same calculation createCreditNote itself runs at creation time. */
+async function prepareCreditNoteEdit(
+  businessId: string,
+  input: CreditNoteUpdateInput,
+): Promise<PreparedCreditNoteEdit | { ok: false; reason: CreditNoteWriteFailureReason }> {
+  const business = await Business.findOne({ _id: businessId, deletedAt: { $exists: false } });
+  if (!business) return { ok: false, reason: "business_not_found" };
+
+  const businessState = business.addresses?.billing?.state ?? "";
+  const lineItemCalcInputs: LineItemCalcInput[] = input.lineItems.map((li) => ({
+    quantity: li.quantity,
+    unitPriceMinor: li.unitPriceMinor,
+    discountType: li.discountType,
+    discountValue: li.discountValue,
+    taxRatePercent: li.taxRatePercent,
+  }));
+
+  const totals = computeDocumentTotals(
+    lineItemCalcInputs,
+    { type: input.discountType, value: input.discountValue, target: input.discountTarget },
+    input.roundOff,
+    businessState,
+    input.placeOfSupplyState,
+  );
+
+  const lineItemDocs: CreditNoteLineItemDoc[] = input.lineItems.map((li, i) => ({
+    productId: li.productId ? new mongoose.Types.ObjectId(li.productId) : undefined,
+    variantId: li.variantId ? new mongoose.Types.ObjectId(li.variantId) : undefined,
+    description: li.description,
+    notes: li.notes,
+    hsnOrSac: li.hsnOrSac,
+    unit: li.unit ?? "PCS",
+    quantity: li.quantity,
+    unitPriceMinor: li.unitPriceMinor,
+    discountType: li.discountType,
+    discountValue: li.discountValue,
+    taxRatePercent: li.taxRatePercent,
+    cgstMinor: totals.lineItems[i].cgstMinor,
+    sgstMinor: totals.lineItems[i].sgstMinor,
+    igstMinor: totals.lineItems[i].igstMinor,
+    taxableAmountMinor: totals.lineItems[i].taxableAmountMinor,
+    totalMinor: totals.lineItems[i].totalMinor,
+    warehouseId: li.warehouseId ? new mongoose.Types.ObjectId(li.warehouseId) : undefined,
+    batchId: li.batchId ? new mongoose.Types.ObjectId(li.batchId) : undefined,
+    serialNumbers: li.serialNumbers,
+  })) as CreditNoteLineItemDoc[];
+
+  return { ok: true, business, totals, lineItemDocs };
+}
+
+function buildCreditNoteSetFields(input: CreditNoteUpdateInput, prepared: PreparedCreditNoteEdit) {
+  return {
+    creditNoteDate: input.creditNoteDate,
+    reason: input.reason,
+    restockItems: input.restockItems ?? false,
+    placeOfSupplyState: input.placeOfSupplyState,
+    lineItems: prepared.lineItemDocs,
+    discountType: input.discountType,
+    discountValue: input.discountValue,
+    discountTarget: input.discountTarget,
+    discountAmountMinor: prepared.totals.discountAmountMinor,
+    roundOff: input.roundOff,
+    roundOffAmountMinor: prepared.totals.roundOffAmountMinor,
+    subtotalMinor: prepared.totals.subtotalMinor,
+    totalTaxMinor: prepared.totals.totalTaxMinor,
+    totalCgstMinor: prepared.totals.totalCgstMinor,
+    totalSgstMinor: prepared.totals.totalSgstMinor,
+    totalIgstMinor: prepared.totals.totalIgstMinor,
+    grandTotalMinor: prepared.totals.grandTotalMinor,
+  };
+}
+
+/** Edits a draft credit note's header/line items; issued/cancelled credit notes are immutable —
+ * matches Invoice's updateInvoice (editing a numbered, issued financial document would corrupt
+ * the customer ledger it already affected). Not transactional: a single document update, no
+ * numbering, no stock movements (a draft never moved stock in the first place). */
+export async function updateCreditNote(
+  creditNoteId: string,
+  businessId: string,
+  input: CreditNoteUpdateInput,
+): Promise<CreditNoteWriteResult> {
+  await connectToDatabase();
+  const existing = await CreditNote.findOne({ _id: creditNoteId, businessId, deletedAt: { $exists: false } });
+  if (!existing) return { ok: false, reason: "not_found" };
+  if (existing.status !== "draft") return { ok: false, reason: "not_editable" };
+
+  const prepared = await prepareCreditNoteEdit(businessId, input);
+  if (!prepared.ok) return prepared;
+
+  const updated = await CreditNote.findOneAndUpdate(
+    { _id: creditNoteId, businessId, status: "draft" },
+    { $set: buildCreditNoteSetFields(input, prepared) },
+    { returnDocument: "after" },
+  );
+  if (!updated) return { ok: false, reason: "not_found" };
+  return { ok: true, creditNote: updated };
+}
+
+class CreditNoteNoLongerDraftError extends Error {}
+
+/** Turns a draft into a numbered, issued credit note — the only place a draft ever gets a
+ * docNumber. Mirrors Invoice's finalizeInvoiceDraft. */
+export async function finalizeCreditNoteDraft(
+  creditNoteId: string,
+  businessId: string,
+  input: CreditNoteUpdateInput,
+  createdByUserId: string,
+): Promise<CreditNoteWriteResult> {
+  await connectToDatabase();
+  const existing = await CreditNote.findOne({ _id: creditNoteId, businessId, deletedAt: { $exists: false } });
+  if (!existing) return { ok: false, reason: "not_found" };
+  if (existing.status !== "draft") return { ok: false, reason: "not_editable" };
+
+  const prepared = await prepareCreditNoteEdit(businessId, input);
+  if (!prepared.ok) return prepared;
+
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  let result: CreditNoteWriteResult;
+  try {
+    let txResult!: CreditNoteWriteResult;
+    try {
+      await session.withTransaction(async () => {
+        const numbering = prepared.business.preferences?.documentNumbering;
+        const config = resolveNumberingConfig(numbering, "credit_note");
+        const seriesKey = resolveSeriesKey(input.creditNoteDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+        const number = await reserveNextDocumentNumber(businessId, "credit_note", seriesKey, session);
+        const docNumber = formatDocumentNumber(config, seriesKey, number);
+
+        const updated = await CreditNote.findOneAndUpdate(
+          { _id: creditNoteId, businessId, status: "draft" },
+          { $set: { ...buildCreditNoteSetFields(input, prepared), docNumber, seriesKey, status: "issued" } },
+          { returnDocument: "after", session },
+        );
+        // The draft was finalized/edited/deleted by a concurrent request between our read above
+        // and this write — abort so the just-reserved document number rolls back with it.
+        if (!updated) throw new CreditNoteNoLongerDraftError();
+
+        if (input.restockItems) {
+          await writeDocumentStockMovements(session, {
+            businessId,
+            lineItems: updated.lineItems as DocumentStockLineItem[],
+            direction: "in",
+            reason: "credit_note",
+            refDocumentType: "credit_note",
+            refDocumentId: String(updated._id),
+            refDocumentNumber: docNumber,
+            createdByUserId,
+          });
+        }
+
+        txResult = { ok: true, creditNote: updated };
+      });
+      result = txResult;
+    } catch (err) {
+      if (err instanceof CreditNoteNoLongerDraftError) {
+        result = { ok: false, reason: "not_editable" };
+      } else if (err instanceof InsufficientStockError) {
+        result = { ok: false, reason: "insufficient_stock" };
+      } else {
+        throw err;
+      }
+    }
+  } finally {
+    await session.endSession();
+  }
+  return result;
 }
 
 export async function cancelCreditNote(creditNoteId: string, businessId: string): Promise<CreditNoteWriteResult> {

@@ -16,17 +16,28 @@ import { saveDebitNoteAction, type DebitNoteFormState } from "./actions";
 
 const initialState: DebitNoteFormState = {};
 
-function SubmitButton() {
+function SubmitIntentButton({
+  intent,
+  variant = "outline",
+  children,
+}: {
+  intent: "draft" | "finalize" | "finalize_print";
+  variant?: "default" | "outline";
+  children: React.ReactNode;
+}) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" name="intent" value={intent} disabled={pending} variant={variant}>
       {pending ? <Loader2 className="size-4 animate-spin" data-icon="inline-start" /> : null}
-      Issue debit note
+      {children}
     </Button>
   );
 }
 
 export function DebitNoteForm({
+  mode,
+  debitNoteId,
+  editableStatus,
   linkedPurchaseId,
   vendorLabel,
   purchaseDocNumber,
@@ -35,6 +46,9 @@ export function DebitNoteForm({
   defaultWarehouseId,
   defaultValues,
 }: {
+  mode: "create" | "edit";
+  debitNoteId?: string;
+  editableStatus?: "draft";
   linkedPurchaseId: string;
   vendorLabel: string;
   purchaseDocNumber: string;
@@ -54,10 +68,12 @@ export function DebitNoteForm({
   };
 }) {
   const [state, formAction] = useActionState(saveDebitNoteAction, initialState);
+  const canDraft = mode === "create" || editableStatus === "draft";
 
   return (
     <form action={formAction} className="space-y-6">
       <FormError message={state.error} />
+      {debitNoteId ? <input type="hidden" name="debitNoteId" value={debitNoteId} /> : null}
       <input type="hidden" name="linkedPurchaseId" value={linkedPurchaseId} />
 
       <Card>
@@ -161,7 +177,11 @@ export function DebitNoteForm({
       </Card>
 
       <div className="sticky bottom-0 z-20 flex items-center gap-3 border-t bg-background/95 py-3 backdrop-blur-sm">
-        <SubmitButton />
+        {canDraft ? <SubmitIntentButton intent="draft">Save as Draft</SubmitIntentButton> : null}
+        <SubmitIntentButton intent="finalize_print">Save &amp; Print</SubmitIntentButton>
+        <SubmitIntentButton intent="finalize" variant="default">
+          {canDraft ? "Issue debit note" : "Save changes"}
+        </SubmitIntentButton>
       </div>
     </form>
   );

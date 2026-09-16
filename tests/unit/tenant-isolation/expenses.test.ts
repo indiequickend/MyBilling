@@ -4,6 +4,7 @@ import { createBankAccount } from "@/lib/db/queries/bankAccounts";
 import { createExpenseCategory } from "@/lib/db/queries/expenseCategories";
 import {
   createExpense,
+  updateExpense,
   cancelExpense,
   softDeleteExpense,
   restoreExpense,
@@ -142,6 +143,135 @@ describe("expenses — tenant isolation", () => {
     expect(list.items.map((e) => String(e._id))).toContain(id);
 
     await restoreExpense(id, tenants.businessAId);
+  });
+
+  it("updateExpense edits the record and keeps its linked payment in sync, but never touches another business's expense", async () => {
+    const secondBankA = await createBankAccount({ businessId: tenants.businessAId, type: "bank", name: "Second Account A" });
+    const secondBankAId = String(secondBankA._id);
+
+    const created = await createExpense({
+      businessId: tenants.businessAId,
+      categoryId: categoryAId,
+      amountMinor: 10_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      expenseDate: new Date("2030-05-01"),
+      createdByUserId: tenants.userAId,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const id = String(created.expense._id);
+
+    const crossTenant = await updateExpense(id, tenants.businessBId, {
+      categoryId: categoryBId,
+      amountMinor: 99_999,
+      mode: "cash",
+      bankAccountId: bankBId,
+      expenseDate: new Date("2030-05-02"),
+    });
+    expect(crossTenant.ok).toBe(false);
+    if (!crossTenant.ok) expect(crossTenant.reason).toBe("not_editable");
+
+    const updated = await updateExpense(id, tenants.businessAId, {
+      categoryId: categoryAId,
+      amountMinor: 40_000,
+      mode: "upi",
+      bankAccountId: secondBankAId,
+      expenseDate: new Date("2030-05-03"),
+      description: "Updated description",
+    });
+    expect(updated.ok).toBe(true);
+    if (updated.ok) {
+      expect(updated.expense.amountMinor).toBe(40_000);
+      expect(updated.expense.mode).toBe("upi");
+      expect(String(updated.expense.bankAccountId)).toBe(secondBankAId);
+      expect(updated.expense.description).toBe("Updated description");
+    }
+
+    const payments = await listPaymentsForDocument("expense", id, tenants.businessAId);
+    expect(payments).toHaveLength(1);
+    expect(payments[0].amountMinor).toBe(40_000);
+    expect(payments[0].mode).toBe("upi");
+    expect(String(payments[0].bankAccountId)).toBe(secondBankAId);
+  });
+
+  it("updateExpense refuses to edit a cancelled expense", async () => {
+    const created = await createExpense({
+      businessId: tenants.businessAId,
+      categoryId: categoryAId,
+      amountMinor: 2_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      expenseDate: new Date(),
+      createdByUserId: tenants.userAId,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const id = String(created.expense._id);
+
+    const cancelled = await cancelExpense(id, tenants.businessAId);
+    expect(cancelled.ok).toBe(true);
+
+    const result = await updateExpense(id, tenants.businessAId, {
+      categoryId: categoryAId,
+      amountMinor: 1,
+      mode: "cash",
+      bankAccountId: bankAId,
+      expenseDate: new Date(),
+    });
+    expect(result).toEqual({ ok: false, reason: "not_editable" });
+  });
+
+  it("cancelExpense voids its linked payment so it stops showing in the Payments Timeline", async () => {
+    const created = await createExpense({
+      businessId: tenants.businessAId,
+      categoryId: categoryAId,
+      amountMinor: 179_000,
+      mode: "cash",
+      bankAccountId: bankAId,
+      expenseDate: new Date(),
+      createdByUserId: tenants.userAId,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const id = String(created.expense._id);
+
+    const before = await listPaymentsForDocument("expense", id, tenants.businessAId);
+    expect(before).toHaveLength(1);
+    expect(before[0].voidedAt).toBeUndefined();
+
+    const cancelled = await cancelExpense(id, tenants.businessAId);
+    expect(cancelled.ok).toBe(true);
+
+    const after = await listPaymentsForDocument("expense", id, tenants.businessAId);
+    expect(after).toHaveLength(1);
+    expect(after[0].voidedAt).toBeInstanceOf(Date);
+  });
+
+  it("cancelExpense never voids a different business's payment for a same-shaped expense", async () => {
+    const createdA = await createExpense({
+      businessId: tenants.businessAId,
+      categoryId: categoryAId,
+      amountMinor: 4_242,
+      mode: "cash",
+      bankAccountId: bankAId,
+      expenseDate: new Date(),
+      createdByUserId: tenants.userAId,
+    });
+    const createdB = await createExpense({
+      businessId: tenants.businessBId,
+      categoryId: categoryBId,
+      amountMinor: 4_242,
+      mode: "cash",
+      bankAccountId: bankBId,
+      expenseDate: new Date(),
+      createdByUserId: tenants.userBId,
+    });
+    if (!createdA.ok || !createdB.ok) throw new Error("setup failed");
+
+    const cancelled = await cancelExpense(String(createdA.expense._id), tenants.businessAId);
+    expect(cancelled.ok).toBe(true);
+
+    const paymentsB = await listPaymentsForDocument("expense", String(createdB.expense._id), tenants.businessBId);
+    expect(paymentsB).toHaveLength(1);
+    expect(paymentsB[0].voidedAt).toBeUndefined();
   });
 
   it("listExpenses never crosses businesses", async () => {

@@ -30,6 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       business: {
         name: business.name,
         brandName: business.brandName,
+        logoUrl: business.logoUrl,
         gstin: business.gstin,
         addresses: business.addresses,
       },

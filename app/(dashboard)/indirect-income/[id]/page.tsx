@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findIndirectIncomeById } from "@/lib/db/queries/indirectIncome";
@@ -7,6 +9,7 @@ import { minorToRupeesString } from "@/lib/utils/money";
 import { PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CancelIndirectIncomeButton, DeleteIndirectIncomeButton } from "./IndirectIncomeActionButtons";
 
 export default async function IndirectIncomeDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +27,8 @@ export default async function IndirectIncomeDetailPage({ params }: { params: Pro
 
   const category = await findExpenseCategoryById(String(entry.categoryId), context.activeBusinessId);
 
-  const canCancel = can(context.membership, "indirect_income", "edit") && entry.status === "recorded";
+  const canEdit = can(context.membership, "indirect_income", "edit") && entry.status === "recorded";
+  const canCancel = canEdit;
   const canDelete = can(context.membership, "indirect_income", "delete") && entry.status === "cancelled";
 
   return (
@@ -40,6 +44,14 @@ export default async function IndirectIncomeDetailPage({ params }: { params: Pro
           <p className="text-sm text-muted-foreground">{category?.name ?? "Uncategorized"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canEdit ? (
+            <Button variant="outline" asChild>
+              <Link href={`/indirect-income/${id}/edit`}>
+                <Pencil data-icon="inline-start" />
+                Edit
+              </Link>
+            </Button>
+          ) : null}
           {canCancel ? <CancelIndirectIncomeButton indirectIncomeId={id} /> : null}
           {canDelete ? <DeleteIndirectIncomeButton indirectIncomeId={id} /> : null}
         </div>

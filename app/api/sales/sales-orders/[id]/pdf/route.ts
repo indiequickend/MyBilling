@@ -3,6 +3,7 @@ import { getApiBusinessContext } from "@/lib/auth/apiContext";
 import { requirePermission } from "@/lib/rbac/can";
 import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
 import { findBusinessById } from "@/lib/db/queries/businesses";
+import { findDefaultSignature } from "@/lib/db/queries/signatures";
 import { SalesOrderDocument } from "@/lib/pdf/salesOrderTemplate";
 import { renderPdf } from "@/lib/pdf/render";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
@@ -22,14 +23,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const business = await findBusinessById(context.businessId);
     if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
+    const signature = await findDefaultSignature(context.businessId);
+
     const document = await SalesOrderDocument({
       salesOrder,
       business: {
         name: business.name,
         brandName: business.brandName,
+        logoUrl: business.logoUrl,
         gstin: business.gstin,
         addresses: business.addresses,
       },
+      signature: signature ? { imageUrl: signature.imageUrl, name: signature.name } : null,
     });
 
     const pdf = await renderPdf(document);

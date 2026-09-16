@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, MoreHorizontal } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listDebitNotes } from "@/lib/db/queries/debitNotes";
@@ -22,6 +22,13 @@ import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { ButtonLabel } from "@/components/ui/ButtonLabel";
 import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -61,6 +68,7 @@ export default async function DebitNotesPage({
   });
 
   const canCreate = can(context.membership, "debit_notes", "create");
+  const canEdit = can(context.membership, "debit_notes", "edit");
 
   return (
     <div>
@@ -125,10 +133,26 @@ export default async function DebitNotesPage({
                 </TableCell>
                 <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(dn.grandTotalMinor)}</TableCell>
                 <TableCell>
-                  <div className="flex items-center justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/purchases/debit-notes/${id}`}>View</Link>
                     </Button>
+                    {canEdit ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm" aria-label="More actions">
+                            <MoreHorizontal />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/purchases/debit-notes/${id}/edit`}>Edit</Link>
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
                   </div>
                 </TableCell>
               </TableRow>

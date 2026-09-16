@@ -13,9 +13,12 @@ import {
 import { parseIndexedRows, parseCheckbox } from "@/lib/validation/shared";
 import {
   createCreditNote,
+  updateCreditNote,
+  finalizeCreditNoteDraft,
   cancelCreditNote,
   softDeleteCreditNote,
   restoreCreditNote,
+  findCreditNoteById,
   type CreditNoteWriteFailureReason,
 } from "@/lib/db/queries/creditNotes";
 import { recordAuditLog } from "@/lib/db/queries/auditLog";
@@ -38,6 +41,7 @@ const REASON_MESSAGES: Record<CreditNoteWriteFailureReason, string> = {
   invoice_not_eligible: "This invoice can't be credited.",
   business_not_found: "Business not found.",
   not_found: "Credit note not found.",
+  not_editable: "This credit note can no longer be edited.",
   not_cancellable: "This credit note can't be cancelled.",
   not_deletable: "Only draft or cancelled credit notes can be deleted.",
   insufficient_stock: "One of the line items doesn't have enough stock available to restock.",
@@ -71,13 +75,17 @@ function parseLineItemRows(formData: FormData) {
   }));
 }
 
-/** Single-step: always issues immediately (no draft/edit flow — there is no updateCreditNote). */
+/**
+ * One action handles both create and edit (via a hidden `creditNoteId` field) and all three
+ * submit intents (Save as Draft / Save & Print / Issue), the same shape as saveInvoiceAction.
+ */
 export async function saveCreditNoteAction(
   _prev: CreditNoteFormState,
   formData: FormData,
 ): Promise<CreditNoteFormState> {
   const context = await requireDashboardContext();
-  requirePermission(context.membership, "sales_credit_notes", "create");
+  const intent = String(formData.get("intent") ?? "draft"); // "draft" | "finalize" | "finalize_print"
+  const creditNoteId = String(formData.get("creditNoteId") ?? "") || undefined;
 
   const headerParsed = creditNoteHeaderSchema.safeParse({
     linkedInvoiceId: formData.get("linkedInvoiceId"),
@@ -109,9 +117,7 @@ export async function saveCreditNoteAction(
   }
 
   const h = headerParsed.data;
-  const result = await createCreditNote({
-    businessId: context.activeBusinessId,
-    linkedInvoiceId: h.linkedInvoiceId,
+  const editInput = {
     creditNoteDate: new Date(h.creditNoteDate),
     reason: h.reason,
     restockItems: h.restockItems,
@@ -121,14 +127,41 @@ export async function saveCreditNoteAction(
     discountValue: discountParsed.data.discountValue,
     discountTarget: discountParsed.data.discountTarget,
     roundOff: h.roundOff,
-    createdByUserId: context.membership.userId,
-    finalize: true,
-  });
+  };
+
+  let result;
+  if (!creditNoteId) {
+    requirePermission(context.membership, "sales_credit_notes", "create");
+    result = await createCreditNote({
+      businessId: context.activeBusinessId,
+      linkedInvoiceId: h.linkedInvoiceId,
+      ...editInput,
+      createdByUserId: context.membership.userId,
+      finalize: intent !== "draft",
+    });
+  } else {
+    requirePermission(context.membership, "sales_credit_notes", "edit");
+    const existing = await findCreditNoteById(creditNoteId, context.activeBusinessId);
+    if (!existing) return { error: REASON_MESSAGES.not_found };
+
+    if (existing.status === "draft" && intent !== "draft") {
+      result = await finalizeCreditNoteDraft(
+        creditNoteId,
+        context.activeBusinessId,
+        editInput,
+        context.membership.userId,
+      );
+    } else {
+      result = await updateCreditNote(creditNoteId, context.activeBusinessId, editInput);
+    }
+  }
 
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
 
   revalidatePath("/sales/credit-notes");
-  redirect(`/sales/credit-notes/${String(result.creditNote._id)}`);
+  const savedId = String(result.creditNote._id);
+  if (intent === "finalize_print") redirect(`/api/sales/credit-notes/${savedId}/pdf`);
+  redirect(`/sales/credit-notes/${savedId}`);
 }
 
 export async function cancelCreditNoteAction(

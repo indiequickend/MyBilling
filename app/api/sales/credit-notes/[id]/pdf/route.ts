@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac/can";
 import { findCreditNoteById } from "@/lib/db/queries/creditNotes";
 import { findInvoiceById } from "@/lib/db/queries/invoices";
 import { findBusinessById } from "@/lib/db/queries/businesses";
+import { findDefaultSignature } from "@/lib/db/queries/signatures";
 import { CreditNoteDocument } from "@/lib/pdf/creditNoteTemplate";
 import { renderPdf } from "@/lib/pdf/render";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
@@ -23,17 +24,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const business = await findBusinessById(context.businessId);
     if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-    const linkedInvoice = await findInvoiceById(String(creditNote.linkedInvoiceId), context.businessId);
+    const [linkedInvoice, signature] = await Promise.all([
+      findInvoiceById(String(creditNote.linkedInvoiceId), context.businessId),
+      findDefaultSignature(context.businessId),
+    ]);
 
     const document = await CreditNoteDocument({
       creditNote,
       business: {
         name: business.name,
         brandName: business.brandName,
+        logoUrl: business.logoUrl,
         gstin: business.gstin,
         addresses: business.addresses,
       },
       linkedInvoiceDocNumber: linkedInvoice?.docNumber ?? null,
+      signature: signature ? { imageUrl: signature.imageUrl, name: signature.name } : null,
     });
 
     const pdf = await renderPdf(document);

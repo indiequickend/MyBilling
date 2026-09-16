@@ -1,4 +1,4 @@
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { minorToRupeesString } from "@/lib/utils/money";
 import type { CreditNoteDoc } from "@/lib/db/models/CreditNote";
 import type { AddressSubdoc } from "@/lib/db/models/shared/address";
@@ -8,10 +8,16 @@ export type CreditNoteTemplateData = {
   business: {
     name: string;
     brandName?: string;
+    /** 1st preference for the header identity — falls back to brandName, then name (the legal
+     * company name), when absent. */
+    logoUrl?: string;
     gstin?: string;
     addresses?: { billing?: AddressSubdoc | null; shipping?: AddressSubdoc | null };
   };
   linkedInvoiceDocNumber?: string | null;
+  /** The business's default signature (CreditNote has no per-document signature picker of its
+   * own, unlike Invoice) — see findDefaultSignature in lib/db/queries/signatures.ts. */
+  signature?: { imageUrl: string; name: string } | null;
 };
 
 function formatDate(date: Date): string {
@@ -52,13 +58,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 4,
   },
+  footer: {
+    marginTop: 24,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  signatureImg: { height: 48, objectFit: "contain" },
+  logoImg: { height: 40, maxWidth: 180, objectFit: "contain", marginBottom: 4 },
 });
 
 /** Renders one Credit Note as a React-PDF Document. Pure-JS layout (no headless browser), so this
- * runs on Vercel serverless functions without a Chromium binary. No signature/bank account section
- * — CreditNote (like DebitNote) doesn't carry those fields. */
+ * runs on Vercel serverless functions without a Chromium binary. No bank account section —
+ * CreditNote (like DebitNote) doesn't carry that field; the signature is always the business's
+ * default (see CreditNoteTemplateData's doc-comment), since there's no per-document picker. */
 export async function CreditNoteDocument(data: CreditNoteTemplateData) {
-  const { creditNote, business, linkedInvoiceDocNumber } = data;
+  const { creditNote, business, linkedInvoiceDocNumber, signature } = data;
 
   const billingAddress = addressLine(business.addresses?.billing);
   const customerAddress = addressLine(creditNote.customerSnapshot.billingAddress);
@@ -68,7 +82,11 @@ export async function CreditNoteDocument(data: CreditNoteTemplateData) {
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.businessName}>{business.brandName || business.name}</Text>
+            {business.logoUrl ? (
+              <Image style={styles.logoImg} src={business.logoUrl} />
+            ) : (
+              <Text style={styles.businessName}>{business.brandName || business.name}</Text>
+            )}
             {business.gstin ? <Text style={styles.muted}>GSTIN: {business.gstin}</Text> : null}
             {billingAddress ? <Text style={styles.muted}>{billingAddress}</Text> : null}
           </View>
@@ -149,6 +167,15 @@ export async function CreditNoteDocument(data: CreditNoteTemplateData) {
             <Text style={styles.bold}>Rs. {minorToRupeesString(creditNote.grandTotalMinor)}</Text>
           </View>
         </View>
+
+        {signature ? (
+          <View style={styles.footer}>
+            <View style={styles.alignRight}>
+              <Image style={styles.signatureImg} src={signature.imageUrl} />
+              <Text style={styles.muted}>Authorized Signatory</Text>
+            </View>
+          </View>
+        ) : null}
       </Page>
     </Document>
   );

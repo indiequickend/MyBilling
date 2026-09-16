@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findExpenseById } from "@/lib/db/queries/expenses";
@@ -8,6 +10,7 @@ import { minorToRupeesString } from "@/lib/utils/money";
 import { PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CancelExpenseButton, DeleteExpenseButton } from "./ExpenseActionButtons";
 
 export default async function ExpenseDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,7 +33,8 @@ export default async function ExpenseDetailPage({ params }: { params: Promise<{ 
       : null,
   ]);
 
-  const canCancel = can(context.membership, "expenses", "edit") && expense.status === "recorded";
+  const canEdit = can(context.membership, "expenses", "edit") && expense.status === "recorded";
+  const canCancel = canEdit;
   const canDelete = can(context.membership, "expenses", "delete") && expense.status === "cancelled";
 
   return (
@@ -46,6 +50,14 @@ export default async function ExpenseDetailPage({ params }: { params: Promise<{ 
           <p className="text-sm text-muted-foreground">{category?.name ?? "Uncategorized"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canEdit ? (
+            <Button variant="outline" asChild>
+              <Link href={`/expenses/${id}/edit`}>
+                <Pencil data-icon="inline-start" />
+                Edit
+              </Link>
+            </Button>
+          ) : null}
           {canCancel ? <CancelExpenseButton expenseId={id} /> : null}
           {canDelete ? <DeleteExpenseButton expenseId={id} /> : null}
         </div>

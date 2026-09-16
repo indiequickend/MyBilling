@@ -4,6 +4,8 @@ import { createCustomer } from "@/lib/db/queries/customers";
 import { createInvoice } from "@/lib/db/queries/invoices";
 import {
   createCreditNote,
+  updateCreditNote,
+  finalizeCreditNoteDraft,
   cancelCreditNote,
   softDeleteCreditNote,
   restoreCreditNote,
@@ -197,6 +199,119 @@ describe("credit notes — tenant isolation", () => {
     expect(list.items.map((cn) => String(cn._id))).toContain(id);
 
     await restoreCreditNote(id, tenants.businessAId);
+  });
+
+  it("updateCreditNote edits a draft's line items, but never another business's draft", async () => {
+    const created = await createCreditNote({
+      businessId: tenants.businessAId,
+      linkedInvoiceId: invoiceAId,
+      creditNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 10_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: false,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const id = String(created.creditNote._id);
+    expect(created.creditNote.status).toBe("draft");
+    expect(created.creditNote.docNumber).toBeUndefined();
+
+    const crossTenant = await updateCreditNote(id, tenants.businessBId, {
+      creditNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 99_999 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+    });
+    expect(crossTenant.ok).toBe(false);
+    if (!crossTenant.ok) expect(crossTenant.reason).toBe("not_found");
+
+    const updated = await updateCreditNote(id, tenants.businessAId, {
+      creditNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 40_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+    });
+    expect(updated.ok).toBe(true);
+    if (updated.ok) {
+      expect(updated.creditNote.status).toBe("draft");
+      expect(updated.creditNote.grandTotalMinor).toBe(40_000);
+    }
+  });
+
+  it("updateCreditNote refuses to edit an already-issued credit note", async () => {
+    const created = await createCreditNote({
+      businessId: tenants.businessAId,
+      linkedInvoiceId: invoiceAId,
+      creditNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 15_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+    });
+    if (!created.ok) throw new Error("setup failed");
+
+    const result = await updateCreditNote(String(created.creditNote._id), tenants.businessAId, {
+      creditNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 1_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+    });
+    expect(result).toEqual({ ok: false, reason: "not_editable" });
+  });
+
+  it("finalizeCreditNoteDraft turns a draft into a numbered, issued credit note scoped to its business", async () => {
+    const created = await createCreditNote({
+      businessId: tenants.businessAId,
+      linkedInvoiceId: invoiceAId,
+      creditNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 12_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: false,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const id = String(created.creditNote._id);
+
+    const finalized = await finalizeCreditNoteDraft(
+      id,
+      tenants.businessAId,
+      {
+        creditNoteDate: new Date(),
+        placeOfSupplyState: "Maharashtra",
+        lineItems: [{ ...lineItems[0], unitPriceMinor: 12_000 }],
+        discountType: "percentage",
+        discountValue: 0,
+        discountTarget: "total",
+        roundOff: false,
+      },
+      tenants.userAId,
+    );
+    expect(finalized.ok).toBe(true);
+    if (!finalized.ok) return;
+    expect(finalized.creditNote.status).toBe("issued");
+    expect(finalized.creditNote.docNumber).toMatch(/^CN-/);
+    expect(String(finalized.creditNote.businessId)).toBe(tenants.businessAId);
   });
 
   it("listCreditNotes never crosses businesses", async () => {

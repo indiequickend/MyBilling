@@ -31,6 +31,11 @@ const fixtureInvoice = {
   terms: "Net 15",
 } as unknown as InvoiceDoc;
 
+// A 1x1 transparent PNG, embedded as a data URI — react-pdf's Image accepts this directly with no
+// network fetch, unlike a real Cloudinary URL, so the logo/signature render path is testable here.
+const FIXTURE_IMAGE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
 describe("InvoiceDocument + renderPdf", () => {
   // Pure-JS (@react-pdf/renderer) — no headless browser / Chromium binary required, so this runs
   // the same way in CI, locally, and inside a Vercel serverless function.
@@ -40,6 +45,24 @@ describe("InvoiceDocument + renderPdf", () => {
       business: { name: "QuickTrails", brandName: "QuickTrails", gstin: "27BBBBB1111B1Z5" },
       bankAccount: { name: "Cash Account", upiId: "business@upi" },
       signature: null,
+    });
+
+    const pdf = await renderPdf(document);
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.byteLength).toBeGreaterThan(1000);
+  }, 30_000);
+
+  it("renders with a logo (in place of the business name text) and a signature, without crashing", async () => {
+    const document = await InvoiceDocument({
+      invoice: fixtureInvoice,
+      business: {
+        name: "QuickTrails",
+        brandName: "QuickTrails",
+        logoUrl: FIXTURE_IMAGE_DATA_URI,
+        gstin: "27BBBBB1111B1Z5",
+      },
+      bankAccount: { name: "Cash Account", upiId: "business@upi" },
+      signature: { imageUrl: FIXTURE_IMAGE_DATA_URI, name: "Owner" },
     });
 
     const pdf = await renderPdf(document);

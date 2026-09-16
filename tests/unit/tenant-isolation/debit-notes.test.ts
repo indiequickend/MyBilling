@@ -4,6 +4,8 @@ import { createVendor } from "@/lib/db/queries/vendors";
 import { createPurchase } from "@/lib/db/queries/purchases";
 import {
   createDebitNote,
+  updateDebitNote,
+  finalizeDebitNoteDraft,
   cancelDebitNote,
   softDeleteDebitNote,
   restoreDebitNote,
@@ -193,6 +195,119 @@ describe("debit notes — tenant isolation", () => {
     expect(list.items.map((dn) => String(dn._id))).toContain(id);
 
     await restoreDebitNote(id, tenants.businessAId);
+  });
+
+  it("updateDebitNote edits a draft's line items, but never another business's draft", async () => {
+    const created = await createDebitNote({
+      businessId: tenants.businessAId,
+      linkedPurchaseId: purchaseAId,
+      debitNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 10_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: false,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const id = String(created.debitNote._id);
+    expect(created.debitNote.status).toBe("draft");
+    expect(created.debitNote.docNumber).toBeUndefined();
+
+    const crossTenant = await updateDebitNote(id, tenants.businessBId, {
+      debitNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 99_999 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+    });
+    expect(crossTenant.ok).toBe(false);
+    if (!crossTenant.ok) expect(crossTenant.reason).toBe("not_found");
+
+    const updated = await updateDebitNote(id, tenants.businessAId, {
+      debitNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 40_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+    });
+    expect(updated.ok).toBe(true);
+    if (updated.ok) {
+      expect(updated.debitNote.status).toBe("draft");
+      expect(updated.debitNote.grandTotalMinor).toBe(40_000);
+    }
+  });
+
+  it("updateDebitNote refuses to edit an already-issued debit note", async () => {
+    const created = await createDebitNote({
+      businessId: tenants.businessAId,
+      linkedPurchaseId: purchaseAId,
+      debitNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 15_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+    });
+    if (!created.ok) throw new Error("setup failed");
+
+    const result = await updateDebitNote(String(created.debitNote._id), tenants.businessAId, {
+      debitNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 1_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+    });
+    expect(result).toEqual({ ok: false, reason: "not_editable" });
+  });
+
+  it("finalizeDebitNoteDraft turns a draft into a numbered, issued debit note scoped to its business", async () => {
+    const created = await createDebitNote({
+      businessId: tenants.businessAId,
+      linkedPurchaseId: purchaseAId,
+      debitNoteDate: new Date(),
+      placeOfSupplyState: "Maharashtra",
+      lineItems: [{ ...lineItems[0], unitPriceMinor: 12_000 }],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: false,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const id = String(created.debitNote._id);
+
+    const finalized = await finalizeDebitNoteDraft(
+      id,
+      tenants.businessAId,
+      {
+        debitNoteDate: new Date(),
+        placeOfSupplyState: "Maharashtra",
+        lineItems: [{ ...lineItems[0], unitPriceMinor: 12_000 }],
+        discountType: "percentage",
+        discountValue: 0,
+        discountTarget: "total",
+        roundOff: false,
+      },
+      tenants.userAId,
+    );
+    expect(finalized.ok).toBe(true);
+    if (!finalized.ok) return;
+    expect(finalized.debitNote.status).toBe("issued");
+    expect(finalized.debitNote.docNumber).toMatch(/^DN-/);
+    expect(String(finalized.debitNote.businessId)).toBe(tenants.businessAId);
   });
 
   it("listDebitNotes never crosses businesses", async () => {

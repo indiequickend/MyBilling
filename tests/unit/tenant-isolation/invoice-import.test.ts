@@ -93,7 +93,6 @@ describe("invoice bulk-import — tenant isolation", () => {
 
     // Business B can reuse the exact same docNumber — the uniqueness constraint is per-business.
     const customerB = await findOrCreateCustomerByName(tenants.businessBId, "Import Test Customer");
-    const cashAccountB = await findOrCreateImportBankAccount(tenants.businessBId, { mode: "cash" });
     const resultB = await importInvoice({
       businessId: tenants.businessBId,
       customerId: String(customerB._id),

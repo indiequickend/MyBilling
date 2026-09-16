@@ -1,4 +1,4 @@
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { minorToRupeesString } from "@/lib/utils/money";
 import type { DebitNoteDoc } from "@/lib/db/models/DebitNote";
 import type { AddressSubdoc } from "@/lib/db/models/shared/address";
@@ -8,6 +8,9 @@ export type DebitNoteTemplateData = {
   business: {
     name: string;
     brandName?: string;
+    /** 1st preference for the header identity — falls back to brandName, then name (the legal
+     * company name), when absent. */
+    logoUrl?: string;
     gstin?: string;
     addresses?: { billing?: AddressSubdoc | null; shipping?: AddressSubdoc | null };
   };
@@ -52,6 +55,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 4,
   },
+  logoImg: { height: 40, maxWidth: 180, objectFit: "contain", marginBottom: 4 },
 });
 
 /** Renders one Debit Note (purchase return) as a React-PDF Document — same shape as
@@ -67,7 +71,11 @@ export async function DebitNoteDocument(data: DebitNoteTemplateData) {
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.businessName}>{business.brandName || business.name}</Text>
+            {business.logoUrl ? (
+              <Image style={styles.logoImg} src={business.logoUrl} />
+            ) : (
+              <Text style={styles.businessName}>{business.brandName || business.name}</Text>
+            )}
             {business.gstin ? <Text style={styles.muted}>GSTIN: {business.gstin}</Text> : null}
             {billingAddress ? <Text style={styles.muted}>{billingAddress}</Text> : null}
           </View>

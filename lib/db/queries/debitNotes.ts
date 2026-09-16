@@ -60,6 +60,7 @@ export type DebitNoteWriteFailureReason =
   | "purchase_not_found"
   | "business_not_found"
   | "not_found"
+  | "not_editable"
   | "not_cancellable"
   | "not_deletable"
   | "insufficient_stock";
@@ -213,6 +214,184 @@ export async function createDebitNote(input: CreateDebitNoteInput): Promise<Debi
   } finally {
     await session.endSession();
   }
+}
+
+/** Everything except `linkedPurchaseId` — a debit note's linked purchase (and thus its vendor) is
+ * fixed at creation and never changes on edit, matching the form (shown as read-only text). */
+export type DebitNoteUpdateInput = Omit<DebitNoteWriteInput, "linkedPurchaseId" | "businessId">;
+
+type PreparedDebitNoteEdit = {
+  ok: true;
+  business: InstanceType<typeof Business>;
+  totals: ReturnType<typeof computeDocumentTotals>;
+  lineItemDocs: DebitNoteLineItemDoc[];
+};
+
+/** Shared by updateDebitNote/finalizeDebitNoteDraft: recompute totals for a line-item edit, same
+ * calculation createDebitNote itself runs at creation time. */
+async function prepareDebitNoteEdit(
+  businessId: string,
+  input: DebitNoteUpdateInput,
+): Promise<PreparedDebitNoteEdit | { ok: false; reason: DebitNoteWriteFailureReason }> {
+  const business = await Business.findOne({ _id: businessId, deletedAt: { $exists: false } });
+  if (!business) return { ok: false, reason: "business_not_found" };
+
+  const businessState = business.addresses?.billing?.state ?? "";
+  const lineItemCalcInputs: LineItemCalcInput[] = input.lineItems.map((li) => ({
+    quantity: li.quantity,
+    unitPriceMinor: li.unitPriceMinor,
+    discountType: li.discountType,
+    discountValue: li.discountValue,
+    taxRatePercent: li.taxRatePercent,
+  }));
+
+  const totals = computeDocumentTotals(
+    lineItemCalcInputs,
+    { type: input.discountType, value: input.discountValue, target: input.discountTarget },
+    input.roundOff,
+    businessState,
+    input.placeOfSupplyState,
+  );
+
+  const lineItemDocs: DebitNoteLineItemDoc[] = input.lineItems.map((li, i) => ({
+    productId: li.productId ? new mongoose.Types.ObjectId(li.productId) : undefined,
+    variantId: li.variantId ? new mongoose.Types.ObjectId(li.variantId) : undefined,
+    description: li.description,
+    notes: li.notes,
+    hsnOrSac: li.hsnOrSac,
+    unit: li.unit ?? "PCS",
+    quantity: li.quantity,
+    unitPriceMinor: li.unitPriceMinor,
+    discountType: li.discountType,
+    discountValue: li.discountValue,
+    taxRatePercent: li.taxRatePercent,
+    cgstMinor: totals.lineItems[i].cgstMinor,
+    sgstMinor: totals.lineItems[i].sgstMinor,
+    igstMinor: totals.lineItems[i].igstMinor,
+    taxableAmountMinor: totals.lineItems[i].taxableAmountMinor,
+    totalMinor: totals.lineItems[i].totalMinor,
+    warehouseId: li.warehouseId ? new mongoose.Types.ObjectId(li.warehouseId) : undefined,
+    batchId: li.batchId ? new mongoose.Types.ObjectId(li.batchId) : undefined,
+    serialNumbers: li.serialNumbers,
+  })) as DebitNoteLineItemDoc[];
+
+  return { ok: true, business, totals, lineItemDocs };
+}
+
+function buildDebitNoteSetFields(input: DebitNoteUpdateInput, prepared: PreparedDebitNoteEdit) {
+  return {
+    debitNoteDate: input.debitNoteDate,
+    reason: input.reason,
+    restockItems: input.restockItems ?? false,
+    placeOfSupplyState: input.placeOfSupplyState,
+    lineItems: prepared.lineItemDocs,
+    discountType: input.discountType,
+    discountValue: input.discountValue,
+    discountTarget: input.discountTarget,
+    discountAmountMinor: prepared.totals.discountAmountMinor,
+    roundOff: input.roundOff,
+    roundOffAmountMinor: prepared.totals.roundOffAmountMinor,
+    subtotalMinor: prepared.totals.subtotalMinor,
+    totalTaxMinor: prepared.totals.totalTaxMinor,
+    totalCgstMinor: prepared.totals.totalCgstMinor,
+    totalSgstMinor: prepared.totals.totalSgstMinor,
+    totalIgstMinor: prepared.totals.totalIgstMinor,
+    grandTotalMinor: prepared.totals.grandTotalMinor,
+  };
+}
+
+/** Edits a draft debit note's header/line items; issued/cancelled debit notes are immutable —
+ * matches CreditNote's updateCreditNote. Not transactional: a single document update, no
+ * numbering, no stock movements (a draft never moved stock in the first place). */
+export async function updateDebitNote(
+  debitNoteId: string,
+  businessId: string,
+  input: DebitNoteUpdateInput,
+): Promise<DebitNoteWriteResult> {
+  await connectToDatabase();
+  const existing = await DebitNote.findOne({ _id: debitNoteId, businessId, deletedAt: { $exists: false } });
+  if (!existing) return { ok: false, reason: "not_found" };
+  if (existing.status !== "draft") return { ok: false, reason: "not_editable" };
+
+  const prepared = await prepareDebitNoteEdit(businessId, input);
+  if (!prepared.ok) return prepared;
+
+  const updated = await DebitNote.findOneAndUpdate(
+    { _id: debitNoteId, businessId, status: "draft" },
+    { $set: buildDebitNoteSetFields(input, prepared) },
+    { returnDocument: "after" },
+  );
+  if (!updated) return { ok: false, reason: "not_found" };
+  return { ok: true, debitNote: updated };
+}
+
+class DebitNoteNoLongerDraftError extends Error {}
+
+/** Turns a draft into a numbered, issued debit note — the only place a draft ever gets a
+ * docNumber. Mirrors CreditNote's finalizeCreditNoteDraft. */
+export async function finalizeDebitNoteDraft(
+  debitNoteId: string,
+  businessId: string,
+  input: DebitNoteUpdateInput,
+  createdByUserId: string,
+): Promise<DebitNoteWriteResult> {
+  await connectToDatabase();
+  const existing = await DebitNote.findOne({ _id: debitNoteId, businessId, deletedAt: { $exists: false } });
+  if (!existing) return { ok: false, reason: "not_found" };
+  if (existing.status !== "draft") return { ok: false, reason: "not_editable" };
+
+  const prepared = await prepareDebitNoteEdit(businessId, input);
+  if (!prepared.ok) return prepared;
+
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  let result: DebitNoteWriteResult;
+  try {
+    let txResult!: DebitNoteWriteResult;
+    try {
+      await session.withTransaction(async () => {
+        const numbering = prepared.business.preferences?.documentNumbering;
+        const config = resolveNumberingConfig(numbering, "debit_note");
+        const seriesKey = resolveSeriesKey(input.debitNoteDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+        const number = await reserveNextDocumentNumber(businessId, "debit_note", seriesKey, session);
+        const docNumber = formatDocumentNumber(config, seriesKey, number);
+
+        const updated = await DebitNote.findOneAndUpdate(
+          { _id: debitNoteId, businessId, status: "draft" },
+          { $set: { ...buildDebitNoteSetFields(input, prepared), docNumber, seriesKey, status: "issued" } },
+          { returnDocument: "after", session },
+        );
+        if (!updated) throw new DebitNoteNoLongerDraftError();
+
+        if (input.restockItems) {
+          await writeDocumentStockMovements(session, {
+            businessId,
+            lineItems: updated.lineItems as DocumentStockLineItem[],
+            direction: "out",
+            reason: "debit_note",
+            refDocumentType: "debit_note",
+            refDocumentId: String(updated._id),
+            refDocumentNumber: docNumber,
+            createdByUserId,
+          });
+        }
+
+        txResult = { ok: true, debitNote: updated };
+      });
+      result = txResult;
+    } catch (err) {
+      if (err instanceof DebitNoteNoLongerDraftError) {
+        result = { ok: false, reason: "not_editable" };
+      } else if (err instanceof InsufficientStockError) {
+        result = { ok: false, reason: "insufficient_stock" };
+      } else {
+        throw err;
+      }
+    }
+  } finally {
+    await session.endSession();
+  }
+  return result;
 }
 
 export async function cancelDebitNote(debitNoteId: string, businessId: string): Promise<DebitNoteWriteResult> {

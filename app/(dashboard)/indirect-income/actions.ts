@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/rbac/can";
 import { indirectIncomeHeaderSchema } from "@/lib/validation/indirectIncome";
 import {
   createIndirectIncome,
+  updateIndirectIncome,
   cancelIndirectIncome,
   softDeleteIndirectIncome,
   restoreIndirectIncome,
@@ -33,6 +34,7 @@ const REASON_MESSAGES: Record<IndirectIncomeWriteFailureReason, string> = {
   invalid_bank_account: "Select a valid bank account.",
   invalid_customer: "Select a valid customer.",
   not_found: "Indirect income entry not found.",
+  not_editable: "Only recorded (not cancelled) entries can be edited.",
   not_cancellable: "This entry can't be cancelled.",
   not_deletable: "Only cancelled entries can be deleted.",
 };
@@ -46,12 +48,15 @@ function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
   return out;
 }
 
+/** One action handles both create and edit, via a hidden `indirectIncomeId` field — the same
+ * shape as saveExpenseAction. Editing only ever touches a "recorded" entry (see
+ * updateIndirectIncome). */
 export async function saveIndirectIncomeAction(
   _prev: IndirectIncomeFormState,
   formData: FormData,
 ): Promise<IndirectIncomeFormState> {
   const context = await requireDashboardContext();
-  requirePermission(context.membership, "indirect_income", "create");
+  const indirectIncomeId = String(formData.get("indirectIncomeId") ?? "") || undefined;
 
   const parsed = indirectIncomeHeaderSchema.safeParse({
     categoryId: formData.get("categoryId"),
@@ -68,8 +73,7 @@ export async function saveIndirectIncomeAction(
   }
 
   const h = parsed.data;
-  const result = await createIndirectIncome({
-    businessId: context.activeBusinessId,
+  const writeInput = {
     categoryId: h.categoryId,
     amountMinor: h.amountMinor,
     mode: h.mode,
@@ -78,8 +82,20 @@ export async function saveIndirectIncomeAction(
     sourceName: h.sourceName,
     description: h.description,
     incomeDate: new Date(h.incomeDate),
-    createdByUserId: context.membership.userId,
-  });
+  };
+
+  let result;
+  if (!indirectIncomeId) {
+    requirePermission(context.membership, "indirect_income", "create");
+    result = await createIndirectIncome({
+      businessId: context.activeBusinessId,
+      ...writeInput,
+      createdByUserId: context.membership.userId,
+    });
+  } else {
+    requirePermission(context.membership, "indirect_income", "edit");
+    result = await updateIndirectIncome(indirectIncomeId, context.activeBusinessId, writeInput);
+  }
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
 
   revalidatePath("/indirect-income");

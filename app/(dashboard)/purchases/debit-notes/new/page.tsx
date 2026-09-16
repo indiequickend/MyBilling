@@ -100,6 +100,7 @@ export default async function NewDebitNotePage({
     <div>
       <h1 className="mb-6 text-lg font-semibold">New debit note</h1>
       <DebitNoteForm
+        mode="create"
         linkedPurchaseId={purchaseId}
         vendorLabel={purchase.vendorSnapshot.displayName}
         purchaseDocNumber={purchase.docNumber ?? "Draft"}

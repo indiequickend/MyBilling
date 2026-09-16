@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/rbac/can";
 import { findProformaInvoiceById } from "@/lib/db/queries/proformaInvoices";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findBankAccountById } from "@/lib/db/queries/bankAccounts";
-import { findSignatureById } from "@/lib/db/queries/signatures";
+import { findSignatureById, findDefaultSignature } from "@/lib/db/queries/signatures";
 import { ProformaInvoiceDocument } from "@/lib/pdf/proformaInvoiceTemplate";
 import { renderPdf } from "@/lib/pdf/render";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
@@ -24,7 +24,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const business = await findBusinessById(context.businessId);
     if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-    const [bankAccount, signature] = await Promise.all([
+    const [bankAccount, explicitSignature] = await Promise.all([
       proformaInvoice.bankAccountId
         ? findBankAccountById(String(proformaInvoice.bankAccountId), context.businessId)
         : null,
@@ -32,12 +32,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         ? findSignatureById(String(proformaInvoice.signatureId), context.businessId)
         : null,
     ]);
+    // Fall back to the business's default signature when this proforma invoice never had one
+    // explicitly selected — every printable document should carry a signature when set.
+    const signature = explicitSignature ?? (await findDefaultSignature(context.businessId));
 
     const document = await ProformaInvoiceDocument({
       proformaInvoice,
       business: {
         name: business.name,
         brandName: business.brandName,
+        logoUrl: business.logoUrl,
         gstin: business.gstin,
         addresses: business.addresses,
       },

@@ -9,6 +9,7 @@ import { expenseHeaderSchema } from "@/lib/validation/expenses";
 import { parseCheckbox } from "@/lib/validation/shared";
 import {
   createExpense,
+  updateExpense,
   cancelExpense,
   softDeleteExpense,
   restoreExpense,
@@ -39,6 +40,7 @@ const REASON_MESSAGES: Record<ExpenseWriteFailureReason, string> = {
   invalid_vendor: "Select a valid vendor.",
   invalid_project: "Select a valid project.",
   not_found: "Expense not found.",
+  not_editable: "Only recorded (not cancelled) expenses can be edited.",
   not_cancellable: "This expense can't be cancelled.",
   not_deletable: "Only cancelled expenses can be deleted.",
 };
@@ -52,12 +54,14 @@ function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
   return out;
 }
 
+/** One action handles both create and edit, via a hidden `expenseId` field — the same shape as
+ * saveInvoiceAction. Editing only ever touches a "recorded" expense (see updateExpense). */
 export async function saveExpenseAction(
   _prev: ExpenseFormState,
   formData: FormData,
 ): Promise<ExpenseFormState> {
   const context = await requireDashboardContext();
-  requirePermission(context.membership, "expenses", "create");
+  const expenseId = String(formData.get("expenseId") ?? "") || undefined;
 
   const parsed = expenseHeaderSchema.safeParse({
     categoryId: formData.get("categoryId"),
@@ -84,8 +88,7 @@ export async function saveExpenseAction(
   }
 
   const h = parsed.data;
-  const result = await createExpense({
-    businessId: context.activeBusinessId,
+  const writeInput = {
     categoryId: h.categoryId,
     amountMinor: h.amountMinor,
     mode: h.mode,
@@ -104,8 +107,20 @@ export async function saveExpenseAction(
     tcsSectionCode: h.tcsSectionCode,
     tcsRatePercent: h.tcsRatePercent,
     tcsAmountMinor: h.tcsAmountMinor,
-    createdByUserId: context.membership.userId,
-  });
+  };
+
+  let result;
+  if (!expenseId) {
+    requirePermission(context.membership, "expenses", "create");
+    result = await createExpense({
+      businessId: context.activeBusinessId,
+      ...writeInput,
+      createdByUserId: context.membership.userId,
+    });
+  } else {
+    requirePermission(context.membership, "expenses", "edit");
+    result = await updateExpense(expenseId, context.activeBusinessId, writeInput);
+  }
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
 
   const receipt = formData.get("receipt");

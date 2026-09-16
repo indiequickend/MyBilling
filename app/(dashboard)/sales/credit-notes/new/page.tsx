@@ -102,6 +102,7 @@ export default async function NewCreditNotePage({
     <div>
       <h1 className="mb-6 text-lg font-semibold">New credit note</h1>
       <CreditNoteForm
+        mode="create"
         linkedInvoiceId={invoiceId}
         customerLabel={invoice.customerSnapshot.displayName}
         invoiceDocNumber={invoice.docNumber ?? "Draft"}

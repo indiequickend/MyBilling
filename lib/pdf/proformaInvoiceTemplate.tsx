@@ -9,6 +9,9 @@ export type ProformaInvoiceTemplateData = {
   business: {
     name: string;
     brandName?: string;
+    /** 1st preference for the header identity — falls back to brandName, then name (the legal
+     * company name), when absent. */
+    logoUrl?: string;
     gstin?: string;
     addresses?: { billing?: AddressSubdoc | null; shipping?: AddressSubdoc | null };
   };
@@ -62,6 +65,7 @@ const styles = StyleSheet.create({
   },
   signatureImg: { height: 48, objectFit: "contain" },
   qrImg: { height: 90, width: 90 },
+  logoImg: { height: 40, maxWidth: 180, objectFit: "contain", marginBottom: 4 },
 });
 
 /** Renders one Pro Forma Invoice as a React-PDF Document. Pure-JS layout (no headless browser),
@@ -87,7 +91,11 @@ export async function ProformaInvoiceDocument(data: ProformaInvoiceTemplateData)
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.businessName}>{business.brandName || business.name}</Text>
+            {business.logoUrl ? (
+              <Image style={styles.logoImg} src={business.logoUrl} />
+            ) : (
+              <Text style={styles.businessName}>{business.brandName || business.name}</Text>
+            )}
             {business.gstin ? <Text style={styles.muted}>GSTIN: {business.gstin}</Text> : null}
             {billingAddress ? <Text style={styles.muted}>{billingAddress}</Text> : null}
           </View>
@@ -165,19 +173,6 @@ export async function ProformaInvoiceDocument(data: ProformaInvoiceTemplateData)
           </View>
         </View>
 
-        {proformaInvoice.notes ? (
-          <View style={styles.section}>
-            <Text style={styles.bold}>Notes</Text>
-            <Text>{proformaInvoice.notes}</Text>
-          </View>
-        ) : null}
-        {proformaInvoice.terms ? (
-          <View style={{ marginTop: 8 }}>
-            <Text style={styles.bold}>Terms</Text>
-            <Text>{proformaInvoice.terms}</Text>
-          </View>
-        ) : null}
-
         <View style={styles.footer}>
           <View>
             {bankAccount ? (
@@ -198,6 +193,19 @@ export async function ProformaInvoiceDocument(data: ProformaInvoiceTemplateData)
             </View>
           ) : null}
         </View>
+
+        {proformaInvoice.notes ? (
+          <View style={styles.section}>
+            <Text style={styles.bold}>Notes</Text>
+            <Text>{proformaInvoice.notes}</Text>
+          </View>
+        ) : null}
+        {proformaInvoice.terms ? (
+          <View style={{ marginTop: 8 }}>
+            <Text style={styles.bold}>Terms</Text>
+            <Text>{proformaInvoice.terms}</Text>
+          </View>
+        ) : null}
       </Page>
     </Document>
   );

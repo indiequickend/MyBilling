@@ -16,17 +16,28 @@ import { saveCreditNoteAction, type CreditNoteFormState } from "./actions";
 
 const initialState: CreditNoteFormState = {};
 
-function SubmitButton() {
+function SubmitIntentButton({
+  intent,
+  variant = "outline",
+  children,
+}: {
+  intent: "draft" | "finalize" | "finalize_print";
+  variant?: "default" | "outline";
+  children: React.ReactNode;
+}) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" name="intent" value={intent} disabled={pending} variant={variant}>
       {pending ? <Loader2 className="size-4 animate-spin" data-icon="inline-start" /> : null}
-      Issue credit note
+      {children}
     </Button>
   );
 }
 
 export function CreditNoteForm({
+  mode,
+  creditNoteId,
+  editableStatus,
   linkedInvoiceId,
   customerLabel,
   invoiceDocNumber,
@@ -35,6 +46,9 @@ export function CreditNoteForm({
   defaultWarehouseId,
   defaultValues,
 }: {
+  mode: "create" | "edit";
+  creditNoteId?: string;
+  editableStatus?: "draft";
   linkedInvoiceId: string;
   customerLabel: string;
   invoiceDocNumber: string;
@@ -54,10 +68,12 @@ export function CreditNoteForm({
   };
 }) {
   const [state, formAction] = useActionState(saveCreditNoteAction, initialState);
+  const canDraft = mode === "create" || editableStatus === "draft";
 
   return (
     <form action={formAction} className="space-y-6">
       <FormError message={state.error} />
+      {creditNoteId ? <input type="hidden" name="creditNoteId" value={creditNoteId} /> : null}
       <input type="hidden" name="linkedInvoiceId" value={linkedInvoiceId} />
 
       <Card>
@@ -161,7 +177,11 @@ export function CreditNoteForm({
       </Card>
 
       <div className="sticky bottom-0 z-20 flex items-center gap-3 border-t bg-background/95 py-3 backdrop-blur-sm">
-        <SubmitButton />
+        {canDraft ? <SubmitIntentButton intent="draft">Save as Draft</SubmitIntentButton> : null}
+        <SubmitIntentButton intent="finalize_print">Save &amp; Print</SubmitIntentButton>
+        <SubmitIntentButton intent="finalize" variant="default">
+          {canDraft ? "Issue credit note" : "Save changes"}
+        </SubmitIntentButton>
       </div>
     </form>
   );

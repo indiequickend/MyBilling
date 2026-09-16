@@ -15,6 +15,16 @@ export async function findSignatureById(signatureId: string, businessId: string)
   return Signature.findOne({ _id: signatureId, businessId });
 }
 
+/** The business's one designated default signature (see setDefaultSignature, which guarantees at
+ * most one per business), or null if none has been set. Used as the PDF fallback for a document
+ * that has no explicit signatureId of its own, and as the only signature source for document
+ * types (Quotation, Sales Order, Credit Note, Debit Note) that don't offer a per-document
+ * signature picker at all. */
+export async function findDefaultSignature(businessId: string) {
+  await connectToDatabase();
+  return Signature.findOne({ businessId, isDefault: true, deletedAt: { $exists: false } });
+}
+
 export async function isOwnedSignature(signatureId: string, businessId: string): Promise<boolean> {
   await connectToDatabase();
   const count = await Signature.countDocuments({
