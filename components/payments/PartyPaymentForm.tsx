@@ -5,9 +5,11 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError } from "@/components/auth/AuthCard";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
-import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { PAYMENT_MODES, PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
+import { PartyComboboxField } from "@/components/documents/PartyComboboxField";
+import { quickCreateCustomerAction } from "@/app/(dashboard)/customers/actions";
+import { quickCreateVendorAction } from "@/app/(dashboard)/vendors/actions";
 
 type PartyPaymentActionState = { error?: string };
 
@@ -35,14 +37,8 @@ export function PartyPaymentForm({
     | { partyId?: undefined; parties: Array<{ id: string; label: string }> }
   )) {
   const [state, formAction] = useActionState(action, {});
+  const quickCreateAction = partyType === "customer" ? quickCreateCustomerAction : quickCreateVendorAction;
 
-  if (parties && parties.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Add a {partyType === "customer" ? "customer" : "vendor"} first to record a payment against them.
-      </p>
-    );
-  }
   if (bankAccounts.length === 0) {
     return (
       <p className="text-sm text-accent-mint-foreground/80">
@@ -68,7 +64,9 @@ export function PartyPaymentForm({
       {parties ? (
         <Field>
           <FieldLabel htmlFor={partyIdFieldName}>{partyType === "customer" ? "Customer" : "Vendor"}</FieldLabel>
-          <ComboboxField
+          <PartyComboboxField
+            partyType={partyType}
+            action={quickCreateAction}
             name={partyIdFieldName}
             placeholder={`Select a ${partyType}…`}
             searchPlaceholder={`Search ${partyType === "customer" ? "customers" : "vendors"}…`}

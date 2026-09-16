@@ -236,11 +236,28 @@ export async function updateProduct(
     normalizedUpdates = { ...updates, stockTracking: normalized.stockTracking, batches: normalized.batches };
   }
 
-  const product = await Product.findOneAndUpdate(
-    { _id: productId, businessId },
-    { $set: normalizedUpdates },
-    { returnDocument: "after" },
-  );
+  // Mongoose's castUpdate silently drops any `$set` key whose value is `undefined` — which is
+  // exactly what an intentionally-cleared optional field (hsnOrSac, categoryId, purchasePriceMinor,
+  // ...) looks like after the Zod schema's empty-string-to-undefined transform. Route those keys
+  // through `$unset` instead, or the old value survives the "clear" untouched. A key that was never
+  // part of `updates` at all (the partial API PATCH route) is simply absent here, not `undefined`,
+  // so it's correctly left out of both operators and stays untouched.
+  const setFields: Record<string, unknown> = {};
+  const unsetFields: Record<string, ""> = {};
+  for (const [key, value] of Object.entries(normalizedUpdates)) {
+    if (value === undefined) {
+      unsetFields[key] = "";
+    } else {
+      setFields[key] = value;
+    }
+  }
+  const updateOp: Record<string, unknown> = {};
+  if (Object.keys(setFields).length > 0) updateOp.$set = setFields;
+  if (Object.keys(unsetFields).length > 0) updateOp.$unset = unsetFields;
+
+  const product = await Product.findOneAndUpdate({ _id: productId, businessId }, updateOp, {
+    returnDocument: "after",
+  });
   if (!product) return { ok: false, reason: "not_found" };
   return { ok: true, product };
 }

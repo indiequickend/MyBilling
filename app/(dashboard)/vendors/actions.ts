@@ -20,6 +20,11 @@ import { recordAuditLog } from "@/lib/db/queries/auditLog";
 import type { ActionKey } from "@/lib/rbac/permissions";
 
 export type VendorFormState = { error?: string; fieldErrors?: Record<string, string> };
+export type QuickAddVendorState = {
+  error?: string;
+  fieldErrors?: Record<string, string>;
+  created?: { id: string; label: string };
+};
 export type VendorPaymentActionState = { error?: string };
 export type RevealResult = { ok: true; value: string } | { ok: false; error: string };
 
@@ -88,6 +93,60 @@ export async function createVendorAction(
 
   revalidatePath("/vendors");
   redirect(`/vendors/${String(result.vendor._id)}/ledger`);
+}
+
+const EMPTY_ADDRESS = {
+  line1: "",
+  line2: "",
+  city: "",
+  state: "",
+  postalCode: "",
+  country: "",
+};
+
+/** Quick-add from a document's vendor picker (Purchase/Purchase Order/etc.) — same validation and
+ * permission check as createVendorAction, but returns the created vendor instead of redirecting,
+ * so the calling dialog can select it without leaving the document form. */
+export async function quickCreateVendorAction(
+  _prev: QuickAddVendorState,
+  formData: FormData,
+): Promise<QuickAddVendorState> {
+  const context = await requireVendorsPermission("create");
+
+  const parsed = vendorSchema.safeParse({
+    displayName: formData.get("displayName"),
+    companyName: formData.get("companyName"),
+    gstin: formData.get("gstin"),
+    email: formData.get("email"),
+    phone: formData.get("phone"),
+    groupIds: [],
+    notes: "",
+  });
+  if (!parsed.success) {
+    return {
+      error: "Fix the errors below and try again.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const result = await createVendor({
+    businessId: context.activeBusinessId,
+    ...parsed.data,
+    billingAddress: EMPTY_ADDRESS,
+    shippingAddress: EMPTY_ADDRESS,
+  });
+  if (!result.ok) {
+    return { error: "Something went wrong. Try again." };
+  }
+
+  revalidatePath("/vendors");
+  const vendor = result.vendor;
+  return {
+    created: {
+      id: String(vendor._id),
+      label: vendor.companyName ? `${vendor.displayName} (${vendor.companyName})` : vendor.displayName,
+    },
+  };
 }
 
 export async function updateVendorAction(

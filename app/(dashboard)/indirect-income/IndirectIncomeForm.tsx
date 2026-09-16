@@ -5,12 +5,13 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
-import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { FormError } from "@/components/auth/AuthCard";
 import { PAYMENT_MODES, PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
+import { PartyComboboxField } from "@/components/documents/PartyComboboxField";
+import { quickCreateCustomerAction } from "@/app/(dashboard)/customers/actions";
 import { saveIndirectIncomeAction, type IndirectIncomeFormState } from "./actions";
 
 const initialState: IndirectIncomeFormState = {};
@@ -119,7 +120,9 @@ export function IndirectIncomeForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="customerId">Customer (optional)</FieldLabel>
-                <ComboboxField
+                <PartyComboboxField
+                  partyType="customer"
+                  action={quickCreateCustomerAction}
                   name="customerId"
                   defaultValue={defaultValues?.customerId}
                   placeholder="None"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { ChevronsUpDownIcon } from "lucide-react";
 import {
   Command,
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 export function ComboboxField({
   name,
   defaultValue = "",
+  value: controlledValue,
   placeholder,
   searchPlaceholder = "Search…",
   emptyText = "No results found.",
@@ -32,6 +33,9 @@ export function ComboboxField({
    * the equivalent note on SelectField. */
   name?: string;
   defaultValue?: string;
+  /** Opt into controlled mode — e.g. a party combobox that must re-select the option it just
+   * created via a quick-add dialog. Omit for the normal defaultValue-only/uncontrolled usage. */
+  value?: string;
   placeholder: string;
   searchPlaceholder?: string;
   emptyText?: string;
@@ -43,7 +47,11 @@ export function ComboboxField({
 }) {
   const listId = useId();
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(defaultValue);
+  const [value, setValue] = useState(controlledValue ?? defaultValue);
+
+  useEffect(() => {
+    if (controlledValue !== undefined) setValue(controlledValue);
+  }, [controlledValue]);
 
   const selectedLabel = useMemo(
     () => options.find((o) => o.value === value)?.label,

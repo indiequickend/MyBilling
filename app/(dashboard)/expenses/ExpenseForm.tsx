@@ -5,13 +5,14 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
-import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { FormError } from "@/components/auth/AuthCard";
 import { PAYMENT_MODES, PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
+import { PartyComboboxField } from "@/components/documents/PartyComboboxField";
+import { quickCreateVendorAction } from "@/app/(dashboard)/vendors/actions";
 import { saveExpenseAction, type ExpenseFormState } from "./actions";
 
 const initialState: ExpenseFormState = {};
@@ -134,7 +135,9 @@ export function ExpenseForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="vendorId">Vendor (optional)</FieldLabel>
-                <ComboboxField
+                <PartyComboboxField
+                  partyType="vendor"
+                  action={quickCreateVendorAction}
                   name="vendorId"
                   defaultValue={defaultValues?.vendorId}
                   placeholder="None"

@@ -20,6 +20,11 @@ import { recordAuditLog } from "@/lib/db/queries/auditLog";
 import type { ActionKey } from "@/lib/rbac/permissions";
 
 export type CustomerFormState = { error?: string; fieldErrors?: Record<string, string> };
+export type QuickAddCustomerState = {
+  error?: string;
+  fieldErrors?: Record<string, string>;
+  created?: { id: string; label: string };
+};
 export type CustomerPaymentActionState = { error?: string };
 export type RevealResult = { ok: true; value: string } | { ok: false; error: string };
 
@@ -88,6 +93,62 @@ export async function createCustomerAction(
 
   revalidatePath("/customers");
   redirect(`/customers/${String(result.customer._id)}/ledger`);
+}
+
+const EMPTY_ADDRESS = {
+  line1: "",
+  line2: "",
+  city: "",
+  state: "",
+  postalCode: "",
+  country: "",
+};
+
+/** Quick-add from a document's customer picker (Invoice/Quotation/etc.) — same validation and
+ * permission check as createCustomerAction, but returns the created customer instead of
+ * redirecting, so the calling dialog can select it without leaving the document form. */
+export async function quickCreateCustomerAction(
+  _prev: QuickAddCustomerState,
+  formData: FormData,
+): Promise<QuickAddCustomerState> {
+  const context = await requireCustomersPermission("create");
+
+  const parsed = customerSchema.safeParse({
+    displayName: formData.get("displayName"),
+    companyName: formData.get("companyName"),
+    gstin: formData.get("gstin"),
+    email: formData.get("email"),
+    phone: formData.get("phone"),
+    groupIds: [],
+    notes: "",
+  });
+  if (!parsed.success) {
+    return {
+      error: "Fix the errors below and try again.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const result = await createCustomer({
+    businessId: context.activeBusinessId,
+    ...parsed.data,
+    billingAddress: EMPTY_ADDRESS,
+    shippingAddress: EMPTY_ADDRESS,
+  });
+  if (!result.ok) {
+    return { error: "Something went wrong. Try again." };
+  }
+
+  revalidatePath("/customers");
+  const customer = result.customer;
+  return {
+    created: {
+      id: String(customer._id),
+      label: customer.companyName
+        ? `${customer.displayName} (${customer.companyName})`
+        : customer.displayName,
+    },
+  };
 }
 
 export async function updateCustomerAction(

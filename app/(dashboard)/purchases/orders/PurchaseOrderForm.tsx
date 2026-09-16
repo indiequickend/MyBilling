@@ -5,7 +5,6 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
-import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,8 @@ import { FormError } from "@/components/auth/AuthCard";
 import { DISCOUNT_TARGETS, DISCOUNT_TARGET_LABELS } from "@/lib/constants/invoices";
 import type { CustomFieldType } from "@/lib/validation/shared";
 import { LineItemsEditor, type LineItemRow } from "@/components/documents/LineItemsEditor";
+import { PartyComboboxField } from "@/components/documents/PartyComboboxField";
+import { quickCreateVendorAction } from "@/app/(dashboard)/vendors/actions";
 import { savePurchaseOrderAction, type PurchaseOrderFormState } from "./actions";
 
 const initialState: PurchaseOrderFormState = {};
@@ -110,7 +111,9 @@ export function PurchaseOrderForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field data-invalid={state.fieldErrors?.vendorId ? true : undefined}>
                 <FieldLabel htmlFor="vendorId">Vendor</FieldLabel>
-                <ComboboxField
+                <PartyComboboxField
+                  partyType="vendor"
+                  action={quickCreateVendorAction}
                   name="vendorId"
                   defaultValue={defaultValues?.vendorId}
                   placeholder="Select a vendor…"

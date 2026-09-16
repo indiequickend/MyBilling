@@ -5,7 +5,6 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
-import { ComboboxField } from "@/components/ui/ComboboxField";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,8 @@ import { DISCOUNT_TARGETS, DISCOUNT_TARGET_LABELS } from "@/lib/constants/invoic
 import type { CustomFieldType } from "@/lib/validation/shared";
 import { LineItemsEditor, type LineItemRow } from "@/components/documents/LineItemsEditor";
 import { PaymentSplitsEditor } from "@/components/documents/PaymentSplitsEditor";
+import { PartyComboboxField } from "@/components/documents/PartyComboboxField";
+import { quickCreateCustomerAction } from "@/app/(dashboard)/customers/actions";
 import { saveInvoiceAction, type InvoiceFormState } from "./actions";
 
 const initialState: InvoiceFormState = {};
@@ -147,7 +148,9 @@ export function InvoiceForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field data-invalid={state.fieldErrors?.customerId ? true : undefined}>
                 <FieldLabel htmlFor="customerId">Customer</FieldLabel>
-                <ComboboxField
+                <PartyComboboxField
+                  partyType="customer"
+                  action={quickCreateCustomerAction}
                   name="customerId"
                   defaultValue={defaultValues?.customerId}
                   placeholder="Select a customer…"
