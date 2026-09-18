@@ -9,7 +9,7 @@ import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
 import { isOwnedProject } from "@/lib/db/queries/projects";
-import { createPayment, type CreatePaymentInput } from "@/lib/db/queries/payments";
+import { createPayment, claimMatchingUnlinkedPayment, type CreatePaymentInput } from "@/lib/db/queries/payments";
 import {
   writeDocumentStockMovements,
   InsufficientStockError,
@@ -860,23 +860,41 @@ export async function importPurchase(input: ImportPurchaseInput): Promise<Import
 
         const createdPayments: InstanceType<typeof Payment>[] = [];
         for (const split of input.payments) {
-          const payment = await createPayment(
+          // A standalone-payments import may already have booked this money as an unlinked
+          // advance — link that one instead of creating a duplicate.
+          const claimed = await claimMatchingUnlinkedPayment(
             {
               businessId: input.businessId,
               partyType: "vendor",
               partyId: String(vendor._id),
               direction: "out",
               amountMinor: split.amountMinor,
-              mode: split.mode,
-              bankAccountId: split.bankAccountId,
               paymentDate: split.paymentDate,
-              linkedDocumentType: "purchase",
-              linkedDocumentId: String(purchaseDoc._id),
-              referenceNote: split.referenceNote,
-              createdByUserId: input.createdByUserId,
             },
+            "purchase",
+            purchaseDoc._id,
             session,
           );
+          const payment =
+            claimed ??
+            (await createPayment(
+              {
+                businessId: input.businessId,
+                partyType: "vendor",
+                partyId: String(vendor._id),
+                direction: "out",
+                amountMinor: split.amountMinor,
+                mode: split.mode,
+                bankAccountId: split.bankAccountId,
+                paymentDate: split.paymentDate,
+                linkedDocumentType: "purchase",
+                linkedDocumentId: String(purchaseDoc._id),
+                referenceNote: split.referenceNote,
+                createdByUserId: input.createdByUserId,
+              },
+              session,
+
+            ));
           createdPayments.push(payment);
         }
 

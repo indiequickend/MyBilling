@@ -105,6 +105,68 @@ describe("purchase/purchase-order/proforma-invoice/payment bulk-import — tenan
     expect(dup).toEqual({ ok: false, reason: "duplicate_doc_number" });
   });
 
+  it("never stores the same money twice when a payment is imported both inline on a purchase and as a standalone payment", async () => {
+    const vendor = await findOrCreateVendorByName(tenants.businessAId, "Overlap Vendor");
+    const cash = await findOrCreateImportBankAccount(tenants.businessAId, { mode: "cash" });
+    const date = new Date("2026-07-01");
+    const purchaseInput = (docNumber: string) => ({
+      businessId: tenants.businessAId,
+      vendorId: String(vendor._id),
+      docNumber,
+      purchaseDate: date,
+      placeOfSupplyState: "West Bengal",
+      lineItemDescription: "Imported purchase",
+      subtotalMinor: 5000_00,
+      discountAmountMinor: 0,
+      totalTaxMinor: 0,
+      grandTotalMinor: 5000_00,
+      payments: [{ amountMinor: 5000_00, mode: "cash" as const, bankAccountId: String(cash._id), paymentDate: date }],
+      createdByUserId: tenants.userAId,
+    });
+    const standalone = (voucherNumber: string) => ({
+      businessId: tenants.businessAId,
+      voucherNumber,
+      partyType: "vendor" as const,
+      partyId: String(vendor._id),
+      direction: "out" as const,
+      amountMinor: 5000_00,
+      mode: "cash" as const,
+      bankAccountId: String(cash._id),
+      paymentDate: date,
+      createdByUserId: tenants.userAId,
+    });
+    const totalOut = async () => {
+      const rows = await Payment.find({
+        businessId: tenants.businessAId,
+        partyId: vendor._id,
+        voidedAt: { $exists: false },
+      }).lean();
+      return rows.reduce((s, p) => s + p.amountMinor, 0);
+    };
+
+    // Order 1: purchase (with inline payment) first, then the same payment as a standalone row.
+    const first = await importPurchase(purchaseInput("PUR/OVERLAP/1"));
+    expect(first.ok).toBe(true);
+    const dup = await importStandalonePayment(standalone("VCH/OVERLAP/1"));
+    expect(dup).toEqual({ ok: false, reason: "already_recorded_on_document" });
+    expect(await totalOut()).toBe(5000_00);
+
+    // Order 2: standalone (unlinked) first, then a purchase carrying the same payment inline.
+    const vendor2 = await findOrCreateVendorByName(tenants.businessAId, "Overlap Vendor 2");
+    const standalone2 = { ...standalone("VCH/OVERLAP/2"), partyId: String(vendor2._id) };
+    expect((await importStandalonePayment(standalone2)).ok).toBe(true);
+    const second = await importPurchase({
+      ...purchaseInput("PUR/OVERLAP/2"),
+      vendorId: String(vendor2._id),
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    const rows = await Payment.find({ businessId: tenants.businessAId, partyId: vendor2._id }).lean();
+    expect(rows).toHaveLength(1);
+    expect(String(rows[0].linkedDocumentId)).toBe(String(second.purchase._id));
+    expect(second.purchase.status).toBe("paid");
+  });
+
   it("importPurchase rejects a vendor that belongs to a different business", async () => {
     const vendorB = await findOrCreateVendorByName(tenants.businessBId, "Cross Tenant Vendor");
     const result = await importPurchase({

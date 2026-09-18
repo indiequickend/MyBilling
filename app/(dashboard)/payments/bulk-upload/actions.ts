@@ -40,6 +40,8 @@ function importErrorMessage(reason: ImportStandalonePaymentFailureReason): strin
       return "Could not resolve a bank/cash account for this payment.";
     case "duplicate_voucher_number":
       return "A payment with this voucher number already exists.";
+    case "already_recorded_on_document":
+      return "Skipped: this payment (same party, amount and date) is already recorded on an imported invoice/purchase.";
   }
 }
 

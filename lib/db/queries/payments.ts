@@ -1038,7 +1038,74 @@ export type ImportStandalonePaymentInput = {
 export type ImportStandalonePaymentFailureReason =
   | "party_not_found"
   | "invalid_bank_account"
-  | "duplicate_voucher_number";
+  | "duplicate_voucher_number"
+  | "already_recorded_on_document";
+
+type PaymentIdentity = {
+  businessId: string;
+  partyType: "customer" | "vendor";
+  partyId: string;
+  direction: "in" | "out";
+  amountMinor: number;
+  paymentDate: Date;
+};
+
+/** Same-UTC-day window: CSV dates carry no time, so "same payment" means same calendar day. */
+function sameDayRange(date: Date) {
+  const start = new Date(date);
+  start.setUTCHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setUTCHours(23, 59, 59, 999);
+  return { $gte: start, $lte: end };
+}
+
+function paymentIdentityFilter(identity: PaymentIdentity) {
+  return {
+    businessId: identity.businessId,
+    partyType: identity.partyType,
+    partyId: identity.partyId,
+    direction: identity.direction,
+    amountMinor: identity.amountMinor,
+    paymentDate: sameDayRange(identity.paymentDate),
+    voidedAt: { $exists: false },
+  };
+}
+
+/**
+ * Bulk-import overlap guard. A purchase/invoice import already books its inline payments as
+ * document-linked Payments; importing the same money again through the standalone payments file
+ * would store it twice (inflating "You Gave"/"You Got"). Finds the existing document-linked
+ * payment with the same party/direction/amount/day, if any.
+ */
+async function findDocumentLinkedTwin(identity: PaymentIdentity) {
+  return Payment.exists({
+    ...paymentIdentityFilter(identity),
+    linkedDocumentId: { $exists: true },
+  });
+}
+
+/**
+ * The reverse overlap: standalone payments were imported first (as unlinked advances) and the
+ * purchase/invoice import now carries the same payment inline. Instead of creating a second
+ * Payment, link the existing unlinked one to the document — money is neither created nor lost.
+ * Must run inside the caller's transaction (`session`).
+ */
+export async function claimMatchingUnlinkedPayment(
+  identity: PaymentIdentity,
+  linkedDocumentType: "invoice" | "purchase",
+  linkedDocumentId: mongoose.Types.ObjectId,
+  session: ClientSession,
+) {
+  const twin = await Payment.findOne({
+    ...paymentIdentityFilter(identity),
+    linkedDocumentId: { $exists: false },
+  }).session(session);
+  if (!twin) return null;
+  twin.linkedDocumentType = linkedDocumentType;
+  twin.linkedDocumentId = linkedDocumentId;
+  await twin.save({ session });
+  return twin;
+}
 
 export type ImportStandalonePaymentResult =
   | { ok: true; payment: InstanceType<typeof Payment> }
@@ -1064,6 +1131,18 @@ export async function importStandalonePayment(
 
   const clash = await Payment.findOne({ businessId: input.businessId, docNumber: input.voucherNumber });
   if (clash) return { ok: false, reason: "duplicate_voucher_number" };
+
+  if (input.partyType && input.partyId) {
+    const twin = await findDocumentLinkedTwin({
+      businessId: input.businessId,
+      partyType: input.partyType,
+      partyId: input.partyId,
+      direction: input.direction,
+      amountMinor: input.amountMinor,
+      paymentDate: input.paymentDate,
+    });
+    if (twin) return { ok: false, reason: "already_recorded_on_document" };
+  }
 
   try {
     const payment = await Payment.create({
