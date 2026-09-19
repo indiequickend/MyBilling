@@ -6,6 +6,7 @@ import { findPurchaseById } from "@/lib/db/queries/purchases";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { DebitNoteDocument } from "@/lib/pdf/debitNoteTemplate";
 import { renderPdf } from "@/lib/pdf/render";
+import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
 
 /** GET, no CSRF needed (read-only) — returns a binary application/pdf response, which a Server
@@ -42,7 +43,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${debitNote.docNumber ?? "debit-note-draft"}.pdf"`,
+        "Content-Disposition": pdfContentDisposition("inline", debitNote.docNumber ?? "debit-note-draft"),
       },
     });
   } catch (err) {

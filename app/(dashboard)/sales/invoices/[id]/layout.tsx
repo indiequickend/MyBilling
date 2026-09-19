@@ -56,7 +56,7 @@ export default async function InvoiceDetailLayout({
         <div className="flex flex-wrap items-center gap-2">
           {invoice.docNumber ? (
             <Button variant="outline" asChild>
-              <a href={`/api/sales/invoices/${id}/pdf`}>
+              <a href={`/api/sales/invoices/${id}/pdf`} target="_blank" rel="noopener noreferrer">
                 <Download data-icon="inline-start" />
                 Download PDF
               </a>

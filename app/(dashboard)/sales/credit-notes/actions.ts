@@ -160,7 +160,10 @@ export async function saveCreditNoteAction(
 
   revalidatePath("/sales/credit-notes");
   const savedId = String(result.creditNote._id);
-  if (intent === "finalize_print") redirect(`/api/sales/credit-notes/${savedId}/pdf`);
+  if (intent === "finalize_print") {
+    // A redirect can only replace this tab, so land on the document and let OpenPdfOnLoad open the PDF in a new one.
+    redirect(`/sales/credit-notes/${savedId}?openPdf=${encodeURIComponent(`/api/sales/credit-notes/${savedId}/pdf`)}`);
+  }
   redirect(`/sales/credit-notes/${savedId}`);
 }
 

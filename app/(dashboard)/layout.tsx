@@ -4,6 +4,7 @@ import { buildNavGroups, buildBottomTabItems, buildQuickCreateItems } from "@/li
 import { SidebarNav } from "@/components/dashboard/SidebarNav";
 import { Topbar } from "@/components/dashboard/Topbar";
 import { BottomTabBar } from "@/components/dashboard/BottomTabBar";
+import { OpenPdfOnLoad } from "@/components/dashboard/OpenPdfOnLoad";
 
 // Every page under this layout depends on the live session/business/permission
 // state for the current request — none of it may be statically prerendered or
@@ -42,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <main className="min-w-0 flex-1 overflow-x-hidden p-4 pb-20 md:p-6 md:pb-6 lg:p-8">{children}</main>
       </div>
       <BottomTabBar items={bottomTabItems} main={main} settings={settings} />
+      <OpenPdfOnLoad />
     </div>
   );
 }

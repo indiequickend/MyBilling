@@ -78,7 +78,7 @@ export default async function PurchaseOrderDetailLayout({
           ) : null}
           {purchaseOrder.docNumber ? (
             <Button variant="outline" asChild>
-              <a href={`/api/purchases/orders/${id}/pdf`}>
+              <a href={`/api/purchases/orders/${id}/pdf`} target="_blank" rel="noopener noreferrer">
                 <Download data-icon="inline-start" />
                 Download PDF
               </a>

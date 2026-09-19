@@ -159,7 +159,10 @@ export async function saveDebitNoteAction(
 
   revalidatePath("/purchases/debit-notes");
   const savedId = String(result.debitNote._id);
-  if (intent === "finalize_print") redirect(`/api/purchases/debit-notes/${savedId}/pdf`);
+  if (intent === "finalize_print") {
+    // A redirect can only replace this tab, so land on the document and let OpenPdfOnLoad open the PDF in a new one.
+    redirect(`/purchases/debit-notes/${savedId}?openPdf=${encodeURIComponent(`/api/purchases/debit-notes/${savedId}/pdf`)}`);
+  }
   redirect(`/purchases/debit-notes/${savedId}`);
 }
 

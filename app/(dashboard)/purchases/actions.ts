@@ -280,7 +280,10 @@ export async function savePurchaseAction(
 
   revalidatePath("/purchases");
   const savedId = String(result.purchase._id);
-  if (intent === "finalize_print") redirect(`/api/purchases/${savedId}/pdf`);
+  if (intent === "finalize_print") {
+    // A redirect can only replace this tab, so land on the document and let OpenPdfOnLoad open the PDF in a new one.
+    redirect(`/purchases/${savedId}?openPdf=${encodeURIComponent(`/api/purchases/${savedId}/pdf`)}`);
+  }
   redirect(`/purchases/${savedId}`);
 }
 

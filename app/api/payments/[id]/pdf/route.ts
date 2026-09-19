@@ -10,6 +10,7 @@ import { findInvoiceById } from "@/lib/db/queries/invoices";
 import { findPurchaseById } from "@/lib/db/queries/purchases";
 import { PaymentReceiptDocument } from "@/lib/pdf/paymentReceiptTemplate";
 import { renderPdf } from "@/lib/pdf/render";
+import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
 
 /** GET, no CSRF needed (read-only) — returns a binary application/pdf response, which a Server
@@ -62,11 +63,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     });
 
     const pdf = await renderPdf(document);
+    // ?download=1 forces a file download; otherwise the PDF renders inline (the "View" action).
+    const disposition = new URL(request.url).searchParams.get("download") === "1" ? "attachment" : "inline";
 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${payment.docNumber ?? "payment-receipt"}.pdf"`,
+        "Content-Disposition": pdfContentDisposition(disposition, payment.docNumber ?? "payment-receipt"),
       },
     });
   } catch (err) {

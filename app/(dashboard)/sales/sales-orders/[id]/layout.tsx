@@ -62,7 +62,7 @@ export default async function SalesOrderDetailLayout({
         <div className="flex flex-wrap items-center gap-2">
           {salesOrder.docNumber ? (
             <Button variant="outline" asChild>
-              <a href={`/api/sales/sales-orders/${id}/pdf`}>
+              <a href={`/api/sales/sales-orders/${id}/pdf`} target="_blank" rel="noopener noreferrer">
                 <Download data-icon="inline-start" />
                 Download PDF
               </a>

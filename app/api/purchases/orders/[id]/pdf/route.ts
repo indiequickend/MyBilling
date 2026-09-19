@@ -5,6 +5,7 @@ import { findPurchaseOrderById } from "@/lib/db/queries/purchaseOrders";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { PurchaseOrderDocument } from "@/lib/pdf/purchaseOrderTemplate";
 import { renderPdf } from "@/lib/pdf/render";
+import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
 
 /** GET, no CSRF needed (read-only) — returns a binary application/pdf response, which a Server
@@ -38,7 +39,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${purchaseOrder.docNumber ?? "purchase-order-draft"}.pdf"`,
+        "Content-Disposition": pdfContentDisposition("inline", purchaseOrder.docNumber ?? "purchase-order-draft"),
       },
     });
   } catch (err) {

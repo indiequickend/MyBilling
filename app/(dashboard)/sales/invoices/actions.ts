@@ -284,7 +284,10 @@ export async function saveInvoiceAction(
 
   revalidatePath("/sales/invoices");
   const savedId = String(result.invoice._id);
-  if (intent === "finalize_print") redirect(`/api/sales/invoices/${savedId}/pdf`);
+  if (intent === "finalize_print") {
+    // A redirect can only replace this tab, so land on the document and let OpenPdfOnLoad open the PDF in a new one.
+    redirect(`/sales/invoices/${savedId}?openPdf=${encodeURIComponent(`/api/sales/invoices/${savedId}/pdf`)}`);
+  }
   redirect(`/sales/invoices/${savedId}`);
 }
 

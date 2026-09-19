@@ -238,7 +238,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                           "—"
                         ) : (
                           <Button variant="outline" size="sm" asChild>
-                            <a href={`/api/payments/${String(p._id)}/pdf`}>
+                            <a href={`/api/payments/${String(p._id)}/pdf`} target="_blank" rel="noopener noreferrer">
                               <Download data-icon="inline-start" />
                               Receipt
                             </a>

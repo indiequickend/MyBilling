@@ -54,7 +54,7 @@ export default async function PurchaseDetailLayout({
         <div className="flex flex-wrap items-center gap-2">
           {purchase.docNumber ? (
             <Button variant="outline" asChild>
-              <a href={`/api/purchases/${id}/pdf`}>
+              <a href={`/api/purchases/${id}/pdf`} target="_blank" rel="noopener noreferrer">
                 <Download data-icon="inline-start" />
                 Download PDF
               </a>

@@ -209,7 +209,10 @@ export async function saveProformaInvoiceAction(
 
   revalidatePath("/sales/proforma-invoices");
   const savedId = String(result.proformaInvoice._id);
-  if (intent === "finalize_print") redirect(`/api/sales/proforma-invoices/${savedId}/pdf`);
+  if (intent === "finalize_print") {
+    // A redirect can only replace this tab, so land on the document and let OpenPdfOnLoad open the PDF in a new one.
+    redirect(`/sales/proforma-invoices/${savedId}?openPdf=${encodeURIComponent(`/api/sales/proforma-invoices/${savedId}/pdf`)}`);
+  }
   redirect(`/sales/proforma-invoices/${savedId}`);
 }
 

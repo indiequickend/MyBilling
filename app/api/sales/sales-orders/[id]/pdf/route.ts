@@ -6,6 +6,7 @@ import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findDefaultSignature } from "@/lib/db/queries/signatures";
 import { SalesOrderDocument } from "@/lib/pdf/salesOrderTemplate";
 import { renderPdf } from "@/lib/pdf/render";
+import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
 
 /** GET, no CSRF needed (read-only) — returns a binary application/pdf response, which a Server
@@ -42,7 +43,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${salesOrder.docNumber ?? "sales-order-draft"}.pdf"`,
+        "Content-Disposition": pdfContentDisposition("inline", salesOrder.docNumber ?? "sales-order-draft"),
       },
     });
   } catch (err) {

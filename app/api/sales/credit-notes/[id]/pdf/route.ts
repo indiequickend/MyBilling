@@ -7,6 +7,7 @@ import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findDefaultSignature } from "@/lib/db/queries/signatures";
 import { CreditNoteDocument } from "@/lib/pdf/creditNoteTemplate";
 import { renderPdf } from "@/lib/pdf/render";
+import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
 
 /** GET, no CSRF needed (read-only) — returns a binary application/pdf response, which a Server
@@ -47,7 +48,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${creditNote.docNumber ?? "credit-note-draft"}.pdf"`,
+        "Content-Disposition": pdfContentDisposition("inline", creditNote.docNumber ?? "credit-note-draft"),
       },
     });
   } catch (err) {

@@ -7,6 +7,7 @@ import { findBankAccountById } from "@/lib/db/queries/bankAccounts";
 import { findSignatureById, findDefaultSignature } from "@/lib/db/queries/signatures";
 import { ProformaInvoiceDocument } from "@/lib/pdf/proformaInvoiceTemplate";
 import { renderPdf } from "@/lib/pdf/render";
+import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
 
 /** GET, no CSRF needed (read-only) — returns a binary application/pdf response, which a Server
@@ -61,7 +62,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${proformaInvoice.docNumber ?? "proforma-invoice-draft"}.pdf"`,
+        "Content-Disposition": pdfContentDisposition("inline", proformaInvoice.docNumber ?? "proforma-invoice-draft"),
       },
     });
   } catch (err) {

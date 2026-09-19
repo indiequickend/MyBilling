@@ -72,7 +72,7 @@ export default async function QuotationDetailLayout({
         <div className="flex flex-wrap items-center gap-2">
           {quotation.docNumber ? (
             <Button variant="outline" asChild>
-              <a href={`/api/sales/quotations/${id}/pdf`}>
+              <a href={`/api/sales/quotations/${id}/pdf`} target="_blank" rel="noopener noreferrer">
                 <Download data-icon="inline-start" />
                 Download PDF
               </a>

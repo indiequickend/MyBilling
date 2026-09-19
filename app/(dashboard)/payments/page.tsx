@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Eye, Download } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listPaymentsTimeline, sumPaymentsTimeline, isPaymentEditable } from "@/lib/db/queries/payments";
@@ -54,7 +54,7 @@ export default async function PaymentsTimelinePage({
   const canCreate = can(context.membership, "payments", "create");
   const canEdit = can(context.membership, "payments", "edit");
   const canDelete = can(context.membership, "payments", "delete");
-  const showActionsColumn = canEdit || canDelete;
+  // Every row can be viewed/downloaded as a receipt (this page already requires payments.view).
 
   return (
     <div>
@@ -141,18 +141,20 @@ export default async function PaymentsTimelinePage({
             <TableHead>Mode</TableHead>
             <TableHead>Direction</TableHead>
             <TableHead className="text-right">Amount</TableHead>
-            {showActionsColumn ? <TableHead className="text-right">Actions</TableHead> : null}
+            <TableHead className="text-right">
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {items.length === 0 ? (
-            <TableEmptyState colSpan={showActionsColumn ? 8 : 7} message="No payments found." />
+            <TableEmptyState colSpan={8} message="No payments found." />
           ) : null}
           {items.map((p) => {
             const linkPrefix = p.linkedDocumentType ? DOC_LINK_PREFIX[p.linkedDocumentType] : undefined;
             const editable = isPaymentEditable(p);
             return (
-              <TableRow key={String(p._id)}>
+              <TableRow key={String(p._id)} className="group">
                 <TableCell>{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
                 <TableCell>{p.partyName ?? "—"}</TableCell>
                 <TableCell>
@@ -178,37 +180,42 @@ export default async function PaymentsTimelinePage({
                 <TableCell className="text-right font-medium font-tabular tabular-nums">
                   ₹{minorToRupeesString(p.amountMinor)}
                 </TableCell>
-                {showActionsColumn ? (
-                  <TableCell className="text-right">
-                    {editable ? (
-                      <div className="flex justify-end gap-2">
-                        {canEdit ? (
-                          <Button variant="outline" size="sm" asChild aria-label="Edit payment">
-                            <Link href={`/payments/${String(p._id)}/edit`}>
-                              <Pencil data-icon="inline-start" />
-                            </Link>
-                          </Button>
-                        ) : null}
-                        {canDelete ? (
-                          <form action={voidPaymentAction}>
-                            <input type="hidden" name="paymentId" value={String(p._id)} />
-                            <Button
-                              type="submit"
-                              variant="outline"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              aria-label="Void payment"
-                            >
-                              <Trash2 data-icon="inline-start" />
-                            </Button>
-                          </form>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                ) : null}
+                <TableCell className="text-right">
+                  {/* Revealed on row hover or keyboard focus; always visible on devices with no hover (touch). */}
+                  <div className="flex justify-end gap-2 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+                    <Button variant="outline" size="sm" asChild aria-label="View receipt">
+                      <a href={`/api/payments/${String(p._id)}/pdf`} target="_blank" rel="noopener noreferrer">
+                        <Eye data-icon="inline-start" />
+                      </a>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild aria-label="Download receipt">
+                      <a href={`/api/payments/${String(p._id)}/pdf?download=1`}>
+                        <Download data-icon="inline-start" />
+                      </a>
+                    </Button>
+                    {editable && canEdit ? (
+                      <Button variant="outline" size="sm" asChild aria-label="Edit payment">
+                        <Link href={`/payments/${String(p._id)}/edit`}>
+                          <Pencil data-icon="inline-start" />
+                        </Link>
+                      </Button>
+                    ) : null}
+                    {editable && canDelete ? (
+                      <form action={voidPaymentAction}>
+                        <input type="hidden" name="paymentId" value={String(p._id)} />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          aria-label="Void payment"
+                        >
+                          <Trash2 data-icon="inline-start" />
+                        </Button>
+                      </form>
+                    ) : null}
+                  </div>
+                </TableCell>
               </TableRow>
             );
           })}

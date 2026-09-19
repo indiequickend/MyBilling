@@ -62,7 +62,7 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
         <div className="flex flex-wrap items-center gap-2">
           {creditNote.docNumber ? (
             <Button variant="outline" asChild>
-              <a href={`/api/sales/credit-notes/${id}/pdf`}>
+              <a href={`/api/sales/credit-notes/${id}/pdf`} target="_blank" rel="noopener noreferrer">
                 <Download data-icon="inline-start" />
                 Download PDF
               </a>

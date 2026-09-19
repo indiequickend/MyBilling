@@ -6,6 +6,7 @@ import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findBankAccountById } from "@/lib/db/queries/bankAccounts";
 import { PurchaseDocument } from "@/lib/pdf/purchaseTemplate";
 import { renderPdf } from "@/lib/pdf/render";
+import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
 
 /** GET, no CSRF needed (read-only) — returns a binary application/pdf response, which a Server
@@ -50,7 +51,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${purchase.docNumber ?? "purchase-draft"}.pdf"`,
+        "Content-Disposition": pdfContentDisposition("inline", purchase.docNumber ?? "purchase-draft"),
       },
     });
   } catch (err) {
