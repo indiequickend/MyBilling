@@ -152,6 +152,10 @@ export type DocumentNumberingConfig = {
   prefix: string;
   padding: number;
   resetPolicy: "never" | "fiscal_year";
+  /** Between the fiscal-year label and the number; absent means "-". */
+  separator?: "-" | "/" | "_" | ".";
+  /** "short" renders the FY label as 26-27 instead of 2026-27; absent means "long". */
+  fyLabelStyle?: "long" | "short";
 };
 
 export type DocumentNumberingPreferences = {

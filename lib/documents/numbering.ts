@@ -48,7 +48,9 @@ export function formatDocumentNumber(
   number: number,
 ): string {
   const padded = String(number).padStart(config.padding, "0");
-  return config.resetPolicy === "fiscal_year"
-    ? `${config.prefix}${seriesKey}-${padded}`
-    : `${config.prefix}${padded}`;
+  if (config.resetPolicy !== "fiscal_year") return `${config.prefix}${padded}`;
+  // The stored series key is always the long "2026-27" form (stable sequence identity); the
+  // short "26-27" style is display-only.
+  const fyLabel = config.fyLabelStyle === "short" ? seriesKey.replace(/^\d{2}(\d{2}-)/, "$1") : seriesKey;
+  return `${config.prefix}${fyLabel}${config.separator ?? "-"}${padded}`;
 }

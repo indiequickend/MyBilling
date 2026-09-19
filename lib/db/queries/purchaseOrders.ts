@@ -6,7 +6,7 @@ import { Vendor } from "@/lib/db/models/Vendor";
 import { toPlainAddress } from "@/lib/db/models/shared/address";
 import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
-import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
+import { reserveNextDocumentNumber, advanceSequenceForImportedNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, type LineItemCalcInput } from "@/lib/documents/calc";
 import { splitKnownTax } from "@/lib/tax/gstSplit";
@@ -506,6 +506,13 @@ export async function importPurchaseOrder(
       terms: input.terms,
       createdByUserId: input.createdByUserId,
     });
+    await advanceSequenceForImportedNumber(
+      input.businessId,
+      "purchase_order",
+      input.docNumber,
+      input.orderDate,
+      business.preferences?.documentNumbering,
+    );
     return { ok: true, purchaseOrder };
   } catch (err) {
     if (err instanceof Error && "code" in err && (err as { code?: number }).code === 11000) {

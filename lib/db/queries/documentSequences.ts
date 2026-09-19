@@ -1,6 +1,9 @@
 import type { ClientSession } from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { DocumentSequence } from "@/lib/db/models/DocumentSequence";
+import type { DocumentNumberingPreferences } from "@/lib/db/models/Business";
+import type { DocumentType } from "@/lib/constants/documentTypes";
+import { resolveNumberingConfig, resolveSeriesKey } from "@/lib/documents/numbering";
 
 /**
  * Read-only preview of the number a document would get if finalized right now — for the
@@ -37,4 +40,34 @@ export async function reserveNextDocumentNumber(
     { upsert: true, returnDocument: "after", session },
   );
   return updated.lastNumber;
+}
+
+/**
+ * Bulk-imported documents carry a caller-supplied docNumber (e.g. "INV/26-27/13") instead of one
+ * drawn from the sequence, so the counter never sees them and the next system-generated number
+ * would restart at 1. Raises the {docType, seriesKey} counter to the trailing number of the
+ * imported docNumber (never lowers it), so the next generated number continues right after the
+ * highest imported one. Pass the import's `session` when it runs inside a transaction.
+ */
+export async function advanceSequenceForImportedNumber(
+  businessId: string,
+  docType: DocumentType,
+  docNumber: string,
+  docDate: Date,
+  numbering: DocumentNumberingPreferences | undefined,
+  session?: ClientSession,
+): Promise<void> {
+  const trailing = /(\d+)\s*$/.exec(docNumber);
+  if (!trailing) return;
+  const imported = Number(trailing[1]);
+  if (!Number.isSafeInteger(imported) || imported <= 0) return;
+
+  await connectToDatabase();
+  const config = resolveNumberingConfig(numbering, docType);
+  const seriesKey = resolveSeriesKey(docDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+  await DocumentSequence.updateOne(
+    { businessId, docType, seriesKey },
+    { $max: { lastNumber: imported } },
+    { upsert: true, session },
+  );
 }

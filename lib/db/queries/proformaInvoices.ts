@@ -12,7 +12,7 @@ import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import { isOwnedSignature } from "@/lib/db/queries/signatures";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
-import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
+import { reserveNextDocumentNumber, advanceSequenceForImportedNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, type LineItemCalcInput } from "@/lib/documents/calc";
 import { splitKnownTax } from "@/lib/tax/gstSplit";
@@ -558,6 +558,13 @@ export async function importProformaInvoice(
       terms: input.terms,
       createdByUserId: input.createdByUserId,
     });
+    await advanceSequenceForImportedNumber(
+      input.businessId,
+      "proforma_invoice",
+      input.docNumber,
+      input.proformaDate,
+      business.preferences?.documentNumbering,
+    );
     return { ok: true, proformaInvoice };
   } catch (err) {
     if (err instanceof Error && "code" in err && (err as { code?: number }).code === 11000) {

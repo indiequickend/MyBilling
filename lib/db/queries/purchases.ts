@@ -15,7 +15,7 @@ import {
   InsufficientStockError,
   type DocumentStockLineItem,
 } from "@/lib/db/queries/stockLedger";
-import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
+import { reserveNextDocumentNumber, advanceSequenceForImportedNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, derivePaymentStatus, type LineItemCalcInput } from "@/lib/documents/calc";
 import { splitKnownTax } from "@/lib/tax/gstSplit";
@@ -858,6 +858,14 @@ export async function importPurchase(input: ImportPurchaseInput): Promise<Import
           { session },
         );
 
+        await advanceSequenceForImportedNumber(
+          input.businessId,
+          "purchase",
+          input.docNumber,
+          input.purchaseDate,
+          business.preferences?.documentNumbering,
+          session,
+        );
         const createdPayments: InstanceType<typeof Payment>[] = [];
         for (const split of input.payments) {
           // A standalone-payments import may already have booked this money as an unlinked

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { resolveNumberingConfig } from "@/lib/documents/numbering";
+import { DOCUMENT_TYPES } from "@/lib/constants/documentTypes";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { DocumentPreferencesForm } from "./DocumentPreferencesForm";
 import { DocumentNumberingForm } from "./DocumentNumberingForm";
@@ -48,9 +49,12 @@ export default async function DocumentPreferencesPage() {
       <div className="mt-10">
         <DocumentNumberingForm
           fyStartMonth={business.preferences.documentNumbering?.fyStartMonth ?? 4}
-          invoiceConfig={{
-            ...resolveNumberingConfig(business.preferences.documentNumbering, "invoice"),
-          }}
+          configs={Object.fromEntries(
+            DOCUMENT_TYPES.map((type) => [
+              type,
+              { ...resolveNumberingConfig(business.preferences.documentNumbering, type) },
+            ]),
+          )}
         />
       </div>
     </div>

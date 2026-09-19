@@ -3,7 +3,7 @@ import { setupTwoTenants, teardownTwoTenants, type TwoTenants } from "../helpers
 import { findOrCreateVendorByName } from "@/lib/db/queries/vendors";
 import { findOrCreateCustomerByName } from "@/lib/db/queries/customers";
 import { findOrCreateImportBankAccount } from "@/lib/db/queries/bankAccounts";
-import { importPurchase } from "@/lib/db/queries/purchases";
+import { importPurchase, createPurchase } from "@/lib/db/queries/purchases";
 import { importPurchaseOrder } from "@/lib/db/queries/purchaseOrders";
 import { importProformaInvoice } from "@/lib/db/queries/proformaInvoices";
 import { importStandalonePayment } from "@/lib/db/queries/payments";
@@ -14,6 +14,7 @@ import { Purchase } from "@/lib/db/models/Purchase";
 import { PurchaseOrder } from "@/lib/db/models/PurchaseOrder";
 import { ProformaInvoice } from "@/lib/db/models/ProformaInvoice";
 import { Payment } from "@/lib/db/models/Payment";
+import { DocumentSequence } from "@/lib/db/models/DocumentSequence";
 
 describe("purchase/purchase-order/proforma-invoice/payment bulk-import — tenant isolation", () => {
   let tenants: TwoTenants;
@@ -32,6 +33,7 @@ describe("purchase/purchase-order/proforma-invoice/payment bulk-import — tenan
       PurchaseOrder.deleteMany({ businessId: { $in: businessIds } }),
       ProformaInvoice.deleteMany({ businessId: { $in: businessIds } }),
       Payment.deleteMany({ businessId: { $in: businessIds } }),
+      DocumentSequence.deleteMany({ businessId: { $in: businessIds } }),
     ]);
     await teardownTwoTenants(tenants);
   });
@@ -165,6 +167,52 @@ describe("purchase/purchase-order/proforma-invoice/payment bulk-import — tenan
     expect(rows).toHaveLength(1);
     expect(String(rows[0].linkedDocumentId)).toBe(String(second.purchase._id));
     expect(second.purchase.status).toBe("paid");
+  });
+
+  it("a generated document number continues after the highest imported number instead of restarting at 1", async () => {
+    const vendor = await findOrCreateVendorByName(tenants.businessAId, "Sequence Vendor");
+    const base = {
+      businessId: tenants.businessAId,
+      vendorId: String(vendor._id),
+      purchaseDate: new Date("2026-08-01"),
+      placeOfSupplyState: "West Bengal",
+      lineItemDescription: "Imported purchase",
+      subtotalMinor: 100_00,
+      discountAmountMinor: 0,
+      totalTaxMinor: 0,
+      grandTotalMinor: 100_00,
+      payments: [],
+      createdByUserId: tenants.userAId,
+    };
+    // Out-of-order on purpose: the counter must keep the max, never lower.
+    expect((await importPurchase({ ...base, docNumber: "PUR/26-27/13" })).ok).toBe(true);
+    expect((await importPurchase({ ...base, docNumber: "PUR/26-27/12" })).ok).toBe(true);
+
+    const created = await createPurchase({
+      businessId: tenants.businessAId,
+      vendorId: String(vendor._id),
+      purchaseDate: new Date("2026-08-15"),
+      placeOfSupplyState: "West Bengal",
+      reverseCharge: false,
+      lineItems: [
+        {
+          description: "Widget",
+          quantity: 1,
+          unitPriceMinor: 100_00,
+          discountType: "percentage",
+          discountValue: 0,
+          taxRatePercent: 0,
+        },
+      ],
+      discountType: "percentage",
+      discountValue: 0,
+      discountTarget: "total",
+      roundOff: false,
+      createdByUserId: tenants.userAId,
+      finalize: true,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    expect(created.purchase.docNumber).toMatch(/-0014$/);
   });
 
   it("importPurchase rejects a vendor that belongs to a different business", async () => {

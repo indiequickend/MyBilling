@@ -15,6 +15,7 @@ import {
   documentNumberingFormSchema,
 } from "@/lib/validation/preferences";
 import { parseCheckbox } from "@/lib/validation/shared";
+import { DOCUMENT_TYPES } from "@/lib/constants/documentTypes";
 
 export type PreferencesPageState = { error?: string; success?: string };
 
@@ -67,13 +68,18 @@ export async function updateDocumentNumberingAction(
 
   const parsed = documentNumberingFormSchema.safeParse({
     fyStartMonth: formData.get("fyStartMonth"),
-    configs: {
-      invoice: {
-        prefix: formData.get("invoice__prefix"),
-        padding: formData.get("invoice__padding"),
-        resetPolicy: formData.get("invoice__resetPolicy"),
-      },
-    },
+    configs: Object.fromEntries(
+      DOCUMENT_TYPES.map((type) => [
+        type,
+        {
+          prefix: formData.get(`${type}__prefix`),
+          padding: formData.get(`${type}__padding`),
+          resetPolicy: formData.get(`${type}__resetPolicy`),
+          separator: formData.get(`${type}__separator`) ?? undefined,
+          fyLabelStyle: formData.get(`${type}__fyLabelStyle`) ?? undefined,
+        },
+      ]),
+    ),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };

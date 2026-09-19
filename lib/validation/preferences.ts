@@ -28,6 +28,8 @@ export const documentNumberingConfigSchema = z.object({
   prefix: z.string().trim().max(10),
   padding: z.coerce.number().int().min(1).max(10),
   resetPolicy: z.enum(["never", "fiscal_year"]),
+  separator: z.enum(["-", "/", "_", "."]).default("-"),
+  fyLabelStyle: z.enum(["long", "short"]).default("long"),
 });
 export type DocumentNumberingConfigInput = z.infer<typeof documentNumberingConfigSchema>;
 

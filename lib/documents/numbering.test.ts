@@ -5,6 +5,8 @@ import {
   formatDocumentNumber,
   resolveNumberingConfig,
 } from "@/lib/documents/numbering";
+import { documentNumberingFormSchema } from "@/lib/validation/preferences";
+import { DOCUMENT_TYPES } from "@/lib/constants/documentTypes";
 
 describe("resolveFiscalYearLabel", () => {
   it("labels a month at or after the FY start month as the current calendar year's FY", () => {
@@ -38,6 +40,15 @@ describe("formatDocumentNumber", () => {
     expect(formatted).toBe("INV-2025-26-0007");
   });
 
+  it("supports the short FY label and a custom separator (INV/26-27/14)", () => {
+    const formatted = formatDocumentNumber(
+      { prefix: "INV/", padding: 1, resetPolicy: "fiscal_year", separator: "/", fyLabelStyle: "short" },
+      "2026-27",
+      14,
+    );
+    expect(formatted).toBe("INV/26-27/14");
+  });
+
   it("omits the series key under never reset", () => {
     const formatted = formatDocumentNumber({ prefix: "INV-", padding: 4, resetPolicy: "never" }, "default", 7);
     expect(formatted).toBe("INV-0007");
@@ -68,5 +79,16 @@ describe("resolveNumberingConfig", () => {
       padding: 5,
       resetPolicy: "never",
     });
+  });
+});
+
+describe("documentNumberingFormSchema", () => {
+  it("accepts a config for every document type and defaults separator/fyLabelStyle", () => {
+    const configs = Object.fromEntries(
+      DOCUMENT_TYPES.map((t) => [t, { prefix: "X/", padding: "1", resetPolicy: "fiscal_year" }]),
+    );
+    const parsed = documentNumberingFormSchema.parse({ fyStartMonth: "4", configs });
+    expect(Object.keys(parsed.configs)).toHaveLength(DOCUMENT_TYPES.length);
+    expect(parsed.configs.purchase).toMatchObject({ separator: "-", fyLabelStyle: "long", padding: 1 });
   });
 });
