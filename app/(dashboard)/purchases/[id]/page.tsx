@@ -281,7 +281,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
           <CardContent>
             <RecordPaymentForm
               purchaseId={id}
-              bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
+              bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
             />
           </CardContent>
         </Card>

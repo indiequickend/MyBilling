@@ -1,5 +1,6 @@
 "use client";
 
+import { pickDefaultBankAccountId, DEFAULT_PAYMENT_MODE, type BankAccountOption } from "@/lib/utils/bankAccounts";
 import { useState } from "react";
 import { X } from "lucide-react";
 import { PAYMENT_MODES, PAYMENT_MODE_LABELS } from "@/lib/constants/payments";
@@ -17,7 +18,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const BLANK_PAYMENT: PaymentSplitRow = {
   amountMinor: "",
-  mode: "cash",
+  mode: DEFAULT_PAYMENT_MODE,
   bankAccountId: "",
   paymentDate: today(),
   referenceNote: "",
@@ -32,7 +33,7 @@ export function PaymentSplitsEditor({
   bankAccounts,
   defaultBankAccountId,
 }: {
-  bankAccounts: Array<{ id: string; name: string }>;
+  bankAccounts: BankAccountOption[];
   defaultBankAccountId?: string;
 }) {
   const [rows, setRows] = useState<PaymentSplitRow[]>([]);
@@ -125,7 +126,10 @@ export function PaymentSplitsEditor({
         onClick={() =>
           setRows((prev) => [
             ...prev,
-            { ...BLANK_PAYMENT, bankAccountId: defaultBankAccountId ?? bankAccounts[0]?.id ?? "" },
+            {
+              ...BLANK_PAYMENT,
+              bankAccountId: pickDefaultBankAccountId(bankAccounts) ?? defaultBankAccountId ?? "",
+            },
           ])
         }
       >

@@ -83,7 +83,7 @@ export default async function CustomerLedgerPage({
               partyType="customer"
               partyIdFieldName="customerId"
               partyId={id}
-              bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
+              bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
               action={recordCustomerPaymentAction}
             />
           </CardContent>

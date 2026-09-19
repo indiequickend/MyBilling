@@ -29,7 +29,7 @@ export default async function NewExpensePage() {
       <h1 className="mb-6 text-lg font-semibold">New expense</h1>
       <ExpenseForm
         categories={categories.map((c) => ({ id: String(c._id), name: c.name }))}
-        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
+        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
         vendors={vendors.items.map((v) => ({
           id: String(v._id),
           label: v.companyName ? `${v.displayName} (${v.companyName})` : v.displayName,

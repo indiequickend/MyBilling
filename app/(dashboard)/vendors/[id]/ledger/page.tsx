@@ -83,7 +83,7 @@ export default async function VendorLedgerPage({
               partyType="vendor"
               partyIdFieldName="vendorId"
               partyId={id}
-              bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
+              bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
               action={recordVendorPaymentAction}
             />
           </CardContent>

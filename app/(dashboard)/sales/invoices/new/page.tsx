@@ -103,7 +103,7 @@ export default async function NewInvoicePage({
           label: c.companyName ? `${c.displayName} (${c.companyName})` : c.displayName,
         }))}
         signatures={signatures.map((s) => ({ id: String(s._id), name: s.name }))}
-        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
+        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}

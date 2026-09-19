@@ -26,7 +26,7 @@ export default async function NewIndirectIncomePage() {
       <h1 className="mb-6 text-lg font-semibold">New indirect income</h1>
       <IndirectIncomeForm
         categories={categories.map((c) => ({ id: String(c._id), name: c.name }))}
-        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
+        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
         customers={customers.items.map((c) => ({
           id: String(c._id),
           label: c.companyName ? `${c.displayName} (${c.companyName})` : c.displayName,

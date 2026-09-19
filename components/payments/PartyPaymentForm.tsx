@@ -1,5 +1,6 @@
 "use client";
 
+import { pickDefaultBankAccountId, DEFAULT_PAYMENT_MODE, type BankAccountOption } from "@/lib/utils/bankAccounts";
 import { useActionState } from "react";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError } from "@/components/auth/AuthCard";
@@ -30,7 +31,7 @@ export function PartyPaymentForm({
 }: {
   partyType: "customer" | "vendor";
   partyIdFieldName: string;
-  bankAccounts: Array<{ id: string; name: string }>;
+  bankAccounts: BankAccountOption[];
   action: (state: PartyPaymentActionState, formData: FormData) => Promise<PartyPaymentActionState>;
 } & (
     | { partyId: string; parties?: undefined }
@@ -92,7 +93,7 @@ export function PartyPaymentForm({
             <FieldLabel htmlFor="mode">Mode</FieldLabel>
             <SelectField
               name="mode"
-              defaultValue="cash"
+              defaultValue={DEFAULT_PAYMENT_MODE}
               placeholder="Mode"
               options={PAYMENT_MODES.map((m) => ({ value: m, label: PAYMENT_MODE_LABELS[m] }))}
             />
@@ -101,6 +102,7 @@ export function PartyPaymentForm({
             <FieldLabel htmlFor="bankAccountId">Account</FieldLabel>
             <SelectField
               name="bankAccountId"
+              defaultValue={pickDefaultBankAccountId(bankAccounts)}
               placeholder="Account…"
               required
               options={bankAccounts.map((a) => ({ value: a.id, label: a.name }))}

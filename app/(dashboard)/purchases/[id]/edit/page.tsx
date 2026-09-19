@@ -85,7 +85,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
           id: String(v._id),
           label: v.companyName ? `${v.displayName} (${v.companyName})` : v.displayName,
         }))}
-        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
+        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
         noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
         warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}

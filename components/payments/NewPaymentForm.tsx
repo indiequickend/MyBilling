@@ -1,5 +1,6 @@
 "use client";
 
+import type { BankAccountOption } from "@/lib/utils/bankAccounts";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,7 +61,7 @@ export function NewPaymentForm({
   canCreateExpense,
   canCreateIndirectIncome,
 }: {
-  bankAccounts: Array<{ id: string; name: string }>;
+  bankAccounts: BankAccountOption[];
   customers: Array<{ id: string; label: string }>;
   vendors: Array<{ id: string; label: string }>;
   recordCustomerPaymentAction: PartyPaymentAction;

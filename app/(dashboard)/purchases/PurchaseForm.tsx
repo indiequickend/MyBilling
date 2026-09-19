@@ -1,5 +1,6 @@
 "use client";
 
+import type { BankAccountOption } from "@/lib/utils/bankAccounts";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
@@ -90,7 +91,7 @@ export function PurchaseForm({
   purchaseId?: string;
   editableStatus?: "draft" | "pending" | "partially_paid";
   vendors: Array<{ id: string; label: string }>;
-  bankAccounts: Array<{ id: string; name: string }>;
+  bankAccounts: BankAccountOption[];
   noteTemplates: Array<{ id: string; label: string }>;
   termTemplates: Array<{ id: string; label: string }>;
   warehouses: Array<{ id: string; name: string }>;

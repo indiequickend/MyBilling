@@ -27,7 +27,7 @@ export default async function NewPaymentPage() {
     <div>
       <h1 className="mb-6 text-lg font-semibold">New payment</h1>
       <NewPaymentForm
-        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
+        bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
         customers={customers.items.map((c) => ({
           id: String(c._id),
           label: c.companyName ? `${c.displayName} (${c.companyName})` : c.displayName,

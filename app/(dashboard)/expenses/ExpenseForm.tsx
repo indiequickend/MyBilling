@@ -1,5 +1,6 @@
 "use client";
 
+import { pickDefaultBankAccountId, DEFAULT_PAYMENT_MODE, type BankAccountOption } from "@/lib/utils/bankAccounts";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
@@ -60,7 +61,7 @@ export function ExpenseForm({
   mode?: "create" | "edit";
   expenseId?: string;
   categories: Array<{ id: string; name: string }>;
-  bankAccounts: Array<{ id: string; name: string }>;
+  bankAccounts: BankAccountOption[];
   vendors: Array<{ id: string; label: string }>;
   /** Only passed when the current user can view Projects — absent (not just empty) means the
    * picker shouldn't render at all for them. */
@@ -106,7 +107,7 @@ export function ExpenseForm({
                 <FieldLabel htmlFor="mode">Mode</FieldLabel>
                 <SelectField
                   name="mode"
-                  defaultValue={defaultValues?.mode ?? "cash"}
+                  defaultValue={defaultValues?.mode ?? DEFAULT_PAYMENT_MODE}
                   placeholder="Mode"
                   options={PAYMENT_MODES.map((m) => ({ value: m, label: PAYMENT_MODE_LABELS[m] }))}
                 />
@@ -115,7 +116,7 @@ export function ExpenseForm({
                 <FieldLabel htmlFor="bankAccountId">Paid from</FieldLabel>
                 <SelectField
                   name="bankAccountId"
-                  defaultValue={defaultValues?.bankAccountId}
+                  defaultValue={defaultValues?.bankAccountId ?? pickDefaultBankAccountId(bankAccounts)}
                   placeholder="Account…"
                   required
                   options={bankAccounts.map((a) => ({ value: a.id, label: a.name }))}
