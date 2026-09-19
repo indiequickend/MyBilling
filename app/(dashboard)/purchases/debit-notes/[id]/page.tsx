@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { Download } from "lucide-react";
@@ -78,7 +79,7 @@ export default async function DebitNoteDetailPage({ params }: { params: Promise<
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <p className="text-sm text-muted-foreground">Debit note date</p>
-              <p className="font-medium">{new Date(debitNote.debitNoteDate).toLocaleDateString()}</p>
+              <p className="font-medium">{formatDate(debitNote.debitNoteDate)}</p>
             </div>
             {debitNote.reason ? (
               <div>

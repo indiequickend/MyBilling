@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MoreHorizontal, Plus } from "lucide-react";
@@ -138,7 +139,7 @@ export default async function QuotationsPage({
                     {q.docNumber ?? "Draft"}
                   </Link>
                 </TableCell>
-                <TableCell>{new Date(q.quotationDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(q.quotationDate)}</TableCell>
                 <TableCell>{q.customerSnapshot.displayName}</TableCell>
                 <TableCell>
                   <StatusStamp variant={STATUS_BADGE_VARIANT[q.status]} seed={String(q._id)}>

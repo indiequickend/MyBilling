@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -32,11 +33,11 @@ export default async function ShareHistoryReportPage({
   const result = await listShareHistory(context.activeBusinessId, { ...dateRange, pageSize: 100 });
 
   const columns: ReportTableColumn<ShareHistoryEntry>[] = [
-    { key: "createdAt", header: "Created On", value: (r) => new Date(r.createdAt).toLocaleString() },
+    { key: "createdAt", header: "Created On", value: (r) => formatDateTime(r.createdAt) },
     { key: "amountMinor", header: "Amount", align: "right", value: (r) => minorToRupeesString(r.amountMinor) },
     { key: "linkedInvoiceNumber", header: "Linked Invoice", value: (r) => r.linkedInvoiceNumber ?? "—" },
     { key: "note", header: "Note", value: (r) => r.note ?? "—" },
-    { key: "expiresAt", header: "Expires", value: (r) => new Date(r.expiresAt).toLocaleString() },
+    { key: "expiresAt", header: "Expires", value: (r) => formatDateTime(r.expiresAt) },
     {
       key: "status",
       header: "Status",

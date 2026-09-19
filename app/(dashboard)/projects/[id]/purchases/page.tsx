@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -62,7 +63,7 @@ export default async function ProjectPurchasesPage({
                   {p.docNumber ?? "Draft"}
                 </Link>
               </TableCell>
-              <TableCell>{new Date(p.purchaseDate).toLocaleDateString()}</TableCell>
+              <TableCell>{formatDate(p.purchaseDate)}</TableCell>
               <TableCell>{p.vendorSnapshot.displayName}</TableCell>
               <TableCell>
                 <StatusStamp variant={DOCUMENT_STATUS_BADGE_VARIANT[p.status]} seed={String(p._id)}>

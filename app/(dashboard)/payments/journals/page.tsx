@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -70,7 +71,7 @@ export default async function JournalsPage({
                   {j.docNumber ?? "—"}
                 </Link>
               </TableCell>
-              <TableCell>{new Date(j.journalDate).toLocaleDateString()}</TableCell>
+              <TableCell>{formatDate(j.journalDate)}</TableCell>
               <TableCell className="whitespace-normal">{j.narration}</TableCell>
               <TableCell className="text-right font-tabular tabular-nums">₹{minorToRupeesString(j.totalMinor)}</TableCell>
             </TableRow>

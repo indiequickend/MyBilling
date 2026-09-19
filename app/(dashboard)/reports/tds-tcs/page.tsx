@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -36,7 +37,7 @@ export default async function TdsTcsReportPage({
   const rows = await getTdsTcsReport(context.activeBusinessId, dateRange);
 
   const columns: ReportTableColumn<TdsTcsRow>[] = [
-    { key: "date", header: "Date", value: (r) => new Date(r.date).toLocaleDateString() },
+    { key: "date", header: "Date", value: (r) => formatDate(r.date) },
     { key: "kind", header: "Kind", value: (r) => KIND_LABELS[r.kind] },
     { key: "documentType", header: "Doc Type", value: (r) => DOC_TYPE_LABELS[r.documentType] },
     { key: "docNumber", header: "Doc #", value: (r) => r.docNumber ?? "—" },

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
@@ -68,7 +69,7 @@ export default async function ExpenseDetailPage({ params }: { params: Promise<{ 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">Date</p>
-              <p className="font-medium">{new Date(expense.expenseDate).toLocaleDateString()}</p>
+              <p className="font-medium">{formatDate(expense.expenseDate)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Mode</p>

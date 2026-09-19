@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
@@ -62,7 +63,7 @@ export default async function IndirectIncomeDetailPage({ params }: { params: Pro
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">Date</p>
-              <p className="font-medium">{new Date(entry.incomeDate).toLocaleDateString()}</p>
+              <p className="font-medium">{formatDate(entry.incomeDate)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Mode</p>

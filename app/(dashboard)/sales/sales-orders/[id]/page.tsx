@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect, notFound } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -40,13 +41,13 @@ export default async function SalesOrderDetailPage({ params }: { params: Promise
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <p className="text-sm text-muted-foreground">Order date</p>
-              <p className="font-medium">{new Date(salesOrder.orderDate).toLocaleDateString()}</p>
+              <p className="font-medium">{formatDate(salesOrder.orderDate)}</p>
             </div>
             {salesOrder.expectedDeliveryDate ? (
               <div>
                 <p className="text-sm text-muted-foreground">Expected delivery</p>
                 <p className="font-medium">
-                  {new Date(salesOrder.expectedDeliveryDate).toLocaleDateString()}
+                  {formatDate(salesOrder.expectedDeliveryDate)}
                 </p>
               </div>
             ) : null}

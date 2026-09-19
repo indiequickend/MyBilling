@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -50,11 +51,11 @@ export default async function Gstr1TrackerPage() {
             {rows.map((r) => (
               <TableRow key={r.period}>
                 <TableCell>{r.period}</TableCell>
-                <TableCell>{new Date(r.computedAt).toLocaleString("en-IN")}</TableCell>
+                <TableCell>{formatDateTime(r.computedAt)}</TableCell>
                 <TableCell>
                   {r.manualFiledFlag ? <Badge variant="success">Filed</Badge> : <Badge variant="outline">Not Filed</Badge>}
                 </TableCell>
-                <TableCell>{r.filedAt ? new Date(r.filedAt).toLocaleDateString("en-IN") : "—"}</TableCell>
+                <TableCell>{r.filedAt ? formatDate(r.filedAt) : "—"}</TableCell>
                 <TableCell>
                   <Link href={`/gst/gstr1?period=${r.period}`} className="text-sm text-primary underline-offset-4 hover:underline">
                     View

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -88,7 +89,7 @@ export default async function EInvoicesPage({
             {rows.map((inv) => (
               <TableRow key={inv.invoiceId}>
                 <TableCell>{inv.docNumber ?? "—"}</TableCell>
-                <TableCell>{inv.invoiceDate.toLocaleDateString("en-IN")}</TableCell>
+                <TableCell>{formatDate(inv.invoiceDate)}</TableCell>
                 <TableCell>{inv.customerDisplayName}</TableCell>
                 <TableCell className="font-tabular tabular-nums">{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
                 <TableCell>

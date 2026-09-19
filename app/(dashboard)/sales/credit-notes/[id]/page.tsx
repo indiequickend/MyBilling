@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { Download } from "lucide-react";
@@ -78,7 +79,7 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <p className="text-sm text-muted-foreground">Credit note date</p>
-              <p className="font-medium">{new Date(creditNote.creditNoteDate).toLocaleDateString()}</p>
+              <p className="font-medium">{formatDate(creditNote.creditNoteDate)}</p>
             </div>
             {creditNote.reason ? (
               <div>

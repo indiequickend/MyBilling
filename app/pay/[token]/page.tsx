@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { headers } from "next/headers";
 import { hashToken } from "@/lib/auth/tokens";
 import { checkRateLimit, rateLimitKeyFromHeaders } from "@/lib/auth/rateLimit";
@@ -112,7 +113,7 @@ export default async function PaymentLinkPage({ params }: { params: Promise<{ to
       )}
 
       <p className="text-xs text-muted-foreground">
-        This link expires {new Date(paymentLink.expiresAt).toLocaleString()}.
+        This link expires {formatDateTime(paymentLink.expiresAt)}.
       </p>
     </AuthCard>
   );

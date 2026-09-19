@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus, MoreHorizontal } from "lucide-react";
@@ -124,7 +125,7 @@ export default async function CreditNotesPage({
                     {cn.docNumber ?? "Draft"}
                   </Link>
                 </TableCell>
-                <TableCell>{new Date(cn.creditNoteDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(cn.creditNoteDate)}</TableCell>
                 <TableCell>{cn.customerSnapshot.displayName}</TableCell>
                 <TableCell>
                   <StatusStamp variant={STATUS_BADGE_VARIANT[cn.status]} seed={String(cn._id)}>

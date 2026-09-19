@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { handleReportExport } from "@/lib/reports/exportHandler";
 import { getDayBook, type DayBookEntry } from "@/lib/db/queries/reports";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -15,7 +16,7 @@ const DOC_TYPE_LABELS: Record<DayBookEntry["type"], string> = {
 };
 
 const columns: ExportColumn<DayBookEntry>[] = [
-  { key: "date", header: "Date", value: (r) => new Date(r.date).toLocaleString() },
+  { key: "date", header: "Date", value: (r) => formatDateTime(r.date) },
   { key: "type", header: "Type", value: (r) => DOC_TYPE_LABELS[r.type] },
   { key: "docNumber", header: "Doc #", value: (r) => r.docNumber ?? "—" },
   { key: "description", header: "Description", value: (r) => r.description },

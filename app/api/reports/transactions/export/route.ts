@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { handleReportExport } from "@/lib/reports/exportHandler";
 import { getTransactionReport, type TransactionReportRow } from "@/lib/db/queries/reports";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -11,7 +12,7 @@ const DOC_TYPE_LABELS: Record<TransactionReportRow["documentType"], string> = {
 };
 
 const columns: ExportColumn<TransactionReportRow>[] = [
-  { key: "date", header: "Date", value: (r) => new Date(r.date).toLocaleDateString() },
+  { key: "date", header: "Date", value: (r) => formatDate(r.date) },
   { key: "documentType", header: "Type", value: (r) => DOC_TYPE_LABELS[r.documentType] },
   { key: "docNumber", header: "Doc #", value: (r) => r.docNumber ?? "Draft" },
   { key: "partyName", header: "Party", value: (r) => r.partyName },

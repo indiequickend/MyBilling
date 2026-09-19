@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/utils/date";
 import { useActionState } from "react";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormError } from "@/components/auth/AuthCard";
@@ -50,9 +51,7 @@ export function ApplyAdvanceForm({
               required
               options={advances.map((a) => ({
                 value: a.paymentId,
-                label: `${a.docNumber ?? "Advance"} — ₹${minorToRupeesString(a.amountMinor)} (${new Date(
-                  a.paymentDate,
-                ).toLocaleDateString()})`,
+                label: `${a.docNumber ?? "Advance"} — ₹${minorToRupeesString(a.amountMinor)} (${formatDate(a.paymentDate)})`,
               }))}
             />
           </Field>

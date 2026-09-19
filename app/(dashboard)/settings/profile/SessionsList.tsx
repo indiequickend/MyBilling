@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { Button } from "@/components/ui/button";
 import { revokeSessionAction } from "./actions";
 
@@ -24,7 +25,7 @@ export function SessionsList({ sessions }: { sessions: SessionRow[] }) {
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{s.userAgent ?? "Unknown device"}</p>
               <p className="text-xs text-muted-foreground">
-                {s.ip ? `${s.ip} · ` : ""}last active {new Date(s.lastActiveAt).toLocaleString()}
+                {s.ip ? `${s.ip} · ` : ""}last active {formatDateTime(s.lastActiveAt)}
               </p>
             </div>
             <form action={revoke}>

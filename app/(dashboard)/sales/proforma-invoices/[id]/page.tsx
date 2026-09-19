@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect, notFound } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -40,12 +41,12 @@ export default async function ProformaInvoiceDetailPage({ params }: { params: Pr
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <p className="text-sm text-muted-foreground">Proforma date</p>
-              <p className="font-medium">{new Date(proformaInvoice.proformaDate).toLocaleDateString()}</p>
+              <p className="font-medium">{formatDate(proformaInvoice.proformaDate)}</p>
             </div>
             {proformaInvoice.dueDate ? (
               <div>
                 <p className="text-sm text-muted-foreground">Due date</p>
-                <p className="font-medium">{new Date(proformaInvoice.dueDate).toLocaleDateString()}</p>
+                <p className="font-medium">{formatDate(proformaInvoice.dueDate)}</p>
               </div>
             ) : null}
             {proformaInvoice.referenceNumber ? (

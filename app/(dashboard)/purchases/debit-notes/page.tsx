@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus, MoreHorizontal } from "lucide-react";
@@ -124,7 +125,7 @@ export default async function DebitNotesPage({
                     {dn.docNumber ?? "Draft"}
                   </Link>
                 </TableCell>
-                <TableCell>{new Date(dn.debitNoteDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(dn.debitNoteDate)}</TableCell>
                 <TableCell>{dn.vendorSnapshot.displayName}</TableCell>
                 <TableCell>
                   <StatusStamp variant={STATUS_BADGE_VARIANT[dn.status]} seed={String(dn._id)}>

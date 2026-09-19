@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { NextResponse } from "next/server";
 import { getApiBusinessContext } from "@/lib/auth/apiContext";
 import { requirePermission } from "@/lib/rbac/can";
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
           .map((b) => ({
             id: String(b._id),
             label: b.expiryDate
-              ? `${b.batchNumber} (exp. ${new Date(b.expiryDate).toLocaleDateString()})`
+              ? `${b.batchNumber} (exp. ${formatDate(b.expiryDate)})`
               : b.batchNumber,
           }));
         if (p.variants.length === 0) {

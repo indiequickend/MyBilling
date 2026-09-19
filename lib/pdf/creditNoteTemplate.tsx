@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { minorToRupeesString } from "@/lib/utils/money";
 import type { CreditNoteDoc } from "@/lib/db/models/CreditNote";
@@ -19,10 +20,6 @@ export type CreditNoteTemplateData = {
    * own, unlike Invoice) — see findDefaultSignature in lib/db/queries/signatures.ts. */
   signature?: { imageUrl: string; name: string } | null;
 };
-
-function formatDate(date: Date): string {
-  return new Date(date).toLocaleDateString("en-IN");
-}
 
 function addressLine(addr?: AddressSubdoc | null): string | null {
   if (!addr) return null;

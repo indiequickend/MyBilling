@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/utils/date";
 import {
   Bar,
   BarChart,
@@ -30,7 +31,8 @@ function formatRupees(minor: number): string {
 }
 
 function formatShortDate(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  // dd-mm — the full dd-mm-yyyy is shown in the tooltip.
+  return formatDate(value).slice(0, 5);
 }
 
 export type TrendPoint = { periodStart: string; totalMinor: number };
@@ -58,7 +60,7 @@ export function SalesTrendChart({ data }: { data: TrendPoint[] }) {
         <YAxis tick={axisTick} tickFormatter={formatRupees} axisLine={false} tickLine={false} width={70} />
         <Tooltip
           formatter={(value) => formatRupees(Number(value))}
-          labelFormatter={(label) => new Date(String(label)).toLocaleDateString()}
+          labelFormatter={(label) => formatDate(String(label))}
           contentStyle={tooltipStyle}
         />
         <ReferenceLine y={average} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
@@ -96,7 +98,7 @@ export function WeeklyRevenueChart({ data }: { data: TrendPoint[] }) {
         <YAxis tick={axisTick} tickFormatter={formatRupees} axisLine={false} tickLine={false} width={70} />
         <Tooltip
           formatter={(value) => formatRupees(Number(value))}
-          labelFormatter={(label) => new Date(String(label)).toLocaleDateString()}
+          labelFormatter={(label) => formatDate(String(label))}
           contentStyle={tooltipStyle}
         />
         <Bar dataKey="totalMinor" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />

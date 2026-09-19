@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MoreHorizontal, Plus, Upload } from "lucide-react";
@@ -139,7 +140,7 @@ export default async function ProformaInvoicesPage({
                     {pi.docNumber ?? "Draft"}
                   </Link>
                 </TableCell>
-                <TableCell>{new Date(pi.proformaDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(pi.proformaDate)}</TableCell>
                 <TableCell>{pi.customerSnapshot.displayName}</TableCell>
                 <TableCell>
                   <StatusStamp variant={STATUS_BADGE_VARIANT[pi.status]} seed={String(pi._id)}>

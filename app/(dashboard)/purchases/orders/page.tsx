@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MoreHorizontal, Plus, Upload } from "lucide-react";
@@ -139,7 +140,7 @@ export default async function PurchaseOrdersPage({
                     {po.docNumber ?? "Draft"}
                   </Link>
                 </TableCell>
-                <TableCell>{new Date(po.orderDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(po.orderDate)}</TableCell>
                 <TableCell>{po.vendorSnapshot.displayName}</TableCell>
                 <TableCell>
                   <StatusStamp variant={STATUS_BADGE_VARIANT[po.status]} seed={String(po._id)}>

@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -108,7 +109,7 @@ export default async function Gstr2bPage({
           <ImportGstr2bForm period={period} />
           {snapshot?.importedFileName ? (
             <p className="mt-3 text-xs text-muted-foreground">
-              Last imported: {snapshot.importedFileName} ({new Date(snapshot.computedAt).toLocaleString("en-IN")})
+              Last imported: {snapshot.importedFileName} ({formatDateTime(snapshot.computedAt)})
             </p>
           ) : null}
         </div>

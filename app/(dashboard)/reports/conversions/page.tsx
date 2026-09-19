@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -36,7 +37,7 @@ export default async function ConversionHistoryReportPage({
   const rows = await getDocumentConversionHistory(context.activeBusinessId, dateRange);
 
   const columns: ReportTableColumn<ConversionHistoryEntry>[] = [
-    { key: "convertedAt", header: "Converted On", value: (r) => new Date(r.convertedAt).toLocaleDateString() },
+    { key: "convertedAt", header: "Converted On", value: (r) => formatDate(r.convertedAt) },
     { key: "sourceType", header: "Source Type", value: (r) => SOURCE_LABELS[r.sourceType] },
     { key: "sourceDocNumber", header: "Source Doc #", value: (r) => r.sourceDocNumber ?? "—" },
     { key: "targetType", header: "Target Type", value: (r) => TARGET_LABELS[r.targetType] },

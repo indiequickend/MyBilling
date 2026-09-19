@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect, notFound } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -40,12 +41,12 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <p className="text-sm text-muted-foreground">Quotation date</p>
-              <p className="font-medium">{new Date(quotation.quotationDate).toLocaleDateString()}</p>
+              <p className="font-medium">{formatDate(quotation.quotationDate)}</p>
             </div>
             {quotation.validUntil ? (
               <div>
                 <p className="text-sm text-muted-foreground">Valid until</p>
-                <p className="font-medium">{new Date(quotation.validUntil).toLocaleDateString()}</p>
+                <p className="font-medium">{formatDate(quotation.validUntil)}</p>
               </div>
             ) : null}
             {quotation.referenceNumber ? (

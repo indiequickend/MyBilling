@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -57,7 +58,7 @@ export default async function CustomerLedgerPage({
           {items.length === 0 ? <TableEmptyState colSpan={6} message="No ledger entries yet." /> : null}
           {items.map((entry, i) => (
             <TableRow key={i}>
-              <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+              <TableCell>{formatDate(entry.date)}</TableCell>
               <TableCell className="capitalize">{entry.type}</TableCell>
               <TableCell>{entry.description}</TableCell>
               <TableCell className="font-tabular tabular-nums">{entry.debitMinor > 0 ? `₹${minorToRupeesString(entry.debitMinor)}` : "—"}</TableCell>

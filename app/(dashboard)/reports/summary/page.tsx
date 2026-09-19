@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -30,7 +31,7 @@ export default async function SummaryReportPage({
   const rows = await getSummaryReport(context.activeBusinessId, { ...dateRange, bucket });
 
   const columns: ReportTableColumn<SummaryReportRow>[] = [
-    { key: "periodStart", header: "Period", value: (r) => new Date(r.periodStart).toLocaleDateString() },
+    { key: "periodStart", header: "Period", value: (r) => formatDate(r.periodStart) },
     { key: "salesMinor", header: "Sales", align: "right", value: (r) => minorToRupeesString(r.salesMinor) },
     {
       key: "purchasesMinor",

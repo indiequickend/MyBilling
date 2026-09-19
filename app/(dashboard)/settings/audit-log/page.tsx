@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -99,7 +100,7 @@ export default async function AuditLogPage({
           {items.length === 0 ? <TableEmptyState colSpan={4} message="No audit log entries found." /> : null}
           {items.map((entry) => (
             <TableRow key={String(entry._id)}>
-              <TableCell>{new Date(entry.createdAt).toLocaleString()}</TableCell>
+              <TableCell>{formatDateTime(entry.createdAt)}</TableCell>
               <TableCell>{entry.userName ?? "—"}</TableCell>
               <TableCell className="font-mono text-xs">{entry.action}</TableCell>
               <TableCell>

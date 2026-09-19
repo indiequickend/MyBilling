@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -69,10 +70,10 @@ export default async function PaymentLinksPage({
             const variant = isRevoked || isExpired ? "outline" : "success";
             return (
               <TableRow key={String(link._id)}>
-                <TableCell>{new Date(link.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(link.createdAt)}</TableCell>
                 <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(link.amountMinor)}</TableCell>
                 <TableCell>{link.note ?? "—"}</TableCell>
-                <TableCell>{new Date(link.expiresAt).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(link.expiresAt)}</TableCell>
                 <TableCell>
                   <Badge variant={variant}>{status}</Badge>
                 </TableCell>

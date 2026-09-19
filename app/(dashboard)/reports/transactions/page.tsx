@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -32,7 +33,7 @@ export default async function TransactionReportPage({
   const rows = await getTransactionReport(context.activeBusinessId, dateRange);
 
   const columns: ReportTableColumn<TransactionReportRow>[] = [
-    { key: "date", header: "Date", value: (r) => new Date(r.date).toLocaleDateString() },
+    { key: "date", header: "Date", value: (r) => formatDate(r.date) },
     { key: "documentType", header: "Type", value: (r) => DOC_TYPE_LABELS[r.documentType] },
     { key: "docNumber", header: "Doc #", value: (r) => r.docNumber ?? "Draft" },
     { key: "partyName", header: "Party", value: (r) => r.partyName },

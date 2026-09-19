@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus, Upload } from "lucide-react";
@@ -116,7 +117,7 @@ export default async function ExpensesPage({
             const id = String(e._id);
             return (
               <TableRow key={id}>
-                <TableCell>{new Date(e.expenseDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(e.expenseDate)}</TableCell>
                 <TableCell>{e.supplierName ?? "—"}</TableCell>
                 <TableCell>{e.description ?? "—"}</TableCell>
                 <TableCell>

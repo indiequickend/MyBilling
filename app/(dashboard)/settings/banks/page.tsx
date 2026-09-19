@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -163,7 +164,7 @@ export default async function BanksPage() {
               <TableBody>
                 {transfers.items.map((t) => (
                   <TableRow key={String(t._id)}>
-                    <TableCell>{new Date(t.transferDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(t.transferDate)}</TableCell>
                     <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(t.amountMinor)}</TableCell>
                     <TableCell>{t.note ?? "—"}</TableCell>
                   </TableRow>

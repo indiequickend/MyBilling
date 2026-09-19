@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -36,7 +37,7 @@ export default async function DayBookPage({
   const rows = await getDayBook(context.activeBusinessId, date);
 
   const columns: ReportTableColumn<DayBookEntry>[] = [
-    { key: "date", header: "Date", value: (r) => new Date(r.date).toLocaleString() },
+    { key: "date", header: "Date", value: (r) => formatDateTime(r.date) },
     { key: "type", header: "Type", value: (r) => DOC_TYPE_LABELS[r.type] },
     { key: "docNumber", header: "Doc #", value: (r) => r.docNumber ?? "—" },
     { key: "description", header: "Description", value: (r) => r.description },

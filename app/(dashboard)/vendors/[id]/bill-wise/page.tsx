@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -64,7 +65,7 @@ export default async function VendorBillWisePage({
                     <TableBody>
                       {bill.payments.map((p) => (
                         <TableRow key={p.paymentId}>
-                          <TableCell>{new Date(p.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{formatDate(p.date)}</TableCell>
                           <TableCell>{PAYMENT_MODE_LABELS[p.mode]}</TableCell>
                           <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.amountMinor)}</TableCell>
                         </TableRow>

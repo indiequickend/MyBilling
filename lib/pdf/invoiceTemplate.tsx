@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import QRCode from "qrcode";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -18,10 +19,6 @@ export type InvoiceTemplateData = {
   bankAccount?: { name: string; accountNumber?: string; ifsc?: string; upiId?: string } | null;
   signature?: { imageUrl: string; name: string } | null;
 };
-
-function formatDate(date: Date): string {
-  return new Date(date).toLocaleDateString("en-IN");
-}
 
 function addressLine(addr?: AddressSubdoc | null): string | null {
   if (!addr) return null;

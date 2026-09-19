@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect, notFound } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -38,7 +39,7 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
         <div>
           <h1 className="text-lg font-semibold">{journal.docNumber ?? "Journal"}</h1>
           <p className="text-sm text-muted-foreground">
-            {new Date(journal.journalDate).toLocaleDateString()} — {journal.narration}
+            {formatDate(journal.journalDate)} — {journal.narration}
           </p>
         </div>
         {canDelete && !journal.deletedAt ? (

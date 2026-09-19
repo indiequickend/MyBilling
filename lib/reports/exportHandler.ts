@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { NextResponse } from "next/server";
 import { getApiBusinessContext } from "@/lib/auth/apiContext";
 import { requirePermission } from "@/lib/rbac/can";
@@ -21,8 +22,8 @@ export function parseDateRangeFromSearchParams(searchParams: URLSearchParams): R
 
 function formatDateRangeLabel(params: ReportDateRangeParams): string | undefined {
   if (!params.dateFrom && !params.dateTo) return undefined;
-  const from = params.dateFrom ? params.dateFrom.toLocaleDateString("en-IN") : "…";
-  const to = params.dateTo ? params.dateTo.toLocaleDateString("en-IN") : "…";
+  const from = params.dateFrom ? formatDate(params.dateFrom) : "…";
+  const to = params.dateTo ? formatDate(params.dateTo) : "…";
   return `${from} – ${to}`;
 }
 

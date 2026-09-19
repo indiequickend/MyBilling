@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Download } from "lucide-react";
@@ -154,7 +155,7 @@ export default async function Gstr1Page({
         columns={["Invoice #", "Date", "Customer GSTIN", "Customer", "POS", "Rate %", "Taxable", "Total"]}
         rows={data.b2b.map((r) => [
           r.docNumber ?? "—",
-          r.invoiceDate.toLocaleDateString("en-IN"),
+          formatDate(r.invoiceDate),
           r.customerGstin,
           r.customerName,
           r.placeOfSupplyState,
@@ -168,7 +169,7 @@ export default async function Gstr1Page({
         columns={["Invoice #", "Date", "POS", "Rate %", "Taxable", "Total"]}
         rows={data.b2cl.map((r) => [
           r.docNumber ?? "—",
-          r.invoiceDate.toLocaleDateString("en-IN"),
+          formatDate(r.invoiceDate),
           r.placeOfSupplyState,
           r.taxRatePercent,
           minorToRupeesString(r.taxableAmountMinor),
@@ -190,7 +191,7 @@ export default async function Gstr1Page({
         columns={["Invoice #", "Date", "Customer", "Rate %", "Taxable", "Total"]}
         rows={data.exports.map((r) => [
           r.docNumber ?? "—",
-          r.invoiceDate.toLocaleDateString("en-IN"),
+          formatDate(r.invoiceDate),
           r.customerName,
           r.taxRatePercent,
           minorToRupeesString(r.taxableAmountMinor),
@@ -207,7 +208,7 @@ export default async function Gstr1Page({
         columns={["Note #", "Date", "Customer", "POS", "Rate %", "Taxable", "Total"]}
         rows={data.creditDebitNotes.map((r) => [
           r.docNumber ?? "—",
-          r.noteDate.toLocaleDateString("en-IN"),
+          formatDate(r.noteDate),
           r.customerName,
           r.placeOfSupplyState,
           r.taxRatePercent,

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -53,7 +54,7 @@ export default async function CustomerTransactionsPage({
                     {inv.docNumber ?? "Draft"}
                   </Link>
                 </TableCell>
-                <TableCell>{new Date(inv.invoiceDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(inv.invoiceDate)}</TableCell>
                 <TableCell>
                   <StatusStamp variant={statusDisplay.variant} seed={String(inv._id)}>
                     {statusDisplay.label}

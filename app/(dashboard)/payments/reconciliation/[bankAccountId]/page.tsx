@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect, notFound } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -65,7 +66,7 @@ export default async function ReconcileAccountPage({
                 ) : null}
                 {unmatchedLines.map((line) => (
                   <TableRow key={String(line._id)}>
-                    <TableCell>{new Date(line.statementDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(line.statementDate)}</TableCell>
                     <TableCell className="whitespace-normal">{line.description ?? "—"}</TableCell>
                     <TableCell className="text-right font-tabular tabular-nums">
                       {line.direction === "credit" ? "+" : "-"}₹{minorToRupeesString(line.amountMinor)}
@@ -85,7 +86,7 @@ export default async function ReconcileAccountPage({
                               .filter((p) => (p.direction === "in") === (line.direction === "credit"))
                               .map((p) => (
                                 <option key={String(p._id)} value={String(p._id)}>
-                                  {new Date(p.paymentDate).toLocaleDateString()} — ₹
+                                  {formatDate(p.paymentDate)} — ₹
                                   {minorToRupeesString(p.amountMinor)}
                                 </option>
                               ))}
@@ -122,7 +123,7 @@ export default async function ReconcileAccountPage({
                 ) : null}
                 {unmatchedPayments.map((p) => (
                   <TableRow key={String(p._id)}>
-                    <TableCell>{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(p.paymentDate)}</TableCell>
                     <TableCell>{p.direction === "in" ? "Received" : "Given"}</TableCell>
                     <TableCell className="text-right font-tabular tabular-nums">₹{minorToRupeesString(p.amountMinor)}</TableCell>
                   </TableRow>
@@ -153,7 +154,7 @@ export default async function ReconcileAccountPage({
               ) : null}
               {matchedLines.map((line) => (
                 <TableRow key={String(line._id)}>
-                  <TableCell>{new Date(line.statementDate).toLocaleDateString()}</TableCell>
+                  <TableCell>{formatDate(line.statementDate)}</TableCell>
                   <TableCell className="whitespace-normal">{line.description ?? "—"}</TableCell>
                   <TableCell className="text-right font-tabular tabular-nums">
                     {line.direction === "credit" ? "+" : "-"}₹{minorToRupeesString(line.amountMinor)}

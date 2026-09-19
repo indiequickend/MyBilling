@@ -19,6 +19,14 @@ function fromIso(value: string | undefined) {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+/** The calendar hands back local-midnight dates, so show the day the user picked in their own
+ * timezone (not IST) — dd-mm-yyyy like every other date in the app. */
+function formatPickedDate(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  return `${dd}-${mm}-${date.getFullYear()}`;
+}
+
 export function DateRangeFilter({
   dateFrom,
   dateTo,
@@ -44,9 +52,9 @@ export function DateRangeFilter({
   // and trigger a hydration mismatch. "en-IN" matches the locale used elsewhere in the app.
   const label =
     range?.from && range?.to
-      ? `${range.from.toLocaleDateString("en-IN")} – ${range.to.toLocaleDateString("en-IN")}`
+      ? `${formatPickedDate(range.from)} – ${formatPickedDate(range.to)}`
       : range?.from
-        ? range.from.toLocaleDateString("en-IN")
+        ? formatPickedDate(range.from)
         : "Date range";
 
   function applyPreset(from: string, to: string) {

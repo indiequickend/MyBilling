@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus, Pencil, Trash2, Upload, Eye, Download } from "lucide-react";
@@ -155,7 +156,7 @@ export default async function PaymentsTimelinePage({
             const editable = isPaymentEditable(p);
             return (
               <TableRow key={String(p._id)} className="group">
-                <TableCell>{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(p.paymentDate)}</TableCell>
                 <TableCell>{p.partyName ?? "—"}</TableCell>
                 <TableCell>
                   {!p.linkedDocumentType ? (

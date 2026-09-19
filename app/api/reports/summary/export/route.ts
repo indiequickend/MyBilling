@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { handleReportExport } from "@/lib/reports/exportHandler";
 import { getSummaryReport, type SummaryReportRow } from "@/lib/db/queries/reports";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -7,7 +8,7 @@ const BUCKETS = ["day", "week", "month"] as const;
 type Bucket = (typeof BUCKETS)[number];
 
 const columns: ExportColumn<SummaryReportRow>[] = [
-  { key: "periodStart", header: "Period", value: (r) => new Date(r.periodStart).toLocaleDateString() },
+  { key: "periodStart", header: "Period", value: (r) => formatDate(r.periodStart) },
   { key: "salesMinor", header: "Sales", value: (r) => minorToRupeesString(r.salesMinor) },
   { key: "purchasesMinor", header: "Purchases", value: (r) => minorToRupeesString(r.purchasesMinor) },
   { key: "expensesMinor", header: "Expenses", value: (r) => minorToRupeesString(r.expensesMinor) },

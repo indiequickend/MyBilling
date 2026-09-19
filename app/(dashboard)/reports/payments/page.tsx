@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -27,7 +28,7 @@ export default async function PaymentsReportPage({
   const rows = await getPaymentsReport(context.activeBusinessId, dateRange);
 
   const columns: ReportTableColumn<PaymentTimelineEntry>[] = [
-    { key: "paymentDate", header: "Date", value: (r) => new Date(r.paymentDate).toLocaleDateString() },
+    { key: "paymentDate", header: "Date", value: (r) => formatDate(r.paymentDate) },
     { key: "direction", header: "Direction", value: (r) => (r.direction === "in" ? "Received" : "Given") },
     { key: "partyName", header: "Party", value: (r) => r.partyName ?? "—" },
     { key: "bankAccountName", header: "Account", value: (r) => r.bankAccountName },

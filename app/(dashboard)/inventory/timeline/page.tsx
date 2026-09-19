@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -103,7 +104,7 @@ export default async function StockTimelinePage({
             const linkPrefix = entry.refDocumentType ? DOC_LINK_PREFIX[entry.refDocumentType] : undefined;
             return (
               <TableRow key={String(entry._id)}>
-                <TableCell>{new Date(entry.createdAt).toLocaleString()}</TableCell>
+                <TableCell>{formatDateTime(entry.createdAt)}</TableCell>
                 <TableCell>{product?.name ?? "—"}</TableCell>
                 <TableCell>{warehouseMap.get(String(entry.warehouseId)) ?? "—"}</TableCell>
                 <TableCell>

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { handleReportExport } from "@/lib/reports/exportHandler";
 import { getTdsTcsReport, type TdsTcsRow } from "@/lib/db/queries/reports";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -15,7 +16,7 @@ const KIND_LABELS: Record<TdsTcsRow["kind"], string> = {
 };
 
 const columns: ExportColumn<TdsTcsRow>[] = [
-  { key: "date", header: "Date", value: (r) => new Date(r.date).toLocaleDateString() },
+  { key: "date", header: "Date", value: (r) => formatDate(r.date) },
   { key: "kind", header: "Kind", value: (r) => KIND_LABELS[r.kind] },
   { key: "documentType", header: "Doc Type", value: (r) => DOC_TYPE_LABELS[r.documentType] },
   { key: "docNumber", header: "Doc #", value: (r) => r.docNumber ?? "—" },

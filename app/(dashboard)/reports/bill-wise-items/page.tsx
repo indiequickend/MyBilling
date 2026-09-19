@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -27,7 +28,7 @@ export default async function BillWiseItemReportPage({
   const rows = await getBillWiseItemReport(context.activeBusinessId, docType, dateRange);
 
   const columns: ReportTableColumn<BillWiseItemRow>[] = [
-    { key: "date", header: "Date", value: (r) => new Date(r.date).toLocaleDateString() },
+    { key: "date", header: "Date", value: (r) => formatDate(r.date) },
     { key: "docNumber", header: "Doc #", value: (r) => r.docNumber ?? "Draft" },
     { key: "partyName", header: "Party", value: (r) => r.partyName },
     { key: "description", header: "Item", value: (r) => r.description },

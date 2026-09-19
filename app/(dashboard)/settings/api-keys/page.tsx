@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -68,7 +69,7 @@ export default async function ApiKeysPage() {
                     </TableCell>
                     <TableCell>{roleNameById.get(String(key.roleId)) ?? "—"}</TableCell>
                     <TableCell>
-                      {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : "Never"}
+                      {key.lastUsedAt ? formatDateTime(key.lastUsedAt) : "Never"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={isRevoked ? "outline" : "success"}>

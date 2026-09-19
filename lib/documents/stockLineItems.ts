@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import type { Types } from "mongoose";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
 import type { ProductDoc } from "@/lib/db/models/Product";
@@ -31,7 +32,7 @@ export function hydrateLineItemsStockInfo<
         .map((b) => ({
           id: String(b._id),
           label: b.expiryDate
-            ? `${b.batchNumber} (exp. ${new Date(b.expiryDate).toLocaleDateString()})`
+            ? `${b.batchNumber} (exp. ${formatDate(b.expiryDate)})`
             : b.batchNumber,
         })),
     };

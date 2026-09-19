@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { minorToRupeesString } from "@/lib/utils/money";
 import type { PaymentDoc } from "@/lib/db/models/Payment";
@@ -19,10 +20,6 @@ export type PaymentReceiptTemplateData = {
   partyName?: string;
   linkedDocumentNumber?: string;
 };
-
-function formatDate(date: Date): string {
-  return new Date(date).toLocaleDateString("en-IN");
-}
 
 function addressLine(addr?: AddressSubdoc | null): string | null {
   if (!addr) return null;

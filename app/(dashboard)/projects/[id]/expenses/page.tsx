@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -58,7 +59,7 @@ export default async function ProjectExpensesPage({
             <TableRow key={String(e._id)}>
               <TableCell>
                 <Link href={`/expenses/${String(e._id)}`} className="font-medium hover:underline">
-                  {new Date(e.expenseDate).toLocaleDateString()}
+                  {formatDate(e.expenseDate)}
                 </Link>
               </TableCell>
               <TableCell>{e.supplierName ?? "—"}</TableCell>

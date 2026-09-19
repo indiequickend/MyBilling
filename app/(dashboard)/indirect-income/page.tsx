@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -108,7 +109,7 @@ export default async function IndirectIncomePage({
             const id = String(e._id);
             return (
               <TableRow key={id}>
-                <TableCell>{new Date(e.incomeDate).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(e.incomeDate)}</TableCell>
                 <TableCell>{e.sourceName ?? "—"}</TableCell>
                 <TableCell>{e.description ?? "—"}</TableCell>
                 <TableCell>

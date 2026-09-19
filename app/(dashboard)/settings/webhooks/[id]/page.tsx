@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/utils/date";
 import { redirect, notFound } from "next/navigation";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
@@ -69,7 +70,7 @@ export default async function WebhookEndpointDetailPage({
               ) : null}
               {deliveries.map((delivery) => (
                 <TableRow key={String(delivery._id)}>
-                  <TableCell>{new Date(delivery.createdAt).toLocaleString()}</TableCell>
+                  <TableCell>{formatDateTime(delivery.createdAt)}</TableCell>
                   <TableCell>{delivery.eventType}</TableCell>
                   <TableCell>
                     <Badge variant={delivery.status === "success" ? "success" : "destructive"}>

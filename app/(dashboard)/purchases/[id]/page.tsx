@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/date";
 import { redirect, notFound } from "next/navigation";
 import { Download } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
@@ -63,12 +64,12 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <p className="text-sm text-muted-foreground">Purchase date</p>
-              <p className="font-medium">{new Date(purchase.purchaseDate).toLocaleDateString()}</p>
+              <p className="font-medium">{formatDate(purchase.purchaseDate)}</p>
             </div>
             {purchase.dueDate ? (
               <div>
                 <p className="text-sm text-muted-foreground">Due date</p>
-                <p className="font-medium">{new Date(purchase.dueDate).toLocaleDateString()}</p>
+                <p className="font-medium">{formatDate(purchase.dueDate)}</p>
               </div>
             ) : null}
             {purchase.referenceNumber ? (
@@ -224,7 +225,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               <TableBody>
                 {payments.map((p) => (
                   <TableRow key={String(p._id)}>
-                    <TableCell>{new Date(p.paymentDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(p.paymentDate)}</TableCell>
                     <TableCell>{PAYMENT_MODE_LABELS[p.mode]}</TableCell>
                     <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.amountMinor)}</TableCell>
                     <TableCell>
