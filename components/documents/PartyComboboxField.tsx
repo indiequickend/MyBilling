@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ComboboxField } from "@/components/ui/ComboboxField";
 import {
   QuickAddPartyDialog,
@@ -42,6 +42,29 @@ export function PartyComboboxField({
   );
   const [selected, setSelected] = useState(defaultValue);
 
+  // Only the first page of parties is preloaded into `options`; typing searches the whole business.
+  const searchParties = useCallback(
+    async (query: string) => {
+      const res = await fetch(
+        `/api/parties/search?type=${partyType}&q=${encodeURIComponent(query)}`,
+      );
+      if (!res.ok) throw new Error("Party search failed");
+      const data = (await res.json()) as { parties: Array<{ value: string; label: string }> };
+      return data.parties;
+    },
+    [partyType],
+  );
+
+  const resolvePartyLabel = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/api/parties/search?type=${partyType}&id=${encodeURIComponent(id)}`);
+      if (!res.ok) return undefined;
+      const data = (await res.json()) as { parties: Array<{ label: string }> };
+      return data.parties[0]?.label;
+    },
+    [partyType],
+  );
+
   function select(value: string) {
     setSelected(value);
     onValueChange?.(value);
@@ -60,6 +83,8 @@ export function PartyComboboxField({
           disabled={disabled}
           className={className}
           onValueChange={select}
+          onSearch={searchParties}
+          onResolveLabel={resolvePartyLabel}
         />
       </div>
       <QuickAddPartyDialog
