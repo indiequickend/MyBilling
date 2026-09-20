@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { setDefaultBankAccountAction, restoreBankAccountAction } from "./actions";
 import { DeleteBankAccountButton } from "./DeleteBankAccountButton";
 import { TransferFundsForm } from "./TransferFundsForm";
+import { DeleteBankTransferButton } from "./DeleteBankTransferButton";
 
 export default async function BanksPage() {
   const context = await getDashboardContext();
@@ -44,6 +45,8 @@ export default async function BanksPage() {
   const balances = await Promise.all(
     active.map((a) => getBankAccountBalance(String(a._id), context.activeBusinessId!)),
   );
+
+  const accountName = new Map([...active, ...deleted].map((a) => [String(a._id), a.name]));
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -161,7 +164,10 @@ export default async function BanksPage() {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>From</TableHead>
+                  <TableHead>To</TableHead>
                   <TableHead>Note</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -169,7 +175,15 @@ export default async function BanksPage() {
                   <TableRow key={String(t._id)}>
                     <TableCell>{formatDate(t.transferDate)}</TableCell>
                     <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(t.amountMinor)}</TableCell>
+                    <TableCell>{accountName.get(String(t.fromAccountId)) ?? "—"}</TableCell>
+                    <TableCell>{accountName.get(String(t.toAccountId)) ?? "—"}</TableCell>
                     <TableCell>{t.note ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/settings/banks/transfers/${String(t._id)}/edit`}>Edit</Link>
+                      </Button>{" "}
+                      <DeleteBankTransferButton transferId={String(t._id)} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

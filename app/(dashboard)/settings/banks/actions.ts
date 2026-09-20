@@ -15,11 +15,14 @@ import {
   restoreBankAccount,
   findBankAccountById,
   transferFunds,
+  updateBankTransfer,
+  softDeleteBankTransfer,
 } from "@/lib/db/queries/bankAccounts";
 import { recordAuditLog } from "@/lib/db/queries/auditLog";
 
 export type BankAccountFormState = { error?: string; fieldErrors?: Record<string, string> };
 export type TransferFundsFormState = { error?: string; success?: string };
+export type DeleteBankTransferState = { error?: string };
 
 async function requireBankingPermission() {
   const context = await getDashboardContext();
@@ -173,4 +176,71 @@ export async function transferFundsAction(
 
   revalidatePath("/settings/banks");
   return { success: "Funds transferred." };
+}
+
+export async function updateBankTransferAction(
+  _prev: TransferFundsFormState,
+  formData: FormData,
+): Promise<TransferFundsFormState> {
+  const context = await requireBankingPermission();
+  const transferId = String(formData.get("transferId") ?? "");
+  if (!/^[0-9a-fA-F]{24}$/.test(transferId)) return { error: "Transfer not found." };
+
+  const parsed = bankTransferSchema.safeParse({
+    fromAccountId: formData.get("fromAccountId"),
+    toAccountId: formData.get("toAccountId"),
+    amountMinor: formData.get("amountMinor"),
+    transferDate: formData.get("transferDate"),
+    note: formData.get("note"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const result = await updateBankTransfer(transferId, {
+    businessId: context.activeBusinessId,
+    fromAccountId: parsed.data.fromAccountId,
+    toAccountId: parsed.data.toAccountId,
+    amountMinor: parsed.data.amountMinor,
+    transferDate: new Date(parsed.data.transferDate),
+    note: parsed.data.note,
+  });
+  if (!result.ok) {
+    return {
+      error:
+        result.reason === "same_account"
+          ? "Choose two different accounts."
+          : result.reason === "not_found"
+            ? "Transfer not found."
+            : "One of the selected accounts is invalid.",
+    };
+  }
+
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.userId,
+    action: "bank_transfer.updated",
+    target: { type: "bank_transfer", id: transferId },
+  });
+  revalidatePath("/settings/banks");
+  redirect("/settings/banks");
+}
+
+export async function deleteBankTransferAction(
+  _prev: DeleteBankTransferState,
+  formData: FormData,
+): Promise<DeleteBankTransferState> {
+  const context = await requireBankingPermission();
+  const transferId = String(formData.get("transferId") ?? "");
+  if (!/^[0-9a-fA-F]{24}$/.test(transferId)) return { error: "Transfer not found." };
+  const deleted = await softDeleteBankTransfer(transferId, context.activeBusinessId);
+  if (!deleted) return { error: "Transfer not found." };
+  await recordAuditLog({
+    businessId: context.activeBusinessId,
+    userId: context.userId,
+    action: "bank_transfer.deleted",
+    target: { type: "bank_transfer", id: transferId },
+  });
+  revalidatePath("/settings/banks");
+  return {};
 }

@@ -4,6 +4,9 @@ import { BankAccount } from "@/lib/db/models/BankAccount";
 import { BankTransfer } from "@/lib/db/models/BankTransfer";
 import { BankStatementLine } from "@/lib/db/models/BankStatementLine";
 import { Payment } from "@/lib/db/models/Payment";
+import { Expense } from "@/lib/db/models/Expense";
+import { IndirectIncome } from "@/lib/db/models/IndirectIncome";
+import { ExpenseCategory } from "@/lib/db/models/ExpenseCategory";
 import { resolvePaymentTimelineNames } from "@/lib/db/queries/payments";
 import type { PaymentMode } from "@/lib/constants/payments";
 
@@ -38,6 +41,17 @@ export type BankLedger = {
   currentBalanceMinor: number;
   entries: BankLedgerEntry[];
   unmatchedStatementLines: number;
+  /** Recorded expenses / indirect incomes on this account that have no active linked Payment, so
+   * they are NOT part of the balance (the balance is derived from Payments). Normally empty. */
+  missingPayments: MissingPaymentEntry[];
+};
+
+export type MissingPaymentEntry = {
+  kind: "expense" | "indirect_income";
+  id: string;
+  date: Date;
+  amountMinor: number;
+  label: string;
 };
 
 type Raw = Omit<BankLedgerEntry, "balanceMinor"> & { sortAt: number };
@@ -68,6 +82,7 @@ export async function getBankLedger(
       .lean(),
     BankTransfer.find({
       businessId: businessObjectId,
+      deletedAt: { $exists: false },
       $or: [{ fromAccountId: accountObjectId }, { toAccountId: accountObjectId }],
     })
       .sort({ transferDate: 1, createdAt: 1 })
@@ -91,6 +106,66 @@ export async function getBankLedger(
       transfers.map((t) => String(String(t.fromAccountId) === bankAccountId ? t.toAccountId : t.fromAccountId)),
     ),
   ];
+  const expensePaymentIds = payments.filter((p) => p.linkedDocumentType === "expense").map((p) => p.linkedDocumentId);
+  const incomePaymentIds = payments
+    .filter((p) => p.linkedDocumentType === "indirect_income")
+    .map((p) => p.linkedDocumentId);
+  const [linkedExpenses, linkedIncomes, accountExpenses, accountIncomes] = await Promise.all([
+    expensePaymentIds.length
+      ? Expense.find({ businessId: businessObjectId, _id: { $in: expensePaymentIds } })
+          .select("categoryId description supplierName")
+          .lean()
+      : [],
+    incomePaymentIds.length
+      ? IndirectIncome.find({ businessId: businessObjectId, _id: { $in: incomePaymentIds } })
+          .select("categoryId description sourceName")
+          .lean()
+      : [],
+    Expense.find({
+      businessId: businessObjectId,
+      bankAccountId: accountObjectId,
+      status: "recorded",
+      deletedAt: { $exists: false },
+    })
+      .select("categoryId description supplierName amountMinor expenseDate")
+      .lean(),
+    IndirectIncome.find({
+      businessId: businessObjectId,
+      bankAccountId: accountObjectId,
+      status: "recorded",
+      deletedAt: { $exists: false },
+    })
+      .select("categoryId description sourceName amountMinor incomeDate")
+      .lean(),
+  ]);
+  const categoryIds = [
+    ...new Set(
+      [...linkedExpenses, ...linkedIncomes, ...accountExpenses, ...accountIncomes].map((d) => String(d.categoryId)),
+    ),
+  ];
+  const categories = categoryIds.length
+    ? await ExpenseCategory.find({ businessId: businessObjectId, _id: { $in: categoryIds } })
+        .select("name")
+        .lean()
+    : [];
+  const categoryName = new Map(categories.map((c) => [String(c._id), c.name as string]));
+  const describeRecord = (d: {
+    categoryId: mongoose.Types.ObjectId;
+    description?: string | null;
+    supplierName?: string | null;
+    sourceName?: string | null;
+  }) =>
+    [
+      categoryName.get(String(d.categoryId)),
+      d.supplierName ?? d.sourceName ?? undefined,
+      d.description ?? undefined,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  const expenseLabel = new Map(linkedExpenses.map((d) => [String(d._id), describeRecord(d)]));
+  const incomeLabel = new Map(linkedIncomes.map((d) => [String(d._id), describeRecord(d)]));
+  const paidDocIds = new Set(payments.map((p) => String(p.linkedDocumentId)));
+
   const [named, otherAccounts] = await Promise.all([
     resolvePaymentTimelineNames(payments),
     otherAccountIds.length
@@ -104,13 +179,19 @@ export async function getBankLedger(
   for (const p of named) {
     const isIn = p.direction === "in";
     const doc = p.linkedDocumentNumber ? `${p.linkedDocumentNumber}` : undefined;
-    const description = [
-      isIn ? "Received" : "Paid",
-      p.partyName ? `${isIn ? "from" : "to"} ${p.partyName}` : undefined,
-      doc ? `(${doc})` : undefined,
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const linkedId = p.linkedDocumentId ? String(p.linkedDocumentId) : "";
+    const description =
+      p.linkedDocumentType === "expense"
+        ? `Expense${expenseLabel.get(linkedId) ? ` — ${expenseLabel.get(linkedId)}` : ""}`
+        : p.linkedDocumentType === "indirect_income"
+          ? `Indirect income${incomeLabel.get(linkedId) ? ` — ${incomeLabel.get(linkedId)}` : ""}`
+          : [
+              isIn ? "Received" : "Paid",
+              p.partyName ? `${isIn ? "from" : "to"} ${p.partyName}` : undefined,
+              doc ? `(${doc})` : undefined,
+            ]
+              .filter(Boolean)
+              .join(" ");
     raw.push({
       id: String(p._id),
       kind: "payment",
@@ -169,6 +250,29 @@ export async function getBankLedger(
     entries.push({ ...entry, balanceMinor: running });
   }
 
+  const missingPayments: MissingPaymentEntry[] = [
+    ...accountExpenses
+      .filter((d) => !paidDocIds.has(String(d._id)))
+      .map((d) => ({
+        kind: "expense" as const,
+        id: String(d._id),
+        date: d.expenseDate,
+        amountMinor: d.amountMinor,
+        label: describeRecord(d),
+      })),
+    ...accountIncomes
+      .filter((d) => !paidDocIds.has(String(d._id)))
+      .map((d) => ({
+        kind: "indirect_income" as const,
+        id: String(d._id),
+        date: d.incomeDate,
+        amountMinor: d.amountMinor,
+        label: describeRecord(d),
+      })),
+  ]
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .slice(0, 100);
+
   const currentBalanceMinor = raw.reduce((sum, r) => sum + r.inMinor - r.outMinor, account.openingBalanceMinor ?? 0);
 
   return {
@@ -185,5 +289,6 @@ export async function getBankLedger(
     currentBalanceMinor,
     entries,
     unmatchedStatementLines,
+    missingPayments,
   };
 }

@@ -126,6 +126,7 @@ export async function softDeleteBankAccount(
     Payment.countDocuments({ businessId, bankAccountId }),
     BankTransfer.countDocuments({
       businessId,
+      deletedAt: { $exists: false },
       $or: [{ fromAccountId: bankAccountId }, { toAccountId: bankAccountId }],
     }),
   ]);
@@ -182,7 +183,60 @@ export async function listBankTransfers(
   params: { page?: number; pageSize?: number } = {},
 ) {
   await connectToDatabase();
-  return paginate(BankTransfer, { businessId }, { ...params, sort: { transferDate: -1 } });
+  return paginate(
+    BankTransfer,
+    { businessId, deletedAt: { $exists: false } },
+    { ...params, sort: { transferDate: -1, createdAt: -1 } },
+  );
+}
+
+export async function findBankTransferById(transferId: string, businessId: string) {
+  await connectToDatabase();
+  return BankTransfer.findOne({ _id: transferId, businessId, deletedAt: { $exists: false } });
+}
+
+export type UpdateBankTransferInput = Omit<TransferFundsInput, "createdByUserId">;
+export type BankTransferWriteResult =
+  | { ok: true; transfer: InstanceType<typeof BankTransfer> }
+  | { ok: false; reason: "not_found" | "invalid_accounts" | "same_account" };
+
+/** Balances are derived from transfers, so editing one re-derives every affected balance
+ * immediately — no separate adjustment needed. */
+export async function updateBankTransfer(
+  transferId: string,
+  input: UpdateBankTransferInput,
+): Promise<BankTransferWriteResult> {
+  await connectToDatabase();
+  if (input.fromAccountId === input.toAccountId) return { ok: false, reason: "same_account" };
+  const [fromOwned, toOwned] = await Promise.all([
+    isOwnedBankAccount(input.fromAccountId, input.businessId),
+    isOwnedBankAccount(input.toAccountId, input.businessId),
+  ]);
+  if (!fromOwned || !toOwned) return { ok: false, reason: "invalid_accounts" };
+  const transfer = await BankTransfer.findOneAndUpdate(
+    { _id: transferId, businessId: input.businessId, deletedAt: { $exists: false } },
+    {
+      $set: {
+        fromAccountId: input.fromAccountId,
+        toAccountId: input.toAccountId,
+        amountMinor: input.amountMinor,
+        transferDate: input.transferDate,
+        note: input.note,
+      },
+    },
+    { returnDocument: "after" },
+  );
+  return transfer ? { ok: true, transfer } : { ok: false, reason: "not_found" };
+}
+
+/** Soft delete (kept for audit); the transfer stops counting toward both accounts' balances. */
+export async function softDeleteBankTransfer(transferId: string, businessId: string) {
+  await connectToDatabase();
+  return BankTransfer.findOneAndUpdate(
+    { _id: transferId, businessId, deletedAt: { $exists: false } },
+    { $set: { deletedAt: new Date() } },
+    { returnDocument: "after" },
+  );
 }
 
 /**
@@ -208,11 +262,11 @@ export async function getBankAccountBalance(bankAccountId: string, businessId: s
       { $group: { _id: "$direction", total: { $sum: "$amountMinor" } } },
     ]),
     BankTransfer.aggregate([
-      { $match: { businessId: businessObjectId, toAccountId: accountObjectId } },
+      { $match: { businessId: businessObjectId, toAccountId: accountObjectId, deletedAt: { $exists: false } } },
       { $group: { _id: null, total: { $sum: "$amountMinor" } } },
     ]),
     BankTransfer.aggregate([
-      { $match: { businessId: businessObjectId, fromAccountId: accountObjectId } },
+      { $match: { businessId: businessObjectId, fromAccountId: accountObjectId, deletedAt: { $exists: false } } },
       { $group: { _id: null, total: { $sum: "$amountMinor" } } },
     ]),
   ]);

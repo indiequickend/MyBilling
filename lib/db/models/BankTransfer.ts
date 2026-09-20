@@ -9,6 +9,7 @@ const bankTransferSchema = new Schema(
     amountMinor: { type: Number, required: true },
     transferDate: { type: Date, required: true },
     note: { type: String, trim: true },
+    deletedAt: { type: Date },
     createdByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },
   { timestamps: true },

@@ -137,6 +137,34 @@ export default async function BankLedgerPage({
         </p>
       ) : null}
 
+      {ledger.missingPayments.length > 0 ? (
+        <Card className="mb-4 border-destructive/40">
+          <CardContent>
+            <p className="mb-2 text-sm font-medium text-destructive">
+              {ledger.missingPayments.length} expense/income record
+              {ledger.missingPayments.length === 1 ? " has" : "s have"} no payment entry, so
+              {ledger.missingPayments.length === 1 ? " it isn't" : " they aren't"} counted in this bank&apos;s balance.
+            </p>
+            <ul className="space-y-1 text-sm">
+              {ledger.missingPayments.map((m) => (
+                <li key={`${m.kind}-${m.id}`} className="flex flex-wrap gap-x-3">
+                  <span>{formatDate(m.date)}</span>
+                  <span>{m.kind === "expense" ? "Expense" : "Indirect income"}</span>
+                  <span className="font-tabular tabular-nums">{money(m.amountMinor)}</span>
+                  <span className="text-muted-foreground">{m.label}</span>
+                  <Link
+                    href={`${m.kind === "expense" ? "/expenses" : "/indirect-income"}/${m.id}`}
+                    className="text-xs underline"
+                  >
+                    view
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Table>
         <TableHeader>
           <TableRow>

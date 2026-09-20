@@ -71,7 +71,7 @@ export function ExpenseForm({
   const [state, formAction] = useActionState(saveExpenseAction, initialState);
 
   return (
-    <form action={formAction} encType="multipart/form-data" className="max-w-2xl space-y-6">
+    <form action={formAction} className="max-w-2xl space-y-6">
       <FormError message={state.error} />
       {expenseId ? <input type="hidden" name="expenseId" value={expenseId} /> : null}
 

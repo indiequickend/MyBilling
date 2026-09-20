@@ -24,7 +24,7 @@ export function BulkUploadForm() {
   const [state, formAction] = useActionState(bulkUploadExpensesAction, initialState);
 
   return (
-    <form action={formAction} encType="multipart/form-data" className="max-w-2xl space-y-4">
+    <form action={formAction} className="max-w-2xl space-y-4">
       <Card>
         <CardContent className="space-y-4">
           <Field>
