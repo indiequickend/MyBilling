@@ -95,6 +95,9 @@ export default async function BanksPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/settings/banks/${String(a._id)}/ledger`}>Ledger</Link>
+                    </Button>{" "}
                     <DeleteBankAccountButton bankAccountId={String(a._id)} />
                   </TableCell>
                 </TableRow>

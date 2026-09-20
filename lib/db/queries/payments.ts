@@ -12,7 +12,7 @@ import { Business } from "@/lib/db/models/Business";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { derivePaymentStatus } from "@/lib/documents/calc";
 import type { DocumentStatus } from "@/lib/constants/documents";
-import { clampPageParams, paginate, type PaginatedResult } from "@/lib/db/queryHelpers";
+import { clampPageParams, escapeRegex, paginate, type PaginatedResult } from "@/lib/db/queryHelpers";
 import type { PaymentMode } from "@/lib/constants/payments";
 import { reserveNextDocumentNumber } from "@/lib/db/queries/documentSequences";
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
@@ -31,9 +31,15 @@ export type PaymentsTimelineParams = {
 function buildPaymentsTimelineFilter(
   businessId: string,
   params: Omit<PaymentsTimelineParams, "page" | "pageSize">,
+  options: { forAggregate?: boolean } = {},
 ): Record<string, unknown> {
   const filter: Record<string, unknown> = { businessId, voidedAt: { $exists: false } };
-  if (params.bankAccountId) filter.bankAccountId = params.bankAccountId;
+  // An aggregation $match doesn't cast ids the way find() does, so a string id would match nothing.
+  if (params.bankAccountId) {
+    filter.bankAccountId = options.forAggregate
+      ? new mongoose.Types.ObjectId(params.bankAccountId)
+      : params.bankAccountId;
+  }
   if (params.direction) filter.direction = params.direction;
   if (params.dateFrom || params.dateTo) {
     const range: Record<string, Date> = {};
@@ -41,7 +47,7 @@ function buildPaymentsTimelineFilter(
     if (params.dateTo) range.$lte = params.dateTo;
     filter.paymentDate = range;
   }
-  if (params.search) filter.referenceNote = { $regex: params.search.trim(), $options: "i" };
+  if (params.search) filter.referenceNote = { $regex: escapeRegex(params.search.trim()), $options: "i" };
   return filter;
 }
 
@@ -85,7 +91,7 @@ export function isPaymentEditable(p: {
 
 /** Shared by listPaymentsTimeline/getPaymentsReport — resolves party/bank-account/document names
  * in one batched pass (not per row) to avoid N+1 queries. */
-async function resolvePaymentTimelineNames(
+export async function resolvePaymentTimelineNames(
   items: Array<{
     _id: mongoose.Types.ObjectId;
     direction: "in" | "out";
@@ -212,7 +218,7 @@ export async function sumPaymentsTimeline(
   params: Omit<PaymentsTimelineParams, "page" | "pageSize"> = {},
 ): Promise<PaymentsTimelineTotals> {
   await connectToDatabase();
-  const filter = buildPaymentsTimelineFilter(businessId, params);
+  const filter = buildPaymentsTimelineFilter(businessId, params, { forAggregate: true });
   const rows = await Payment.aggregate([
     { $match: { ...filter, businessId: new mongoose.Types.ObjectId(businessId) } },
     { $group: { _id: "$direction", total: { $sum: "$amountMinor" } } },
@@ -236,7 +242,7 @@ export async function getPaymentsByBankAccount(
   params: Pick<PaymentsTimelineParams, "dateFrom" | "dateTo" | "search"> = {},
 ): Promise<PaymentsByBankAccountRow[]> {
   await connectToDatabase();
-  const filter = buildPaymentsTimelineFilter(businessId, params);
+  const filter = buildPaymentsTimelineFilter(businessId, params, { forAggregate: true });
   const rows = await Payment.aggregate([
     { $match: { ...filter, businessId: new mongoose.Types.ObjectId(businessId) } },
     {

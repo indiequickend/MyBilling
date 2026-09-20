@@ -86,6 +86,17 @@ export default async function PaymentsTimelinePage({
           <CardContent>
             <p className="text-sm text-muted-foreground">Net Balance</p>
             <p className="text-lg font-semibold">₹{minorToRupeesString(totals.netBalanceMinor)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Received − given only; excludes opening balance and transfers.
+              {bankAccountId && can(context.membership, "settings", "manage_banking") ? (
+                <>
+                  {" "}
+                  <Link href={`/settings/banks/${bankAccountId}/ledger`} className="underline">
+                    View bank ledger
+                  </Link>
+                </>
+              ) : null}
+            </p>
           </CardContent>
         </Card>
         <Card>
