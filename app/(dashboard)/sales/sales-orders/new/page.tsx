@@ -5,6 +5,7 @@ import { listCustomers } from "@/lib/db/queries/customers";
 import { listNoteTermTemplates } from "@/lib/db/queries/noteTermTemplates";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findQuotationById } from "@/lib/db/queries/quotations";
+import { mapCustomFieldValues } from "@/lib/documents/customFields";
 import { mapLineItemsForConversion, extractConvertibleHeader } from "@/lib/documents/conversion";
 import { SalesOrderForm } from "../SalesOrderForm";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
@@ -67,8 +68,8 @@ export default async function NewSalesOrderPage({
           id: String(c._id),
           label: c.companyName ? `${c.displayName} (${c.companyName})` : c.displayName,
         }))}
-        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
-        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
+        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{
@@ -86,7 +87,13 @@ export default async function NewSalesOrderPage({
           discountType: headerFromQuotation?.discountType ?? salesOrderPrefs.defaultDiscountType,
           discountValue: headerFromQuotation?.discountValue ?? "0",
           discountTarget: headerFromQuotation?.discountTarget ?? "net_amount",
-          customFieldValues: {},
+          customFieldValues: sourceQuotation
+            ? mapCustomFieldValues(
+                business.documentCustomFieldDefs?.quotation,
+                sourceQuotation.customFieldValues,
+                business.documentCustomFieldDefs?.sales_order,
+              )
+            : {},
           lineItems: lineItemsFromQuotation ?? [],
           sourceQuotationId: sourceQuotation ? String(sourceQuotation._id) : undefined,
         }}

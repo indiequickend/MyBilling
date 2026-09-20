@@ -11,6 +11,7 @@ import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findQuotationById } from "@/lib/db/queries/quotations";
 import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
 import { findProformaInvoiceById } from "@/lib/db/queries/proformaInvoices";
+import { mapCustomFieldValues } from "@/lib/documents/customFields";
 import { mapLineItemsForConversion, extractConvertibleHeader } from "@/lib/documents/conversion";
 import { InvoiceForm } from "../InvoiceForm";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
@@ -92,6 +93,14 @@ export default async function NewInvoicePage({
     ? mapLineItemsForConversion(source.lineItems)
     : undefined;
   const headerFromSource = source ? extractConvertibleHeader(source) : undefined;
+  const sourceFieldDefType = sourceSalesOrder ? "sales_order" : sourceProformaInvoice ? "proforma_invoice" : "quotation";
+  const customFieldValuesFromSource = source
+    ? mapCustomFieldValues(
+        business.documentCustomFieldDefs?.[sourceFieldDefType],
+        source.customFieldValues,
+        business.documentCustomFieldDefs?.invoice,
+      )
+    : {};
 
   return (
     <div>
@@ -104,8 +113,8 @@ export default async function NewInvoicePage({
         }))}
         signatures={signatures.map((s) => ({ id: String(s._id), name: s.name }))}
         bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
-        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
-        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
+        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
         warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}
         defaultWarehouseId={
           business.preferences.productsInventory.inventory.defaultWarehouseId
@@ -132,7 +141,7 @@ export default async function NewInvoicePage({
           discountType: headerFromSource?.discountType ?? salesPrefs.defaultDiscountType,
           discountValue: headerFromSource?.discountValue ?? "0",
           discountTarget: headerFromSource?.discountTarget ?? "net_amount",
-          customFieldValues: headerFromSource?.customFieldValues ?? {},
+          customFieldValues: customFieldValuesFromSource,
           lineItems: lineItemsFromSource ?? [],
           sourceQuotationId: sourceQuotation ? String(sourceQuotation._id) : undefined,
           sourceSalesOrderId: sourceSalesOrder ? String(sourceSalesOrder._id) : undefined,

@@ -45,8 +45,8 @@ export default async function NewPurchaseOrderPage() {
           id: String(v._id),
           label: v.companyName ? `${v.displayName} (${v.companyName})` : v.displayName,
         }))}
-        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
-        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
+        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{

@@ -639,7 +639,11 @@ export async function findPurchaseById(purchaseId: string, businessId: string) {
   return Purchase.findOne({ _id: purchaseId, businessId });
 }
 
+const DEFAULT_SEARCH_PATHS = ["docNumber", "referenceNumber", "vendorInvoiceNumber", "vendorSnapshot.displayName"];
+
 export type PurchaseListParams = {
+  /** Mongo paths to search, pre-validated by resolveSearchPaths (lib/documents/listColumns.ts); defaults to number/reference/party when omitted. */
+  searchPaths?: string[];
   search?: string;
   vendorId?: string;
   projectId?: string;
@@ -672,12 +676,8 @@ function buildPurchaseFilter(
   }
   if (params.search) {
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
-    filter.$or = [
-      { docNumber: pattern },
-      { referenceNumber: pattern },
-      { vendorInvoiceNumber: pattern },
-      { "vendorSnapshot.displayName": pattern },
-    ];
+    const paths = params.searchPaths?.length ? params.searchPaths : DEFAULT_SEARCH_PATHS;
+    filter.$or = paths.map((path) => ({ [path]: pattern }));
   }
   if (params.dateFrom || params.dateTo) {
     const range: Record<string, Date> = {};

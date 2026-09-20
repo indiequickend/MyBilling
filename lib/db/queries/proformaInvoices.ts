@@ -391,7 +391,11 @@ export async function findProformaInvoiceById(proformaInvoiceId: string, busines
   return ProformaInvoice.findOne({ _id: proformaInvoiceId, businessId });
 }
 
+const DEFAULT_SEARCH_PATHS = ["docNumber", "referenceNumber", "customerSnapshot.displayName"];
+
 export type ProformaInvoiceListParams = {
+  /** Mongo paths to search, pre-validated by resolveSearchPaths (lib/documents/listColumns.ts); defaults to number/reference/party when omitted. */
+  searchPaths?: string[];
   search?: string;
   customerId?: string;
   tab?: "all" | "draft" | "open" | "closed" | "cancelled" | "deleted";
@@ -418,7 +422,8 @@ function buildProformaInvoiceFilter(
   }
   if (params.search) {
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
-    filter.$or = [{ docNumber: pattern }, { referenceNumber: pattern }, { "customerSnapshot.displayName": pattern }];
+    const paths = params.searchPaths?.length ? params.searchPaths : DEFAULT_SEARCH_PATHS;
+    filter.$or = paths.map((path) => ({ [path]: pattern }));
   }
   return filter;
 }

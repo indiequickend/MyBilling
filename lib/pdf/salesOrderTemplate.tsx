@@ -1,11 +1,14 @@
 import { formatDate } from "@/lib/utils/date";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import type { CustomFieldEntry } from "@/lib/documents/customFields";
 import { minorToRupeesString } from "@/lib/utils/money";
 import type { SalesOrderDoc } from "@/lib/db/models/SalesOrder";
 import type { AddressSubdoc } from "@/lib/db/models/shared/address";
 
 export type SalesOrderTemplateData = {
   salesOrder: SalesOrderDoc;
+  /** Non-empty per-document custom header fields, shown under the document title. */
+  customFields?: CustomFieldEntry[];
   business: {
     name: string;
     brandName?: string;
@@ -88,6 +91,11 @@ export async function SalesOrderDocument(data: SalesOrderTemplateData) {
           </View>
           <View style={styles.alignRight}>
             <Text style={styles.bold}>Sales Order {salesOrder.docNumber ?? "(draft)"}</Text>
+            {(data.customFields ?? []).map((f) => (
+              <Text key={f.label} style={styles.muted}>
+                {f.label}: {f.value}
+              </Text>
+            ))}
             <Text style={styles.muted}>Date: {formatDate(salesOrder.orderDate)}</Text>
             {salesOrder.expectedDeliveryDate ? (
               <Text style={styles.muted}>Expected delivery: {formatDate(salesOrder.expectedDeliveryDate)}</Text>

@@ -1,16 +1,20 @@
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { SearchFieldPicker, type SearchFieldOption } from "@/components/documents/SearchFieldPicker";
 
 export function SearchInput({
   defaultValue,
   placeholder = "Search…",
   hiddenParams,
+  searchFields,
   children,
 }: {
   defaultValue?: string;
   placeholder?: string;
   hiddenParams?: Record<string, string | undefined>;
+  /** Adds a "Search in" field chooser (submitted as repeated `qf` params). */
+  searchFields?: { options: SearchFieldOption[]; urlSelected: string[]; storageKey: string };
   /** Extra filter controls (e.g. a group/category <select>) submitted in the same GET form. */
   children?: React.ReactNode;
 }) {
@@ -31,6 +35,7 @@ export function SearchInput({
           className="pl-8"
         />
       </div>
+      {searchFields ? <SearchFieldPicker {...searchFields} /> : null}
       {children}
       <Button type="submit" variant="outline">
         Search

@@ -1,12 +1,15 @@
 import { formatDate } from "@/lib/utils/date";
 import QRCode from "qrcode";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import type { CustomFieldEntry } from "@/lib/documents/customFields";
 import { minorToRupeesString } from "@/lib/utils/money";
 import type { ProformaInvoiceDoc } from "@/lib/db/models/ProformaInvoice";
 import type { AddressSubdoc } from "@/lib/db/models/shared/address";
 
 export type ProformaInvoiceTemplateData = {
   proformaInvoice: ProformaInvoiceDoc;
+  /** Non-empty per-document custom header fields, shown under the document title. */
+  customFields?: CustomFieldEntry[];
   business: {
     name: string;
     brandName?: string;
@@ -98,6 +101,11 @@ export async function ProformaInvoiceDocument(data: ProformaInvoiceTemplateData)
           </View>
           <View style={styles.alignRight}>
             <Text style={styles.bold}>Proforma Invoice {proformaInvoice.docNumber ?? "(draft)"}</Text>
+            {(data.customFields ?? []).map((f) => (
+              <Text key={f.label} style={styles.muted}>
+                {f.label}: {f.value}
+              </Text>
+            ))}
             <Text style={styles.muted}>Date: {formatDate(proformaInvoice.proformaDate)}</Text>
             {proformaInvoice.dueDate ? (
               <Text style={styles.muted}>Due: {formatDate(proformaInvoice.dueDate)}</Text>

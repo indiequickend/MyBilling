@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 
 function hrefForPage(
   basePath: string,
-  searchParams: Record<string, string | undefined>,
+  searchParams: Record<string, string | string[] | undefined>,
   page: number,
 ) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(searchParams)) {
-    if (value) params.set(key, value);
+    if (Array.isArray(value)) value.forEach((v) => params.append(key, v));
+    else if (value) params.set(key, value);
   }
   params.set("page", String(page));
   return `${basePath}?${params.toString()}`;
@@ -24,7 +25,7 @@ export function Pagination({
   page: number;
   totalPages: number;
   basePath: string;
-  searchParams: Record<string, string | undefined>;
+  searchParams: Record<string, string | string[] | undefined>;
 }) {
   if (totalPages <= 1) return null;
 

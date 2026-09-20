@@ -1,21 +1,10 @@
-import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listSalesOrders } from "@/lib/db/queries/salesOrders";
 import { salesOrderListQuerySchema } from "@/lib/validation/salesOrders";
-import { minorToRupeesString } from "@/lib/utils/money";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
@@ -23,13 +12,15 @@ import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { ButtonLabel } from "@/components/ui/ButtonLabel";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { DocumentListTable } from "@/components/documents/DocumentListTable";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  buildRowCells,
+  getListColumns,
+  getSearchOptions,
+  parseSearchFieldIds,
+  resolveSearchPaths,
+} from "@/lib/documents/listColumns";
+import { findBusinessById } from "@/lib/db/queries/businesses";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -68,7 +59,13 @@ export default async function SalesOrdersPage({
     page: sp.page,
   });
 
+  const business = await findBusinessById(context.activeBusinessId);
+  const customFieldDefs = business?.documentCustomFieldDefs?.sales_order ?? [];
+  const columns = getListColumns("sales_order", customFieldDefs);
+  const searchFieldIds = parseSearchFieldIds(sp.qf);
+
   const { items, page, totalPages } = await listSalesOrders(context.activeBusinessId, {
+    searchPaths: resolveSearchPaths(columns, searchFieldIds),
     search: query.q,
     customerId: query.customerId,
     tab: query.tab,
@@ -107,74 +104,34 @@ export default async function SalesOrdersPage({
           defaultValue={query.q}
           placeholder="Search order #, reference, customer…"
           hiddenParams={{ tab: query.tab }}
+          searchFields={{
+            options: getSearchOptions(columns),
+            urlSelected: searchFieldIds,
+            storageKey: `mybilling:listSearch:${context.activeBusinessId}:sales_order`,
+          }}
         />
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Order #</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Customer</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Total</TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.length === 0 ? <TableEmptyState colSpan={6} message="No sales orders found." /> : null}
-          {items.map((so) => {
-            const id = String(so._id);
-            return (
-              <TableRow key={id} className="group">
-                <TableCell>
-                  <Link href={`/sales/sales-orders/${id}`} className="font-medium hover:underline">
-                    {so.docNumber ?? "Draft"}
-                  </Link>
-                </TableCell>
-                <TableCell>{formatDate(so.orderDate)}</TableCell>
-                <TableCell>{so.customerSnapshot.displayName}</TableCell>
-                <TableCell>
-                  <StatusStamp variant={STATUS_BADGE_VARIANT[so.status]} seed={String(so._id)}>
-                    {STATUS_LABELS[so.status]}
-                  </StatusStamp>
-                </TableCell>
-                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(so.grandTotalMinor)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/sales/sales-orders/${id}`}>View</Link>
-                    </Button>
-                    {canEdit ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm" aria-label="More actions">
-                            <MoreHorizontal />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuGroup>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/sales/sales-orders/${id}/edit`}>Edit</Link>
-                            </DropdownMenuItem>
-                          </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : null}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+      <DocumentListTable
+        docType="sales_order"
+        businessId={context.activeBusinessId}
+        columns={columns}
+        rows={items.map((doc) => {
+          const id = String(doc._id);
+          const so = doc;
+          return { id, cells: buildRowCells("sales_order", doc, columns, customFieldDefs), status: <StatusStamp variant={STATUS_BADGE_VARIANT[so.status]} seed={id}>{STATUS_LABELS[so.status]}</StatusStamp> };
+        })}
+        basePath="/sales/sales-orders"
+        canEdit={canEdit}
+        emptyMessage="No sales orders found."
+      />
 
       <div className="mt-2 flex items-center justify-end text-sm text-muted-foreground">
         <Pagination
           page={page}
           totalPages={totalPages}
           basePath="/sales/sales-orders"
-          searchParams={{ q: query.q, tab: query.tab }}
+          searchParams={{ q: query.q, tab: query.tab, qf: searchFieldIds }}
         />
       </div>
     </div>

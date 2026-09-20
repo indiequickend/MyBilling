@@ -1,11 +1,11 @@
 "use client";
 
+import { NoteTermFields, type NoteTermTemplateOption } from "@/components/documents/NoteTermFields";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,8 +78,8 @@ export function ProformaInvoiceForm({
   customers: Array<{ id: string; label: string }>;
   signatures: Array<{ id: string; name: string }>;
   bankAccounts: Array<{ id: string; name: string }>;
-  noteTemplates: Array<{ id: string; label: string }>;
-  termTemplates: Array<{ id: string; label: string }>;
+  noteTemplates: NoteTermTemplateOption[];
+  termTemplates: NoteTermTemplateOption[];
   customFieldDefs: Array<{
     key: string;
     label: string;
@@ -268,36 +268,12 @@ export function ProformaInvoiceForm({
 
       <Card>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="noteTemplateId">Notes template</FieldLabel>
-              <SelectField
-                name="noteTemplateId"
-                defaultValue={defaultValues?.noteTemplateId}
-                placeholder="None"
-                options={[{ value: "", label: "None" }, ...noteTemplates.map((t) => ({ value: t.id, label: t.label }))]}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="termTemplateId">Terms template</FieldLabel>
-              <SelectField
-                name="termTemplateId"
-                defaultValue={defaultValues?.termTemplateId}
-                placeholder="None"
-                options={[{ value: "", label: "None" }, ...termTemplates.map((t) => ({ value: t.id, label: t.label }))]}
-              />
-            </Field>
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="notes">Notes</FieldLabel>
-              <Textarea id="notes" name="notes" rows={3} defaultValue={defaultValues?.notes} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="terms">Terms</FieldLabel>
-              <Textarea id="terms" name="terms" rows={3} defaultValue={defaultValues?.terms} />
-            </Field>
-          </div>
+          <NoteTermFields
+            noteTemplates={noteTemplates}
+            termTemplates={termTemplates}
+            defaultValues={defaultValues}
+            errors={state.fieldErrors}
+          />
         </CardContent>
       </Card>
 

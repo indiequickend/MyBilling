@@ -1,23 +1,12 @@
-import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { MoreHorizontal, Plus, Upload } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listPurchases, sumPurchaseTotals } from "@/lib/db/queries/purchases";
 import { purchaseListQuerySchema } from "@/lib/validation/purchases";
 import { DOCUMENT_STATUS_BADGE_VARIANT, DOCUMENT_STATUS_LABELS } from "@/lib/constants/documents";
 import { minorToRupeesString } from "@/lib/utils/money";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
@@ -25,14 +14,16 @@ import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { ButtonLabel } from "@/components/ui/ButtonLabel";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
+import { DocumentListTable } from "@/components/documents/DocumentListTable";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  buildRowCells,
+  getListColumns,
+  getSearchOptions,
+  parseSearchFieldIds,
+  resolveSearchPaths,
+} from "@/lib/documents/listColumns";
+import { findBusinessById } from "@/lib/db/queries/businesses";
+import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -68,7 +59,13 @@ export default async function PurchasesPage({
     page: sp.page,
   });
 
+  const business = await findBusinessById(context.activeBusinessId);
+  const customFieldDefs = business?.documentCustomFieldDefs?.purchase ?? [];
+  const columns = getListColumns("purchase", customFieldDefs);
+  const searchFieldIds = parseSearchFieldIds(sp.qf);
+
   const listParams = {
+    searchPaths: resolveSearchPaths(columns, searchFieldIds),
     search: query.q,
     vendorId: query.vendorId,
     tab: query.tab,
@@ -122,81 +119,30 @@ export default async function PurchasesPage({
           defaultValue={query.q}
           placeholder="Search purchase #, reference, vendor…"
           hiddenParams={{ tab: query.tab }}
+          searchFields={{
+            options: getSearchOptions(columns),
+            urlSelected: searchFieldIds,
+            storageKey: `mybilling:listSearch:${context.activeBusinessId}:purchase`,
+          }}
         >
           <DateRangeFilter dateFrom={query.dateFrom} dateTo={query.dateTo} fyStartMonth={fyStartMonth} />
         </SearchInput>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Purchase #</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Vendor</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Total</TableHead>
-            <TableHead>Paid</TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.length === 0 ? <TableEmptyState colSpan={7} message="No purchases found." /> : null}
-          {items.map((p) => {
-            const id = String(p._id);
-            return (
-              <TableRow key={id} className="group">
-                <TableCell>
-                  <Link href={`/purchases/${id}`} className="font-medium hover:underline">
-                    {p.docNumber ?? "Draft"}
-                  </Link>
-                </TableCell>
-                <TableCell>{formatDate(p.purchaseDate)}</TableCell>
-                <TableCell>{p.vendorSnapshot.displayName}</TableCell>
-                <TableCell>
-                  <StatusStamp variant={DOCUMENT_STATUS_BADGE_VARIANT[p.status]} seed={String(p._id)}>
-                    {DOCUMENT_STATUS_LABELS[p.status]}
-                  </StatusStamp>
-                </TableCell>
-                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.grandTotalMinor)}</TableCell>
-                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(p.amountPaidMinor)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/purchases/${id}`}>View</Link>
-                    </Button>
-                    {canEdit ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm" aria-label="More actions">
-                            <MoreHorizontal />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuGroup>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/purchases/${id}/edit`}>Edit</Link>
-                            </DropdownMenuItem>
-                          </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : null}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-        {items.length > 0 ? (
-          <TableFooter>
-            <TableRow className="hover:bg-muted/50">
-              <TableCell colSpan={4}>Total</TableCell>
-              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(totals.totalMinor)}</TableCell>
-              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(totals.paidMinor)}</TableCell>
-              <TableCell />
-            </TableRow>
-          </TableFooter>
-        ) : null}
-      </Table>
+      <DocumentListTable
+        docType="purchase"
+        businessId={context.activeBusinessId}
+        columns={columns}
+        rows={items.map((doc) => {
+          const id = String(doc._id);
+          const p = doc;
+          return { id, cells: buildRowCells("purchase", doc, columns, customFieldDefs), status: <StatusStamp variant={DOCUMENT_STATUS_BADGE_VARIANT[p.status]} seed={id}>{DOCUMENT_STATUS_LABELS[p.status]}</StatusStamp> };
+        })}
+        footer={{ total: `₹${minorToRupeesString(totals.totalMinor)}`, paid: `₹${minorToRupeesString(totals.paidMinor)}` }}
+        basePath="/purchases"
+        canEdit={canEdit}
+        emptyMessage="No purchases found."
+      />
 
       <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
         <span>Pending: ₹{minorToRupeesString(totals.pendingMinor)}</span>
@@ -204,7 +150,7 @@ export default async function PurchasesPage({
           page={page}
           totalPages={totalPages}
           basePath="/purchases"
-          searchParams={{ q: query.q, tab: query.tab }}
+          searchParams={{ q: query.q, tab: query.tab, qf: searchFieldIds }}
         />
       </div>
     </div>

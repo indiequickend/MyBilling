@@ -365,7 +365,11 @@ export async function findQuotationById(quotationId: string, businessId: string)
   return Quotation.findOne({ _id: quotationId, businessId });
 }
 
+const DEFAULT_SEARCH_PATHS = ["docNumber", "referenceNumber", "customerSnapshot.displayName"];
+
 export type QuotationListParams = {
+  /** Mongo paths to search, pre-validated by resolveSearchPaths (lib/documents/listColumns.ts); defaults to number/reference/party when omitted. */
+  searchPaths?: string[];
   search?: string;
   customerId?: string;
   tab?: "all" | "draft" | "open" | "partial" | "closed" | "cancelled" | "deleted";
@@ -392,7 +396,8 @@ function buildQuotationFilter(
   }
   if (params.search) {
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
-    filter.$or = [{ docNumber: pattern }, { referenceNumber: pattern }, { "customerSnapshot.displayName": pattern }];
+    const paths = params.searchPaths?.length ? params.searchPaths : DEFAULT_SEARCH_PATHS;
+    filter.$or = paths.map((path) => ({ [path]: pattern }));
   }
   return filter;
 }

@@ -6,6 +6,7 @@ import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findBankAccountById } from "@/lib/db/queries/bankAccounts";
 import { findSignatureById, findDefaultSignature } from "@/lib/db/queries/signatures";
 import { ProformaInvoiceDocument } from "@/lib/pdf/proformaInvoiceTemplate";
+import { resolveCustomFieldEntries } from "@/lib/documents/customFields";
 import { renderPdf } from "@/lib/pdf/render";
 import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
@@ -39,6 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const document = await ProformaInvoiceDocument({
       proformaInvoice,
+      customFields: resolveCustomFieldEntries(business.documentCustomFieldDefs?.proforma_invoice, proformaInvoice.customFieldValues),
       business: {
         name: business.name,
         brandName: business.brandName,

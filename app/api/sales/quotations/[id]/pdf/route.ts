@@ -5,6 +5,7 @@ import { findQuotationById } from "@/lib/db/queries/quotations";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findDefaultSignature } from "@/lib/db/queries/signatures";
 import { QuotationDocument } from "@/lib/pdf/quotationTemplate";
+import { resolveCustomFieldEntries } from "@/lib/documents/customFields";
 import { renderPdf } from "@/lib/pdf/render";
 import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
@@ -28,6 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const document = await QuotationDocument({
       quotation,
+      customFields: resolveCustomFieldEntries(business.documentCustomFieldDefs?.quotation, quotation.customFieldValues),
       business: {
         name: business.name,
         brandName: business.brandName,

@@ -5,6 +5,7 @@ import { findSalesOrderById } from "@/lib/db/queries/salesOrders";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findDefaultSignature } from "@/lib/db/queries/signatures";
 import { SalesOrderDocument } from "@/lib/pdf/salesOrderTemplate";
+import { resolveCustomFieldEntries } from "@/lib/documents/customFields";
 import { renderPdf } from "@/lib/pdf/render";
 import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
@@ -28,6 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const document = await SalesOrderDocument({
       salesOrder,
+      customFields: resolveCustomFieldEntries(business.documentCustomFieldDefs?.sales_order, salesOrder.customFieldValues),
       business: {
         name: business.name,
         brandName: business.brandName,

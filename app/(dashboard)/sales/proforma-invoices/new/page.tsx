@@ -56,8 +56,8 @@ export default async function NewProformaInvoicePage() {
         }))}
         signatures={signatures.map((s) => ({ id: String(s._id), name: s.name }))}
         bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name }))}
-        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
-        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
+        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{

@@ -1,11 +1,14 @@
 import { formatDate } from "@/lib/utils/date";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import type { CustomFieldEntry } from "@/lib/documents/customFields";
 import { minorToRupeesString } from "@/lib/utils/money";
 import type { PurchaseDoc } from "@/lib/db/models/Purchase";
 import type { AddressSubdoc } from "@/lib/db/models/shared/address";
 
 export type PurchaseTemplateData = {
   purchase: PurchaseDoc;
+  /** Non-empty per-document custom header fields, shown under the document title. */
+  customFields?: CustomFieldEntry[];
   business: {
     name: string;
     brandName?: string;
@@ -86,6 +89,11 @@ export async function PurchaseDocument(data: PurchaseTemplateData) {
           </View>
           <View style={styles.alignRight}>
             <Text style={styles.bold}>Purchase {purchase.docNumber ?? "(draft)"}</Text>
+            {(data.customFields ?? []).map((f) => (
+              <Text key={f.label} style={styles.muted}>
+                {f.label}: {f.value}
+              </Text>
+            ))}
             <Text style={styles.muted}>Date: {formatDate(purchase.purchaseDate)}</Text>
             {purchase.dueDate ? <Text style={styles.muted}>Due: {formatDate(purchase.dueDate)}</Text> : null}
             {purchase.referenceNumber ? (

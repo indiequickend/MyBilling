@@ -71,8 +71,8 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
           id: String(c._id),
           label: c.companyName ? `${c.displayName} (${c.companyName})` : c.displayName,
         }))}
-        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
-        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
+        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
         customFieldDefs={fieldDefs}
         businessState={businessState}
         defaultValues={{

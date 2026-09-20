@@ -5,6 +5,7 @@ import { findPurchaseById } from "@/lib/db/queries/purchases";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findBankAccountById } from "@/lib/db/queries/bankAccounts";
 import { PurchaseDocument } from "@/lib/pdf/purchaseTemplate";
+import { resolveCustomFieldEntries } from "@/lib/documents/customFields";
 import { renderPdf } from "@/lib/pdf/render";
 import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
@@ -30,6 +31,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const document = await PurchaseDocument({
       purchase,
+      customFields: resolveCustomFieldEntries(business.documentCustomFieldDefs?.purchase, purchase.customFieldValues),
       business: {
         name: business.name,
         brandName: business.brandName,

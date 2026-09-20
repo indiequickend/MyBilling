@@ -366,7 +366,11 @@ export async function findPurchaseOrderById(purchaseOrderId: string, businessId:
   return PurchaseOrder.findOne({ _id: purchaseOrderId, businessId });
 }
 
+const DEFAULT_SEARCH_PATHS = ["docNumber", "referenceNumber", "vendorSnapshot.displayName"];
+
 export type PurchaseOrderListParams = {
+  /** Mongo paths to search, pre-validated by resolveSearchPaths (lib/documents/listColumns.ts); defaults to number/reference/party when omitted. */
+  searchPaths?: string[];
   search?: string;
   vendorId?: string;
   tab?: "all" | "draft" | "open" | "closed" | "cancelled" | "deleted";
@@ -386,7 +390,8 @@ export async function listPurchaseOrders(businessId: string, params: PurchaseOrd
   if (params.vendorId) filter.vendorId = params.vendorId;
   if (params.search) {
     const pattern = new RegExp(escapeRegex(params.search.trim()), "i");
-    filter.$or = [{ docNumber: pattern }, { referenceNumber: pattern }, { "vendorSnapshot.displayName": pattern }];
+    const paths = params.searchPaths?.length ? params.searchPaths : DEFAULT_SEARCH_PATHS;
+    filter.$or = paths.map((path) => ({ [path]: pattern }));
   }
   return paginate(PurchaseOrder, filter, {
     page: params.page,

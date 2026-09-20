@@ -8,6 +8,7 @@ import { listWarehouses } from "@/lib/db/queries/warehouses";
 import { listProjects } from "@/lib/db/queries/projects";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findPurchaseOrderById } from "@/lib/db/queries/purchaseOrders";
+import { mapCustomFieldValues } from "@/lib/documents/customFields";
 import { mapLineItemsForConversion, extractConvertibleHeader } from "@/lib/documents/conversion";
 import { PurchaseForm } from "../PurchaseForm";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
@@ -81,8 +82,8 @@ export default async function NewPurchasePage({
           label: v.companyName ? `${v.displayName} (${v.companyName})` : v.displayName,
         }))}
         bankAccounts={bankAccounts.map((a) => ({ id: String(a._id), name: a.name, isDefault: a.isDefault }))}
-        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
-        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)" }))}
+        noteTemplates={noteTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
+        termTemplates={termTemplates.map((t) => ({ id: String(t._id), label: t.title || "(untitled)", body: t.body }))}
         warehouses={warehouses.map((w) => ({ id: String(w._id), name: w.name }))}
         defaultWarehouseId={
           business.preferences.productsInventory.inventory.defaultWarehouseId
@@ -110,7 +111,13 @@ export default async function NewPurchasePage({
           discountType: headerFromPO?.discountType ?? purchasePrefs.defaultDiscountType,
           discountValue: headerFromPO?.discountValue ?? "0",
           discountTarget: headerFromPO?.discountTarget ?? "net_amount",
-          customFieldValues: {},
+          customFieldValues: sourcePO
+            ? mapCustomFieldValues(
+                business.documentCustomFieldDefs?.purchase_order,
+                sourcePO.customFieldValues,
+                business.documentCustomFieldDefs?.purchase,
+              )
+            : {},
           lineItems: lineItemsFromPO ?? [],
           sourcePurchaseOrderId: sourcePO ? String(sourcePO._id) : undefined,
         }}

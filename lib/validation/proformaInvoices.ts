@@ -10,7 +10,8 @@ import {
   fillMissingCsvColumns,
 } from "@/lib/validation/shared";
 
-const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
+// A missing form field arrives as null (FormData.get) and a cleared select as "" — both mean "none".
+const optionalObjectId = z.preprocess((v) => (v === null || v === "" ? undefined : v), objectId.optional());
 
 const rawProformaInvoiceLineItemSchema = z.object({
   productId: optionalObjectId,
@@ -56,8 +57,8 @@ export const proformaInvoiceHeaderSchema = z.object({
   placeOfSupplyState: z.string().trim().min(1, "Place of supply is required").max(100),
   reverseCharge: z.boolean(),
   roundOff: z.boolean(),
-  notes: optionalTrimmed(2000),
-  terms: optionalTrimmed(2000),
+  notes: optionalTrimmed(5000),
+  terms: optionalTrimmed(5000),
   noteTemplateId: optionalObjectId,
   termTemplateId: optionalObjectId,
   signatureId: optionalObjectId,
@@ -106,7 +107,7 @@ export const proformaInvoiceRowSchema = z.preprocess(
     customerGstin: gstinSchema,
     placeOfSupplyState: optionalTrimmed(100),
     referenceNumber: optionalTrimmed(100),
-    notes: optionalTrimmed(2000),
+    notes: optionalTrimmed(5000),
     terms: optionalTrimmed(5000),
     lineItemDescription: optionalTrimmed(500),
     subtotalMinor: rupeesToMinorUnits,

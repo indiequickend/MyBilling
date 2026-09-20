@@ -1,11 +1,14 @@
 import { formatDate } from "@/lib/utils/date";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import type { CustomFieldEntry } from "@/lib/documents/customFields";
 import { minorToRupeesString } from "@/lib/utils/money";
 import type { QuotationDoc } from "@/lib/db/models/Quotation";
 import type { AddressSubdoc } from "@/lib/db/models/shared/address";
 
 export type QuotationTemplateData = {
   quotation: QuotationDoc;
+  /** Non-empty per-document custom header fields, shown under the document title. */
+  customFields?: CustomFieldEntry[];
   business: {
     name: string;
     brandName?: string;
@@ -88,6 +91,11 @@ export async function QuotationDocument(data: QuotationTemplateData) {
           </View>
           <View style={styles.alignRight}>
             <Text style={styles.bold}>Quotation {quotation.docNumber ?? "(draft)"}</Text>
+            {(data.customFields ?? []).map((f) => (
+              <Text key={f.label} style={styles.muted}>
+                {f.label}: {f.value}
+              </Text>
+            ))}
             <Text style={styles.muted}>Date: {formatDate(quotation.quotationDate)}</Text>
             {quotation.validUntil ? (
               <Text style={styles.muted}>Valid until: {formatDate(quotation.validUntil)}</Text>

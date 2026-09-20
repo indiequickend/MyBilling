@@ -11,7 +11,8 @@ import {
 } from "@/lib/validation/shared";
 import { parseSerialNumbersText } from "@/lib/validation/inventory";
 
-const optionalObjectId = objectId.optional().or(z.literal("").transform(() => undefined));
+// A missing form field arrives as null (FormData.get) and a cleared select as "" — both mean "none".
+const optionalObjectId = z.preprocess((v) => (v === null || v === "" ? undefined : v), objectId.optional());
 
 const rawInvoiceLineItemSchema = z.object({
   productId: optionalObjectId,
@@ -64,8 +65,8 @@ const rawInvoiceHeaderSchema = z.object({
   placeOfSupplyState: z.string().trim().min(1, "Place of supply is required").max(100),
   reverseCharge: z.boolean(),
   roundOff: z.boolean(),
-  notes: optionalTrimmed(2000),
-  terms: optionalTrimmed(2000),
+  notes: optionalTrimmed(5000),
+  terms: optionalTrimmed(5000),
   noteTemplateId: optionalObjectId,
   termTemplateId: optionalObjectId,
   signatureId: optionalObjectId,
@@ -152,7 +153,7 @@ export const invoiceGroupRowSchema = z.object({
   customerGstin: gstinSchema,
   placeOfSupplyState: optionalTrimmed(100),
   referenceNumber: optionalTrimmed(100),
-  notes: optionalTrimmed(2000),
+  notes: optionalTrimmed(5000),
   // A higher ceiling than the manual invoice form's own notes/terms fields (also 2000, see
   // rawInvoiceHeaderSchema above): migrated terms text is typically copied wholesale from
   // whatever system the invoice is coming from, so it's more likely to be long boilerplate than

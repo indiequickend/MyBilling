@@ -1,23 +1,12 @@
-import { formatDate } from "@/lib/utils/date";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { MoreHorizontal, Plus, Upload } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { getDashboardContext, getActiveBusinessFyStartMonth } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { listInvoices, sumInvoiceTotals } from "@/lib/db/queries/invoices";
 import { invoiceListQuerySchema } from "@/lib/validation/invoices";
 import { resolveInvoiceStatusDisplay } from "@/lib/constants/invoices";
 import { minorToRupeesString } from "@/lib/utils/money";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TableEmptyState } from "@/components/ui/TableEmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Pagination } from "@/components/ui/Pagination";
@@ -25,14 +14,16 @@ import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { ButtonLabel } from "@/components/ui/ButtonLabel";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
+import { DocumentListTable } from "@/components/documents/DocumentListTable";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  buildRowCells,
+  getListColumns,
+  getSearchOptions,
+  parseSearchFieldIds,
+  resolveSearchPaths,
+} from "@/lib/documents/listColumns";
+import { findBusinessById } from "@/lib/db/queries/businesses";
+import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -68,7 +59,13 @@ export default async function InvoicesPage({
     page: sp.page,
   });
 
+  const business = await findBusinessById(context.activeBusinessId);
+  const customFieldDefs = business?.documentCustomFieldDefs?.invoice ?? [];
+  const columns = getListColumns("invoice", customFieldDefs);
+  const searchFieldIds = parseSearchFieldIds(sp.qf);
+
   const listParams = {
+    searchPaths: resolveSearchPaths(columns, searchFieldIds),
     search: query.q,
     customerId: query.customerId,
     tab: query.tab,
@@ -122,82 +119,30 @@ export default async function InvoicesPage({
           defaultValue={query.q}
           placeholder="Search invoice #, reference, customer…"
           hiddenParams={{ tab: query.tab }}
+          searchFields={{
+            options: getSearchOptions(columns),
+            urlSelected: searchFieldIds,
+            storageKey: `mybilling:listSearch:${context.activeBusinessId}:invoice`,
+          }}
         >
           <DateRangeFilter dateFrom={query.dateFrom} dateTo={query.dateTo} fyStartMonth={fyStartMonth} />
         </SearchInput>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Invoice #</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Customer</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Total</TableHead>
-            <TableHead>Paid</TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.length === 0 ? <TableEmptyState colSpan={7} message="No invoices found." /> : null}
-          {items.map((inv) => {
-            const id = String(inv._id);
-            const statusDisplay = resolveInvoiceStatusDisplay(inv.status, inv.dueDate);
-            return (
-              <TableRow key={id} className="group">
-                <TableCell>
-                  <Link href={`/sales/invoices/${id}`} className="font-medium hover:underline">
-                    {inv.docNumber ?? "Draft"}
-                  </Link>
-                </TableCell>
-                <TableCell>{formatDate(inv.invoiceDate)}</TableCell>
-                <TableCell>{inv.customerSnapshot.displayName}</TableCell>
-                <TableCell>
-                  <StatusStamp variant={statusDisplay.variant} seed={id}>
-                    {statusDisplay.label}
-                  </StatusStamp>
-                </TableCell>
-                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(inv.grandTotalMinor)}</TableCell>
-                <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(inv.amountPaidMinor)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/sales/invoices/${id}`}>View</Link>
-                    </Button>
-                    {canEdit ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm" aria-label="More actions">
-                            <MoreHorizontal />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuGroup>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/sales/invoices/${id}/edit`}>Edit</Link>
-                            </DropdownMenuItem>
-                          </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : null}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-        {items.length > 0 ? (
-          <TableFooter>
-            <TableRow className="hover:bg-muted/50">
-              <TableCell colSpan={4}>Total</TableCell>
-              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(totals.totalMinor)}</TableCell>
-              <TableCell className="font-tabular tabular-nums">₹{minorToRupeesString(totals.paidMinor)}</TableCell>
-              <TableCell />
-            </TableRow>
-          </TableFooter>
-        ) : null}
-      </Table>
+      <DocumentListTable
+        docType="invoice"
+        businessId={context.activeBusinessId}
+        columns={columns}
+        rows={items.map((doc) => {
+          const id = String(doc._id);
+          const inv = doc;
+          return { id, cells: buildRowCells("invoice", doc, columns, customFieldDefs), status: (() => { const d = resolveInvoiceStatusDisplay(inv.status, inv.dueDate); return <StatusStamp variant={d.variant} seed={id}>{d.label}</StatusStamp>; })() };
+        })}
+        footer={{ total: `₹${minorToRupeesString(totals.totalMinor)}`, paid: `₹${minorToRupeesString(totals.paidMinor)}` }}
+        basePath="/sales/invoices"
+        canEdit={canEdit}
+        emptyMessage="No invoices found."
+      />
 
       <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
         <span>Pending: ₹{minorToRupeesString(totals.pendingMinor)}</span>
@@ -205,7 +150,7 @@ export default async function InvoicesPage({
           page={page}
           totalPages={totalPages}
           basePath="/sales/invoices"
-          searchParams={{ q: query.q, tab: query.tab }}
+          searchParams={{ q: query.q, tab: query.tab, qf: searchFieldIds }}
         />
       </div>
     </div>

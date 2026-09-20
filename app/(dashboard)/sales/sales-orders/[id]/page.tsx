@@ -87,7 +87,10 @@ export default async function SalesOrderDetailPage({ params }: { params: Promise
             <TableBody>
               {salesOrder.lineItems.map((li, i) => (
                 <TableRow key={i}>
-                  <TableCell>{li.description}</TableCell>
+                  <TableCell>
+                    {li.description}
+                    {li.notes ? <p className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{li.notes}</p> : null}
+                  </TableCell>
                   <TableCell>{li.hsnOrSac ?? "—"}</TableCell>
                   <TableCell>
                     {li.quantity} {li.unit}

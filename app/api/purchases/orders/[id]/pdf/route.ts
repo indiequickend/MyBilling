@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac/can";
 import { findPurchaseOrderById } from "@/lib/db/queries/purchaseOrders";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { PurchaseOrderDocument } from "@/lib/pdf/purchaseOrderTemplate";
+import { resolveCustomFieldEntries } from "@/lib/documents/customFields";
 import { renderPdf } from "@/lib/pdf/render";
 import { pdfContentDisposition } from "@/lib/pdf/filename";
 import { apiErrorResponse, UnauthorizedError } from "@/lib/api/handleApiError";
@@ -25,6 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const document = await PurchaseOrderDocument({
       purchaseOrder,
+      customFields: resolveCustomFieldEntries(business.documentCustomFieldDefs?.purchase_order, purchaseOrder.customFieldValues),
       business: {
         name: business.name,
         brandName: business.brandName,
