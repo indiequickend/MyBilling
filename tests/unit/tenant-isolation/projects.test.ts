@@ -73,9 +73,8 @@ describe("projects — tenant isolation", () => {
     vendorAId = String(vendorA.vendor._id);
 
     const bankA = await createBankAccount({ businessId: tenants.businessAId, type: "cash", name: "Cash" });
-    const bankB = await createBankAccount({ businessId: tenants.businessBId, type: "cash", name: "Cash" });
+    await createBankAccount({ businessId: tenants.businessBId, type: "cash", name: "Cash" });
     bankAId = String(bankA._id);
-    bankBId = String(bankB._id);
 
     const categoryA = await createExpenseCategory({ businessId: tenants.businessAId, name: "Materials" });
     categoryAId = String(categoryA._id);

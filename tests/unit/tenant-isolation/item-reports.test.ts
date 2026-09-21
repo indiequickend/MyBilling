@@ -40,7 +40,6 @@ describe("item reports and bill-wise item report — tenant isolation", () => {
     customerAId = String(customerA.customer._id);
     customerBId = String(customerB.customer._id);
     vendorAId = String(vendorA.vendor._id);
-    vendorBId = String(vendorB.vendor._id);
 
     const invoiceA = await createInvoice({
       businessId: tenants.businessAId,

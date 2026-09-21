@@ -16,6 +16,7 @@ export type AvailableAdvanceOption = {
   docNumber?: string;
   amountMinor: number;
   paymentDate: Date | string;
+  referenceNote?: string;
 };
 
 /**
@@ -52,6 +53,7 @@ export function ApplyAdvanceForm({
               options={advances.map((a) => ({
                 value: a.paymentId,
                 label: `${a.docNumber ?? "Advance"} — ₹${minorToRupeesString(a.amountMinor)} (${formatDate(a.paymentDate)})`,
+                description: a.referenceNote,
               }))}
             />
           </Field>

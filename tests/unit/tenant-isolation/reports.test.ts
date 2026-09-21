@@ -80,7 +80,7 @@ describe("reports — tenant isolation and correctness", () => {
       { $set: { "addresses.billing.state": "Maharashtra" } },
     );
 
-    const [customerA, customerB, vendorA, vendorB, categoryA, categoryB, bankA, bankB] = await Promise.all([
+    const [customerA, customerB, vendorA, vendorB, categoryA, , bankA] = await Promise.all([
       createCustomer({ businessId: tenants.businessAId, displayName: "Customer A" }),
       createCustomer({ businessId: tenants.businessBId, displayName: "Customer B" }),
       createVendor({ businessId: tenants.businessAId, displayName: "Vendor A" }),
@@ -96,9 +96,7 @@ describe("reports — tenant isolation and correctness", () => {
     vendorAId = String(vendorA.vendor._id);
     vendorBId = String(vendorB.vendor._id);
     categoryAId = String(categoryA._id);
-    categoryBId = String(categoryB._id);
     bankAId = String(bankA._id);
-    bankBId = String(bankB._id);
 
     // --- P&L period (2031-01) ---
     const invoiceA = await createInvoice({

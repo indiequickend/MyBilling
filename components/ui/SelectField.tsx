@@ -34,7 +34,7 @@ export function SelectField({
   name?: string;
   defaultValue?: string;
   placeholder: string;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; label: string; description?: string }>;
   required?: boolean;
   className?: string;
   onValueChange?: (value: string) => void;
@@ -60,7 +60,14 @@ export function SelectField({
           <SelectGroup>
             {options.map((o) => (
               <SelectItem key={o.value || NONE} value={o.value || NONE}>
-                {o.label}
+                {o.description ? (
+                  <span className="flex flex-col">
+                    <span>{o.label}</span>
+                    <span className="text-xs text-muted-foreground">{o.description}</span>
+                  </span>
+                ) : (
+                  o.label
+                )}
               </SelectItem>
             ))}
           </SelectGroup>
