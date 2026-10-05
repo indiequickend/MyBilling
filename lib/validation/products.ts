@@ -94,7 +94,7 @@ export const productListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
   categoryId: objectId.optional().or(z.literal("").transform(() => undefined)),
   groupId: objectId.optional().or(z.literal("").transform(() => undefined)),
-  type: z.enum(["product", "service"]).optional(),
+  type: z.enum(["product", "service"]).optional().or(z.literal("").transform(() => undefined)),
   tab: z.enum(["active", "deleted"]).default("active"),
   page: z.coerce.number().int().min(1).default(1),
 });
