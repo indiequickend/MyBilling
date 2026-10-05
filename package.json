@@ -15,7 +15,8 @@
     "audit": "pnpm audit --audit-level=high",
     "migrate:audit-log-permission": "tsx --env-file=.env scripts/backfillAuditLogPermission.ts",
     "migrate:document-sequences": "tsx --env-file=.env scripts/syncDocumentSequences.ts",
-    "db:reset": "tsx --env-file=.env scripts/resetDb.ts -- --yes"
+    "db:reset": "tsx --env-file=.env scripts/resetDb.ts -- --yes",
+    "seed:hsn-sac-codes": "tsx --env-file=.env scripts/seedHsnSacCodes.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

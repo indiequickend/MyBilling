@@ -42,3 +42,4 @@ export * from "./EwayBillData";
 export * from "./EInvoiceData";
 export * from "./GstReportSnapshot";
 export * from "./Project";
+export * from "./HsnSacCode";

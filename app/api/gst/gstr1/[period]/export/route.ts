@@ -3,7 +3,8 @@ import { getApiBusinessContext } from "@/lib/auth/apiContext";
 import { requirePermission } from "@/lib/rbac/can";
 import { computeGstr1 } from "@/lib/db/queries/gstReports";
 import { findBusinessById } from "@/lib/db/queries/businesses";
-import { toCsv, toExcelBuffer, type ExportColumn } from "@/lib/reports/export";
+import { type ExportColumn } from "@/lib/reports/export";
+import { buildGstr1JsonExport } from "@/lib/gst/gstr1JsonExport";
 import { renderPdf } from "@/lib/pdf/render";
 import { TabularReportDocument } from "@/lib/pdf/tabularReportTemplate";
 import { minorToRupeesString } from "@/lib/utils/money";
@@ -128,31 +129,36 @@ export async function GET(request: Request, { params }: { params: Promise<{ peri
 
     const { period } = await params;
     const url = new URL(request.url);
-    const format = url.searchParams.get("format") ?? "csv";
+    const format = url.searchParams.get("format") ?? "json";
 
     const data = await computeGstr1(context.businessId, period);
-    const rows = flattenGstr1(data);
     const fileBase = `gstr1-${period}`;
 
-    if (format === "csv") {
-      const csv = toCsv(rows, columns);
-      return new NextResponse(csv, {
+    if (format === "json") {
+      const payload = buildGstr1JsonExport({
+        businessGstin: data.businessGstin,
+        businessState: data.businessState,
+        period,
+        b2b: data.b2b,
+        b2cl: data.b2cl,
+        b2cs: data.b2cs,
+        exports: data.exports,
+        nilRatedSplit: data.nilRatedSplit,
+        creditDebitNotes: data.creditDebitNotes,
+        hsnB2b: data.hsnB2b,
+        hsnB2c: data.hsnB2c,
+        documentsIssued: data.documentsIssued,
+        creditNoteDocumentsIssued: data.creditNoteDocumentsIssued,
+      });
+      return new NextResponse(JSON.stringify(payload, null, 2), {
         headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="${fileBase}.csv"`,
+          "Content-Type": "application/json; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${fileBase}.json"`,
         },
       });
     }
 
-    if (format === "xlsx") {
-      const buffer = await toExcelBuffer(rows, columns, "GSTR-1");
-      return new NextResponse(new Uint8Array(buffer), {
-        headers: {
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": `attachment; filename="${fileBase}.xlsx"`,
-        },
-      });
-    }
+    const rows = flattenGstr1(data);
 
     if (format === "pdf") {
       const business = await findBusinessById(context.businessId);

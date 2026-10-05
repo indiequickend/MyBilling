@@ -6,8 +6,11 @@ import {
   buildB2csSection,
   buildExportsSection,
   buildNilRatedSection,
+  buildNilRatedSplitSection,
   buildCreditDebitNotesSection,
   buildDocumentsIssuedSection,
+  buildCreditNoteDocumentsIssuedSection,
+  buildHsnSplitSections,
   sumGstr1Totals,
   type Gstr1Invoice,
   type Gstr1CreditNote,
@@ -205,6 +208,62 @@ describe("GSTR-1 sections and hand-tallied totals", () => {
       cancelled: 1,
       netIssued: 5,
     });
+  });
+
+  it("splits nil-rated supply by interstate/intrastate × registered/unregistered (JSON export shape)", () => {
+    expect(buildNilRatedSplitSection(invoices, BUSINESS_STATE)).toEqual([
+      { sply_ty: "INTRAB2C", taxableAmountMinor: 20_000 },
+    ]);
+  });
+
+  it("splits HSN summary into hsn_b2b/hsn_b2c by recipient registration status", () => {
+    const withHsn: Gstr1Invoice[] = [
+      { ...invoices[0], lineItems: [{ ...invoices[0].lineItems[0], hsnOrSac: "1234", description: "Widget", unit: "PCS", quantity: 2 }] },
+      { ...invoices[3], lineItems: [{ ...invoices[3].lineItems[0], hsnOrSac: "5678", description: "Gadget", unit: "NOS", quantity: 1 }] },
+    ];
+    const { hsnB2b, hsnB2c } = buildHsnSplitSections(withHsn);
+    expect(hsnB2b).toEqual([
+      {
+        hsnOrSac: "1234",
+        description: "Widget",
+        unit: "PCS",
+        quantity: 2,
+        taxRatePercent: 18,
+        taxableAmountMinor: 100_000,
+        cgstMinor: 9_000,
+        sgstMinor: 9_000,
+        igstMinor: 0,
+      },
+    ]);
+    expect(hsnB2c).toEqual([
+      {
+        hsnOrSac: "5678",
+        description: "Gadget",
+        unit: "NOS",
+        quantity: 1,
+        taxRatePercent: 18,
+        taxableAmountMinor: 50_000,
+        cgstMinor: 4_500,
+        sgstMinor: 4_500,
+        igstMinor: 0,
+      },
+    ]);
+  });
+
+  it("summarizes credit note documents issued, separately from invoices", () => {
+    expect(buildCreditNoteDocumentsIssuedSection(creditNotes)).toEqual([
+      {
+        natureOfDocument: "Credit Note",
+        fromNumber: "CN-0001",
+        toNumber: "CN-0001",
+        totalNumber: 1,
+        cancelled: 0,
+        netIssued: 1,
+      },
+    ]);
+    expect(buildCreditNoteDocumentsIssuedSection([])).toEqual([
+      { natureOfDocument: "Credit Note", totalNumber: 0, cancelled: 0, netIssued: 0 },
+    ]);
   });
 
   it("matches a hand-tallied grand total for the period, net of the issued credit note", () => {
