@@ -19,6 +19,12 @@ export type Gstr1LineItem = {
   sgstMinor: number;
   igstMinor: number;
   totalMinor: number;
+  // Optional: only populated by fetchGstr1Invoices (not needed by the rate-wise section
+  // builders below) — carried through solely for buildHsnSplitSections' GSTR-1 JSON export use.
+  hsnOrSac?: string;
+  description?: string;
+  unit?: string;
+  quantity?: number;
 };
 
 export type Gstr1Invoice = {
@@ -31,6 +37,9 @@ export type Gstr1Invoice = {
   customerDisplayName: string;
   lineItems: Gstr1LineItem[];
   grandTotalMinor: number;
+  // Optional for backward compatibility with existing fixtures/tests that omit it; only the
+  // GSTR-1 JSON export's b2b section (rchrg) reads this.
+  reverseCharge?: boolean;
 };
 
 export type Gstr1CreditNote = {
@@ -110,6 +119,7 @@ export type B2bRow = RateWiseRow & {
   docNumber?: string;
   invoiceDate: Date;
   placeOfSupplyState: string;
+  reverseCharge: boolean;
 };
 
 export function buildB2bSection(invoices: Gstr1Invoice[], businessState: string): B2bRow[] {
@@ -124,6 +134,7 @@ export function buildB2bSection(invoices: Gstr1Invoice[], businessState: string)
         docNumber: inv.docNumber,
         invoiceDate: inv.invoiceDate,
         placeOfSupplyState: inv.placeOfSupplyState,
+        reverseCharge: inv.reverseCharge ?? false,
       });
     }
   }
@@ -203,6 +214,89 @@ export function buildNilRatedSection(invoices: Gstr1Invoice[], businessState: st
     .sort((a, b) => a.placeOfSupplyState.localeCompare(b.placeOfSupplyState));
 }
 
+export type Gstr1SupplyTypeCode = "INTRB2B" | "INTRB2C" | "INTRAB2B" | "INTRAB2C";
+
+export type NilRatedSplitRow = { sply_ty: Gstr1SupplyTypeCode; taxableAmountMinor: number };
+
+/**
+ * Same nil-rated invoices as buildNilRatedSection, but bucketed the way the GSTR-1 JSON export's
+ * "nil" table needs: by interstate/intrastate × registered/unregistered recipient, matching the
+ * GST portal's 4-way `sply_ty` enum. Kept separate from buildNilRatedSection (whose simpler
+ * POS-only shape is locked in by existing tests/UI) rather than changing that function's output.
+ */
+export function buildNilRatedSplitSection(invoices: Gstr1Invoice[], businessState: string): NilRatedSplitRow[] {
+  const map = new Map<Gstr1SupplyTypeCode, number>();
+  for (const inv of activeInvoices(invoices)) {
+    if (classifyInvoiceForGstr1(inv, businessState) !== "nil_rated") continue;
+    const total = inv.lineItems.reduce((sum, li) => sum + li.taxableAmountMinor, 0);
+    const interstate = !isSameState(businessState, inv.placeOfSupplyState);
+    const key: Gstr1SupplyTypeCode = inv.customerGstin
+      ? interstate
+        ? "INTRB2B"
+        : "INTRAB2B"
+      : interstate
+        ? "INTRB2C"
+        : "INTRAB2C";
+    map.set(key, (map.get(key) ?? 0) + total);
+  }
+  return [...map.entries()].map(([sply_ty, taxableAmountMinor]) => ({ sply_ty, taxableAmountMinor }));
+}
+
+export type HsnJsonRow = {
+  hsnOrSac: string;
+  description: string;
+  unit: string;
+  quantity: number;
+  taxRatePercent: number;
+  taxableAmountMinor: number;
+  cgstMinor: number;
+  sgstMinor: number;
+  igstMinor: number;
+};
+
+/**
+ * HSN summary split by recipient registration status (b2b/b2c), the shape the GSTR-1 JSON
+ * export's "hsn" table needs (hsn_b2b/hsn_b2c) — unlike lib/db/queries/reports.ts's
+ * getHsnSummary, which is a single Invoice-wide aggregate used for the "Sale Summary by HSN"
+ * report and isn't split. Grouped by HSN/SAC + rate, same as that aggregate.
+ */
+export function buildHsnSplitSections(invoices: Gstr1Invoice[]): { hsnB2b: HsnJsonRow[]; hsnB2c: HsnJsonRow[] } {
+  const b2bMap = new Map<string, HsnJsonRow>();
+  const b2cMap = new Map<string, HsnJsonRow>();
+  for (const inv of activeInvoices(invoices)) {
+    const map = inv.customerGstin ? b2bMap : b2cMap;
+    for (const li of inv.lineItems) {
+      const hsnOrSac = li.hsnOrSac ?? "—";
+      const key = `${hsnOrSac}::${li.taxRatePercent}`;
+      const row =
+        map.get(key) ??
+        ({
+          hsnOrSac,
+          description: li.description ?? "",
+          unit: li.unit ?? "NA",
+          quantity: 0,
+          taxRatePercent: li.taxRatePercent,
+          taxableAmountMinor: 0,
+          cgstMinor: 0,
+          sgstMinor: 0,
+          igstMinor: 0,
+        } satisfies HsnJsonRow);
+      row.quantity += li.quantity ?? 0;
+      row.taxableAmountMinor += li.taxableAmountMinor;
+      row.cgstMinor += li.cgstMinor;
+      row.sgstMinor += li.sgstMinor;
+      row.igstMinor += li.igstMinor;
+      map.set(key, row);
+    }
+  }
+  const byHsnThenRate = (a: HsnJsonRow, b: HsnJsonRow) =>
+    a.hsnOrSac.localeCompare(b.hsnOrSac) || a.taxRatePercent - b.taxRatePercent;
+  return {
+    hsnB2b: [...b2bMap.values()].sort(byHsnThenRate),
+    hsnB2c: [...b2cMap.values()].sort(byHsnThenRate),
+  };
+}
+
 export type CdnrRow = RateWiseRow & {
   customerGstin?: string;
   customerName: string;
@@ -253,6 +347,28 @@ export function buildDocumentsIssuedSection(invoices: Gstr1Invoice[]): DocIssued
   return [
     {
       natureOfDocument: "Invoices for outward supply",
+      fromNumber: issued[0].docNumber,
+      toNumber: issued[issued.length - 1].docNumber,
+      totalNumber: issued.length,
+      cancelled,
+      netIssued: issued.length - cancelled,
+    },
+  ];
+}
+
+/** Same "documents issued" shape as buildDocumentsIssuedSection, for sales-side credit notes —
+ * the GSTR-1 JSON export's doc_issue table reports these as a separate series (doc_num 5,
+ * "Credit Note"). There's no sales-side Debit Note series in this app (see this file's doc
+ * comment), so doc_num 4 is never produced. */
+export function buildCreditNoteDocumentsIssuedSection(creditNotes: Gstr1CreditNote[]): DocIssuedRow[] {
+  const issued = [...creditNotes].sort((a, b) => a.creditNoteDate.getTime() - b.creditNoteDate.getTime());
+  if (issued.length === 0) {
+    return [{ natureOfDocument: "Credit Note", totalNumber: 0, cancelled: 0, netIssued: 0 }];
+  }
+  const cancelled = issued.filter((n) => n.status === "cancelled").length;
+  return [
+    {
+      natureOfDocument: "Credit Note",
       fromNumber: issued[0].docNumber,
       toNumber: issued[issued.length - 1].docNumber,
       totalNumber: issued.length,

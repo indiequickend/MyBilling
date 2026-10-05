@@ -6,14 +6,18 @@ import { CreditNote } from "@/lib/db/models/CreditNote";
 import { DebitNote } from "@/lib/db/models/DebitNote";
 import { Business } from "@/lib/db/models/Business";
 import { getHsnSummary, type HsnSummaryRow } from "@/lib/db/queries/reports";
+import { lookupHsnSacDescriptions } from "@/lib/db/queries/hsnSacCodes";
 import {
   buildB2bSection,
   buildB2clSection,
   buildB2csSection,
   buildExportsSection,
   buildNilRatedSection,
+  buildNilRatedSplitSection,
   buildCreditDebitNotesSection,
   buildDocumentsIssuedSection,
+  buildCreditNoteDocumentsIssuedSection,
+  buildHsnSplitSections,
   sumGstr1Totals,
   type Gstr1Invoice,
   type Gstr1CreditNote,
@@ -22,8 +26,10 @@ import {
   type B2csRow,
   type ExportRow,
   type NilRatedRow,
+  type NilRatedSplitRow,
   type CdnrRow,
   type DocIssuedRow,
+  type HsnJsonRow,
   type Gstr1Totals,
 } from "@/lib/gst/gstr1";
 import {
@@ -64,6 +70,10 @@ function toGstr1LineItems(lineItems: Array<Record<string, unknown>>) {
     sgstMinor: li.sgstMinor as number,
     igstMinor: li.igstMinor as number,
     totalMinor: li.totalMinor as number,
+    hsnOrSac: li.hsnOrSac as string | undefined,
+    description: li.description as string | undefined,
+    unit: li.unit as string | undefined,
+    quantity: li.quantity as number | undefined,
   }));
 }
 
@@ -73,7 +83,7 @@ async function fetchGstr1Invoices(businessId: string, start: Date, end: Date): P
     invoiceDate: { $gte: start, $lte: end },
     status: { $ne: "draft" },
   })
-    .select("docNumber invoiceDate status placeOfSupplyState customerSnapshot lineItems grandTotalMinor")
+    .select("docNumber invoiceDate status placeOfSupplyState reverseCharge customerSnapshot lineItems grandTotalMinor")
     .lean();
 
   return docs.map((inv) => ({
@@ -82,6 +92,7 @@ async function fetchGstr1Invoices(businessId: string, start: Date, end: Date): P
     invoiceDate: inv.invoiceDate,
     status: inv.status,
     placeOfSupplyState: inv.placeOfSupplyState,
+    reverseCharge: inv.reverseCharge,
     customerGstin: inv.customerSnapshot?.gstin,
     customerDisplayName: inv.customerSnapshot?.displayName ?? "—",
     lineItems: toGstr1LineItems(inv.lineItems),
@@ -115,11 +126,32 @@ export type Gstr1ComputedData = {
   b2cs: B2csRow[];
   exports: ExportRow[];
   nilRated: NilRatedRow[];
+  nilRatedSplit: NilRatedSplitRow[];
   creditDebitNotes: CdnrRow[];
   hsnSummary: HsnSummaryRow[];
+  hsnB2b: HsnJsonRow[];
+  hsnB2c: HsnJsonRow[];
   documentsIssued: DocIssuedRow[];
+  creditNoteDocumentsIssued: DocIssuedRow[];
   totals: Gstr1Totals;
+  businessState: string;
+  businessGstin: string;
 };
+
+/** Overrides each HSN/SAC row's description with the government's own classification
+ * (lib/db/queries/hsnSacCodes.ts), falling back to whatever free-text description was on the
+ * line item when a code isn't found in that master list (e.g. a typo'd or non-standard code) —
+ * never leaving the GSTR-1 JSON export's `desc` field silently blank. */
+async function applyMasterHsnSacDescriptions(sections: {
+  hsnB2b: HsnJsonRow[];
+  hsnB2c: HsnJsonRow[];
+}): Promise<{ hsnB2b: HsnJsonRow[]; hsnB2c: HsnJsonRow[] }> {
+  const allCodes = [...sections.hsnB2b, ...sections.hsnB2c].map((r) => r.hsnOrSac);
+  const descriptions = await lookupHsnSacDescriptions(allCodes);
+  const apply = (rows: HsnJsonRow[]) =>
+    rows.map((r) => ({ ...r, description: descriptions.get(r.hsnOrSac) ?? r.description }));
+  return { hsnB2b: apply(sections.hsnB2b), hsnB2c: apply(sections.hsnB2c) };
+}
 
 /** GSTR-1 "calculation engine" for one businessId-scoped calendar-month period, computed entirely
  * from local documents (Invoice + CreditNote) — never a live GST-portal call. */
@@ -140,11 +172,31 @@ export async function computeGstr1(businessId: string, period: string): Promise<
   const b2cs = buildB2csSection(invoices, businessState);
   const exportsSection = buildExportsSection(invoices, businessState);
   const nilRated = buildNilRatedSection(invoices, businessState);
+  const nilRatedSplit = buildNilRatedSplitSection(invoices, businessState);
   const creditDebitNotes = buildCreditDebitNotesSection(creditNotes);
+  const hsnSplit = buildHsnSplitSections(invoices);
+  const { hsnB2b, hsnB2c } = await applyMasterHsnSacDescriptions(hsnSplit);
   const documentsIssued = buildDocumentsIssuedSection(invoices);
+  const creditNoteDocumentsIssued = buildCreditNoteDocumentsIssuedSection(creditNotes);
   const totals = sumGstr1Totals({ b2b, b2cl, b2cs, exports: exportsSection, creditDebitNotes });
 
-  return { b2b, b2cl, b2cs, exports: exportsSection, nilRated, creditDebitNotes, hsnSummary, documentsIssued, totals };
+  return {
+    b2b,
+    b2cl,
+    b2cs,
+    exports: exportsSection,
+    nilRated,
+    nilRatedSplit,
+    creditDebitNotes,
+    hsnSummary,
+    hsnB2b,
+    hsnB2c,
+    documentsIssued,
+    creditNoteDocumentsIssued,
+    totals,
+    businessState,
+    businessGstin: businessDoc?.gstin ?? "",
+  };
 }
 
 export type Gstr3bComputedData = {

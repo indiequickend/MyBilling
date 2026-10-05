@@ -107,15 +107,9 @@ export default async function Gstr1Page({
           {canExport ? (
             <>
               <Button variant="outline" size="sm" asChild>
-                <Link href={`${exportBase}?format=csv`}>
+                <Link href={`${exportBase}?format=json`}>
                   <Download data-icon="inline-start" />
-                  CSV
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`${exportBase}?format=xlsx`}>
-                  <Download data-icon="inline-start" />
-                  Excel
+                  JSON
                 </Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
