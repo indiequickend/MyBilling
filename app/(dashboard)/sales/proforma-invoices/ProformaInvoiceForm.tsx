@@ -1,7 +1,7 @@
 "use client";
 
 import { NoteTermFields, type NoteTermTemplateOption } from "@/components/documents/NoteTermFields";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
@@ -94,6 +94,15 @@ export function ProformaInvoiceForm({
 
   const canDraft = mode === "create" || editableStatus === "draft";
   const placeOfSupplyState = defaultValues?.placeOfSupplyState ?? businessState;
+
+  // Mirrors the Discount/round-off fields below so the line items totals summary stays live
+  // as the user types, without turning those fields into fully controlled inputs.
+  const [discountType, setDiscountType] = useState<"amount" | "percentage">(
+    defaultValues?.discountType ?? "percentage",
+  );
+  const [discountValue, setDiscountValue] = useState(defaultValues?.discountValue ?? "0");
+  const [discountTarget, setDiscountTarget] = useState(defaultValues?.discountTarget ?? "net_amount");
+  const [roundOff, setRoundOff] = useState(defaultValues?.roundOff ?? true);
 
   return (
     <form action={formAction} className="space-y-6">
@@ -219,6 +228,10 @@ export function ProformaInvoiceForm({
             defaultRows={defaultValues?.lineItems ?? []}
             businessState={businessState}
             placeOfSupplyState={placeOfSupplyState}
+            discountType={discountType}
+            discountValue={discountValue}
+            discountTarget={discountTarget}
+            roundOff={roundOff}
           />
         </CardContent>
       </Card>
@@ -239,6 +252,7 @@ export function ProformaInvoiceForm({
                   { value: "percentage", label: "Percentage" },
                   { value: "amount", label: "Amount" },
                 ]}
+                onValueChange={(v) => setDiscountType(v as "amount" | "percentage")}
               />
             </Field>
             <FormField
@@ -246,6 +260,7 @@ export function ProformaInvoiceForm({
               name="discountValue"
               type="number"
               defaultValue={defaultValues?.discountValue ?? "0"}
+              onChange={setDiscountValue}
             />
             <Field>
               <FieldLabel htmlFor="discountTarget">Applies to</FieldLabel>
@@ -254,10 +269,16 @@ export function ProformaInvoiceForm({
                 defaultValue={defaultValues?.discountTarget ?? "net_amount"}
                 placeholder="Applies to"
                 options={DISCOUNT_TARGETS.map((t) => ({ value: t, label: DISCOUNT_TARGET_LABELS[t] }))}
+                onValueChange={(v) => setDiscountTarget(v as (typeof DISCOUNT_TARGETS)[number])}
               />
             </Field>
             <Field orientation="horizontal" className="pt-6">
-              <Checkbox id="roundOff" name="roundOff" defaultChecked={defaultValues?.roundOff ?? true} />
+              <Checkbox
+                id="roundOff"
+                name="roundOff"
+                defaultChecked={defaultValues?.roundOff ?? true}
+                onCheckedChange={(checked) => setRoundOff(checked === true)}
+              />
               <FieldLabel htmlFor="roundOff" className="font-normal">
                 Round off total
               </FieldLabel>
