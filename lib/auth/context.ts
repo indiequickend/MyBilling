@@ -1,11 +1,18 @@
+import { cache } from "react";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { findUserById } from "@/lib/db/queries/users";
 import { findMembership } from "@/lib/db/queries/memberships";
 import { findRoleById } from "@/lib/db/queries/roles";
 import type { MembershipContext } from "@/lib/rbac/can";
 
-/** Resolves the current request's session cookie to a (non-deleted) User, or null. */
-export async function getCurrentUser() {
+/**
+ * Resolves the current request's session cookie to a (non-deleted) User, or
+ * null. Wrapped in React's `cache()` so the many call sites that each need
+ * "the current user" (layout, dashboard context, getActiveMembership, ...)
+ * share a single session+user DB round trip per request instead of repeating
+ * it on every call.
+ */
+export const getCurrentUser = cache(async () => {
   const session = await getSessionFromCookie();
   if (!session) return null;
 
@@ -13,7 +20,7 @@ export async function getCurrentUser() {
   if (!user) return null;
 
   return user;
-}
+});
 
 /**
  * Resolves the current user's membership + permissions for one business, or
