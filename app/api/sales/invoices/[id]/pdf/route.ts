@@ -62,7 +62,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": pdfContentDisposition("inline", invoice.docNumber ?? "invoice-draft"),
+        "Content-Disposition": pdfContentDisposition(
+          "inline",
+          [invoice.docNumber ?? "invoice-draft", invoice.customerSnapshot.displayName].join("-"),
+        ),
       },
     });
   } catch (err) {
