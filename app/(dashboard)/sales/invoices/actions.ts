@@ -64,6 +64,11 @@ const REASON_MESSAGES: Record<InvoiceWriteFailureReason, string> = {
   not_payable: "This invoice isn't awaiting payment.",
   no_payments: "Enter at least one payment.",
   insufficient_stock: "One of the line items doesn't have enough stock available.",
+  total_below_paid:
+    "The new total is less than what's already been received. Reduce or delete the payment first, or issue a credit note.",
+  customer_locked_by_payments: "This invoice has payments recorded, so its customer can't be changed.",
+  date_changes_series:
+    "The invoice date can't move to a different numbering period (financial year) than the invoice number.",
 };
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -276,7 +281,7 @@ export async function saveInvoiceAction(
         context.membership.userId,
       );
     } else {
-      result = await updateInvoice(invoiceId, context.activeBusinessId, parsed.input);
+      result = await updateInvoice(invoiceId, context.activeBusinessId, parsed.input, context.membership.userId);
     }
   }
 

@@ -23,6 +23,7 @@ const REASON_LABELS: Record<string, string> = {
   purchase: "Purchase",
   debit_note: "Debit Note",
   invoice_cancelled: "Invoice cancelled",
+  invoice_edit_reversal: "Invoice edited (reversal)",
   purchase_cancelled: "Purchase cancelled",
 };
 

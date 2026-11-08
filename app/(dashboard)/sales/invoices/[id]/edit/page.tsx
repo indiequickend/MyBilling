@@ -11,11 +11,10 @@ import { listProjects } from "@/lib/db/queries/projects";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findProductsByIds } from "@/lib/db/queries/products";
 import { minorToRupeesString } from "@/lib/utils/money";
+import { isInvoiceEditable } from "@/lib/constants/invoices";
 import { hydrateLineItemsStockInfo } from "@/lib/documents/stockLineItems";
 import { InvoiceForm } from "../../InvoiceForm";
 import type { LineItemRow } from "@/components/documents/LineItemsEditor";
-
-const EDITABLE_STATUSES = ["draft", "pending", "partially_paid"];
 
 export default async function EditInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,7 +28,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
 
   const invoice = await findInvoiceById(id, context.activeBusinessId);
   if (!invoice) notFound();
-  if (!EDITABLE_STATUSES.includes(invoice.status)) {
+  const status = invoice.status;
+  if (!isInvoiceEditable(status)) {
     redirect(`/sales/invoices/${id}`);
   }
 
@@ -82,7 +82,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
       <InvoiceForm
         mode="edit"
         invoiceId={id}
-        editableStatus={invoice.status as "draft" | "pending" | "partially_paid"}
+        editableStatus={status}
+        amountPaidMinor={invoice.amountPaidMinor}
         customers={customers.items.map((c) => ({
           id: String(c._id),
           label: c.companyName ? `${c.displayName} (${c.companyName})` : c.displayName,
