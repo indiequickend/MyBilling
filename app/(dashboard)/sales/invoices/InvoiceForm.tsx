@@ -17,6 +17,7 @@ import { minorToRupeesString } from "@/lib/utils/money";
 import type { CustomFieldType } from "@/lib/validation/shared";
 import { LineItemsEditor, type LineItemRow } from "@/components/documents/LineItemsEditor";
 import { PaymentSplitsEditor } from "@/components/documents/PaymentSplitsEditor";
+import { ExistingPaymentsEditor, type ExistingPaymentRow } from "@/components/documents/ExistingPaymentsEditor";
 import { PartyComboboxField } from "@/components/documents/PartyComboboxField";
 import { quickCreateCustomerAction } from "@/app/(dashboard)/customers/actions";
 import { saveInvoiceAction, type InvoiceFormState } from "./actions";
@@ -75,6 +76,8 @@ export function InvoiceForm({
   invoiceId,
   editableStatus,
   amountPaidMinor = 0,
+  existingPayments,
+  paymentPermissions,
   customers,
   signatures,
   bankAccounts,
@@ -92,6 +95,9 @@ export function InvoiceForm({
   editableStatus?: InvoiceEditableStatus;
   /** Already received against this invoice — the edited total may not go below it. */
   amountPaidMinor?: number;
+  /** Edit mode on a finalized invoice only: its non-voided payments, editable in this form. */
+  existingPayments?: ExistingPaymentRow[];
+  paymentPermissions?: { canEdit: boolean; canRemove: boolean; canCreate: boolean };
   customers: Array<{ id: string; label: string }>;
   signatures: Array<{ id: string; name: string }>;
   bankAccounts: BankAccountOption[];
@@ -135,9 +141,10 @@ export function InvoiceForm({
       {mode === "edit" && editableStatus && editableStatus !== "draft" ? (
         <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
           Editing a finalized invoice. Stock is re-adjusted to the new line items on save, and the
-          invoice date must stay in the same financial year as its number.
+          invoice date must stay in the same financial year as its number. Payments below can&apos;t
+          add up to more than the new total.
           {amountPaidMinor > 0
-            ? ` ₹${minorToRupeesString(amountPaidMinor)} has already been received, so the total can't go below that and the customer can't be changed.`
+            ? ` ₹${minorToRupeesString(amountPaidMinor)} is currently received — the customer can't be changed while payments remain.`
             : null}
         </p>
       ) : null}
@@ -448,6 +455,26 @@ export function InvoiceForm({
           </Field>
         </CardContent>
       </Card>
+
+      {mode === "edit" && existingPayments && paymentPermissions ? (
+        <Card className="bg-accent-mint text-accent-mint-foreground ring-0">
+          <CardHeader>
+            <CardTitle className="text-accent-mint-foreground">Payments</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <input type="hidden" name="paymentsSection" value="1" />
+            <ExistingPaymentsEditor
+              payments={existingPayments}
+              bankAccounts={bankAccounts}
+              canEdit={paymentPermissions.canEdit}
+              canRemove={paymentPermissions.canRemove}
+            />
+            {paymentPermissions.canCreate ? (
+              <PaymentSplitsEditor bankAccounts={bankAccounts} defaultBankAccountId={defaultValues?.bankAccountId} />
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {showPayments ? (
         <Card className="bg-accent-mint text-accent-mint-foreground ring-0">

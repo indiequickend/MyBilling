@@ -11,7 +11,7 @@ import {
   invoiceDiscountSchema,
   invoicePaymentSplitSchema,
 } from "@/lib/validation/invoices";
-import { applyAdvanceSchema } from "@/lib/validation/payments";
+import { applyAdvanceSchema, editPaymentSchema } from "@/lib/validation/payments";
 import { buildCustomFieldValuesSchema } from "@/lib/validation/business";
 import { parseIndexedRows, parseCheckbox } from "@/lib/validation/shared";
 import { findBusinessById } from "@/lib/db/queries/businesses";
@@ -28,7 +28,12 @@ import {
   type InvoiceWriteFailureReason,
   type InvoicePaymentSplitWriteInput,
 } from "@/lib/db/queries/invoices";
-import { applyAdvancePayment } from "@/lib/db/queries/payments";
+import {
+  applyAdvancePayment,
+  listPaymentsForDocument,
+  isPaymentEditable,
+  type DocumentPaymentChanges,
+} from "@/lib/db/queries/payments";
 // Only the "Convert to Invoice" flow (Quotation/Sales Order/Proforma Invoice features) ever sets these.
 import { markQuotationClosed } from "@/lib/db/queries/quotations";
 import { markSalesOrderClosed } from "@/lib/db/queries/salesOrders";
@@ -65,10 +70,13 @@ const REASON_MESSAGES: Record<InvoiceWriteFailureReason, string> = {
   no_payments: "Enter at least one payment.",
   insufficient_stock: "One of the line items doesn't have enough stock available.",
   total_below_paid:
-    "The new total is less than what's already been received. Reduce or delete the payment first, or issue a credit note.",
+    "Payments add up to more than the invoice total. Reduce or remove a payment, or issue a credit note.",
   customer_locked_by_payments: "This invoice has payments recorded, so its customer can't be changed.",
   date_changes_series:
     "The invoice date can't move to a different numbering period (financial year) than the invoice number.",
+  payment_not_found: "One of the payments was changed or removed elsewhere. Reload and try again.",
+  payment_not_editable: "One of the payments can't be edited here.",
+  amount_invalid: "Payment amounts must be greater than zero.",
 };
 
 function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
@@ -230,6 +238,77 @@ async function parseInvoiceForm(
   return { ok: true, input, payments };
 }
 
+type DashboardContext = Awaited<ReturnType<typeof requireDashboardContext>>;
+
+/**
+ * Turns the edit form's Payments section into a DocumentPaymentChanges diff against what's stored:
+ * only rows whose values actually changed become updates, "remove" rows become voids, and new
+ * rows become creates. Each kind of change is checked against its own `payments` permission here
+ * (server-side), on top of the `sales_invoices.edit` check the caller already did.
+ */
+async function buildInvoicePaymentChanges(
+  context: DashboardContext,
+  invoiceId: string,
+  formData: FormData,
+  newPayments: InvoicePaymentSplitWriteInput[],
+): Promise<{ ok: true; changes: DocumentPaymentChanges } | { ok: false; error: string }> {
+  const changes: DocumentPaymentChanges = { updates: [], voidIds: [], creates: [] };
+  if (formData.get("paymentsSection") !== "1") return { ok: true, changes };
+
+  const stored = await listPaymentsForDocument("invoice", invoiceId, context.activeBusinessId);
+  const storedById = new Map(stored.filter((p) => !p.voidedAt).map((p) => [String(p._id), p]));
+
+  for (const row of parseIndexedRows(formData, "existingPayment")) {
+    const original = storedById.get(row.id ?? "");
+    if (!original || !isPaymentEditable(original)) return { ok: false, error: REASON_MESSAGES.payment_not_found };
+
+    if (row.remove === "1") {
+      changes.voidIds.push(row.id);
+      continue;
+    }
+    const parsed = editPaymentSchema.safeParse({
+      amountMinor: row.amountMinor,
+      mode: row.mode,
+      bankAccountId: row.bankAccountId,
+      paymentDate: row.paymentDate,
+      referenceNote: row.referenceNote,
+    });
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Fix the payment rows." };
+
+    const originalDate = new Date(original.paymentDate).toISOString().slice(0, 10);
+    const dateChanged = parsed.data.paymentDate !== originalDate;
+    const changed =
+      parsed.data.amountMinor !== original.amountMinor ||
+      parsed.data.mode !== original.mode ||
+      parsed.data.bankAccountId !== String(original.bankAccountId) ||
+      dateChanged ||
+      (parsed.data.referenceNote ?? "") !== (original.referenceNote ?? "");
+    if (!changed) continue;
+
+    changes.updates.push({
+      paymentId: row.id,
+      amountMinor: parsed.data.amountMinor,
+      mode: parsed.data.mode,
+      bankAccountId: parsed.data.bankAccountId,
+      // Keep the original timestamp when only other fields changed.
+      paymentDate: dateChanged ? new Date(parsed.data.paymentDate) : new Date(original.paymentDate),
+      referenceNote: parsed.data.referenceNote,
+    });
+  }
+  changes.creates = newPayments;
+
+  if (changes.updates.length && !can(context.membership, "payments", "edit")) {
+    return { ok: false, error: "You don't have permission to edit payments." };
+  }
+  if (changes.voidIds.length && !can(context.membership, "payments", "delete")) {
+    return { ok: false, error: "You don't have permission to remove payments." };
+  }
+  if (changes.creates.length && !can(context.membership, "payments", "create")) {
+    return { ok: false, error: "You don't have permission to record payments." };
+  }
+  return { ok: true, changes };
+}
+
 /**
  * One action handles all three submit paths (Save as Draft / Save / Save & Print) via a hidden
  * `intent` field set by each submit button's own `name="intent" value="..."`. Creates a new
@@ -281,13 +360,22 @@ export async function saveInvoiceAction(
         context.membership.userId,
       );
     } else {
-      result = await updateInvoice(invoiceId, context.activeBusinessId, parsed.input, context.membership.userId);
+      const paymentChanges = await buildInvoicePaymentChanges(context, invoiceId, formData, parsed.payments);
+      if (!paymentChanges.ok) return { error: paymentChanges.error };
+      result = await updateInvoice(
+        invoiceId,
+        context.activeBusinessId,
+        parsed.input,
+        context.membership.userId,
+        paymentChanges.changes,
+      );
     }
   }
 
   if (!result.ok) return { error: REASON_MESSAGES[result.reason] };
 
   revalidatePath("/sales/invoices");
+  revalidatePath("/payments");
   const savedId = String(result.invoice._id);
   if (intent === "finalize_print") {
     // A redirect can only replace this tab, so land on the document and let OpenPdfOnLoad open the PDF in a new one.

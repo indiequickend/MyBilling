@@ -10,6 +10,7 @@ import { listWarehouses } from "@/lib/db/queries/warehouses";
 import { listProjects } from "@/lib/db/queries/projects";
 import { findBusinessById } from "@/lib/db/queries/businesses";
 import { findProductsByIds } from "@/lib/db/queries/products";
+import { listPaymentsForDocument, isPaymentEditable } from "@/lib/db/queries/payments";
 import { minorToRupeesString } from "@/lib/utils/money";
 import { isInvoiceEditable } from "@/lib/constants/invoices";
 import { hydrateLineItemsStockInfo } from "@/lib/documents/stockLineItems";
@@ -34,6 +35,28 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
   }
 
   const canViewProjects = can(context.membership, "projects", "view");
+  const isFinalized = status !== "draft";
+  const existingPayments = isFinalized
+    ? (await listPaymentsForDocument("invoice", id, context.activeBusinessId))
+        .filter((p) => !p.voidedAt)
+        .map((p) => ({
+          id: String(p._id),
+          docNumber: p.docNumber ?? undefined,
+          amount: minorToRupeesString(p.amountMinor),
+          mode: p.mode,
+          bankAccountId: String(p.bankAccountId),
+          paymentDate: new Date(p.paymentDate).toISOString().slice(0, 10),
+          referenceNote: p.referenceNote ?? "",
+          editable: isPaymentEditable(p),
+        }))
+    : undefined;
+  const paymentPermissions = isFinalized
+    ? {
+        canEdit: can(context.membership, "payments", "edit"),
+        canRemove: can(context.membership, "payments", "delete"),
+        canCreate: can(context.membership, "payments", "create"),
+      }
+    : undefined;
   const [customers, signatures, bankAccounts, noteTemplates, termTemplates, warehouses, business, projects] =
     await Promise.all([
       listCustomers(context.activeBusinessId, { pageSize: 500 }),
@@ -84,6 +107,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
         invoiceId={id}
         editableStatus={status}
         amountPaidMinor={invoice.amountPaidMinor}
+        existingPayments={existingPayments}
+        paymentPermissions={paymentPermissions}
         customers={customers.items.map((c) => ({
           id: String(c._id),
           label: c.companyName ? `${c.displayName} (${c.companyName})` : c.displayName,

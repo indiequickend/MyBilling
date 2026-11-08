@@ -542,6 +542,163 @@ export async function updatePayment(
   }
 }
 
+export type DocumentPaymentChanges = {
+  /** Existing payments on the document whose fields changed. */
+  updates: Array<{ paymentId: string } & UpdatePaymentInput>;
+  /** Existing payments on the document to void (money movement is voided, never hard-deleted). */
+  voidIds: string[];
+  /** New payments to record against the document. */
+  creates: UpdatePaymentInput[];
+};
+
+export type DocumentPaymentChangeFailureReason =
+  | "payment_not_found"
+  | "payment_not_editable"
+  | "invalid_bank_account"
+  | "amount_invalid";
+
+/** Thrown from inside the caller's transaction so the whole document edit rolls back. */
+export class DocumentPaymentChangeError extends Error {
+  constructor(public readonly reason: DocumentPaymentChangeFailureReason) {
+    super(reason);
+  }
+}
+
+export function hasDocumentPaymentChanges(changes: DocumentPaymentChanges | undefined): boolean {
+  return Boolean(changes && (changes.updates.length || changes.voidIds.length || changes.creates.length));
+}
+
+export type AppliedDocumentPaymentChanges = {
+  /** Net change to the document's amountPaidMinor. */
+  paidDeltaMinor: number;
+  created: InstanceType<typeof Payment>[];
+  updated: InstanceType<typeof Payment>[];
+  voided: InstanceType<typeof Payment>[];
+};
+
+/**
+ * Applies a batch of payment edits/voids/creations to one Invoice's payments inside the caller's
+ * transaction (used by updateInvoice so the invoice and its payments change atomically). Does NOT
+ * touch the invoice document — the caller applies `paidDeltaMinor` and re-derives status, and
+ * checks the result against the new grand total. Every payment touched must belong to this
+ * business, be linked to this invoice, not be voided, and pass isPaymentEditable (no gateway
+ * payments). Call recordDocumentPaymentChangeAudit after the transaction commits.
+ */
+export async function applyInvoicePaymentChangesInSession(
+  session: ClientSession,
+  params: {
+    businessId: string;
+    invoiceId: string;
+    customerId: string;
+    changes: DocumentPaymentChanges;
+    userId: string;
+  },
+): Promise<AppliedDocumentPaymentChanges> {
+  const { businessId, invoiceId, changes } = params;
+  const applied: AppliedDocumentPaymentChanges = { paidDeltaMinor: 0, created: [], updated: [], voided: [] };
+
+  const touchedIds = [...changes.updates.map((u) => u.paymentId), ...changes.voidIds];
+  if (new Set(touchedIds).size !== touchedIds.length) throw new DocumentPaymentChangeError("payment_not_editable");
+  if (touchedIds.some((id) => !mongoose.isValidObjectId(id))) throw new DocumentPaymentChangeError("payment_not_found");
+
+  const bankIds = new Set([...changes.updates, ...changes.creates].map((p) => p.bankAccountId));
+  for (const bankId of bankIds) {
+    if (!mongoose.isValidObjectId(bankId) || !(await isOwnedBankAccount(bankId, businessId))) {
+      throw new DocumentPaymentChangeError("invalid_bank_account");
+    }
+  }
+
+  async function loadOwn(paymentId: string) {
+    const payment = await Payment.findOne({
+      _id: paymentId,
+      businessId,
+      linkedDocumentType: "invoice",
+      linkedDocumentId: invoiceId,
+    }).session(session);
+    if (!payment || payment.voidedAt) throw new DocumentPaymentChangeError("payment_not_found");
+    if (!isPaymentEditable(payment)) throw new DocumentPaymentChangeError("payment_not_editable");
+    return payment;
+  }
+
+  for (const id of changes.voidIds) {
+    const payment = await loadOwn(id);
+    payment.voidedAt = new Date();
+    await payment.save({ session });
+    applied.paidDeltaMinor -= payment.amountMinor;
+    applied.voided.push(payment);
+  }
+
+  for (const u of changes.updates) {
+    if (u.amountMinor <= 0) throw new DocumentPaymentChangeError("amount_invalid");
+    const payment = await loadOwn(u.paymentId);
+    applied.paidDeltaMinor += u.amountMinor - payment.amountMinor;
+    payment.amountMinor = u.amountMinor;
+    payment.mode = u.mode;
+    payment.bankAccountId = new mongoose.Types.ObjectId(u.bankAccountId);
+    payment.paymentDate = u.paymentDate;
+    payment.referenceNote = u.referenceNote;
+    await payment.save({ session });
+    applied.updated.push(payment);
+  }
+
+  for (const c of changes.creates) {
+    if (c.amountMinor <= 0) throw new DocumentPaymentChangeError("amount_invalid");
+    const payment = await createPayment(
+      {
+        businessId,
+        partyType: "customer",
+        partyId: params.customerId,
+        direction: "in",
+        amountMinor: c.amountMinor,
+        mode: c.mode,
+        bankAccountId: c.bankAccountId,
+        paymentDate: c.paymentDate,
+        linkedDocumentType: "invoice",
+        linkedDocumentId: invoiceId,
+        referenceNote: c.referenceNote,
+        createdByUserId: params.userId,
+      },
+      session,
+    );
+    applied.paidDeltaMinor += payment.amountMinor;
+    applied.created.push(payment);
+  }
+
+  return applied;
+}
+
+/** Audit trail for applyInvoicePaymentChangesInSession — same actions voidPayment/updatePayment log. */
+export async function recordDocumentPaymentChangeAudit(
+  businessId: string,
+  userId: string,
+  applied: AppliedDocumentPaymentChanges,
+): Promise<void> {
+  for (const p of applied.voided) {
+    await recordAuditLog({
+      businessId,
+      userId,
+      action: "payment.voided",
+      target: { type: "payment", id: String(p._id) },
+      before: { voidedAt: null },
+      after: { voidedAt: p.voidedAt, amountMinor: p.amountMinor },
+    });
+  }
+  for (const p of applied.updated) {
+    await recordAuditLog({
+      businessId,
+      userId,
+      action: "payment.edited",
+      target: { type: "payment", id: String(p._id) },
+      after: {
+        amountMinor: p.amountMinor,
+        mode: p.mode,
+        bankAccountId: String(p.bankAccountId),
+        paymentDate: p.paymentDate,
+      },
+    });
+  }
+}
+
 export type LedgerEntry = {
   date: Date;
   type: "invoice" | "purchase" | "payment" | "debit_note" | "credit_note";

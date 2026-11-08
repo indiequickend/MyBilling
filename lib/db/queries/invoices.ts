@@ -11,7 +11,18 @@ import { isOwnedSignature } from "@/lib/db/queries/signatures";
 import { isOwnedBankAccount } from "@/lib/db/queries/bankAccounts";
 import { isOwnedNoteTermTemplate } from "@/lib/db/queries/noteTermTemplates";
 import { isOwnedProject } from "@/lib/db/queries/projects";
-import { createPayment, claimMatchingUnlinkedPayment, type CreatePaymentInput } from "@/lib/db/queries/payments";
+import {
+  createPayment,
+  claimMatchingUnlinkedPayment,
+  applyInvoicePaymentChangesInSession,
+  recordDocumentPaymentChangeAudit,
+  hasDocumentPaymentChanges,
+  DocumentPaymentChangeError,
+  type CreatePaymentInput,
+  type DocumentPaymentChanges,
+  type DocumentPaymentChangeFailureReason,
+  type AppliedDocumentPaymentChanges,
+} from "@/lib/db/queries/payments";
 import {
   writeDocumentStockMovements,
   InsufficientStockError,
@@ -119,7 +130,8 @@ export type InvoiceWriteFailureReason =
   | "insufficient_stock"
   | "total_below_paid"
   | "customer_locked_by_payments"
-  | "date_changes_series";
+  | "date_changes_series"
+  | DocumentPaymentChangeFailureReason;
 
 export type InvoiceWriteResult =
   | { ok: true; invoice: InstanceType<typeof Invoice>; payments: InstanceType<typeof Payment>[] }
@@ -426,15 +438,22 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
 }
 
 class InvoiceChangedConcurrentlyError extends Error {}
+class InvoiceEditRuleError extends Error {
+  constructor(public readonly reason: InvoiceWriteFailureReason) {
+    super(reason);
+  }
+}
 
 /**
  * Edits an invoice's header and line items (invoice date, items, discounts, …). Drafts are a plain
  * document update. For a finalized (pending/partially_paid/paid) invoice the edit runs in one
  * transaction that reverses the old line items' stock and moves the new ones, so on-hand counts
- * always match what the invoice now says. Guards for finalized invoices:
- *  - the new grand total may not drop below what's already been paid (no silent overpayment —
- *    reduce/delete the payment first, or issue a credit note);
- *  - the customer can't change once payments exist (they're recorded against that party);
+ * always match what the invoice now says. `paymentChanges` (finalized invoices only) edits, voids
+ * and adds the invoice's payments in that same transaction. Guards for finalized invoices,
+ * evaluated after the payment changes:
+ *  - payments received may not exceed the new grand total (no silent overpayment — reduce/void a
+ *    payment in the same edit, or issue a credit note);
+ *  - the customer can't change while payments remain (they're recorded against that party);
  *  - the invoice date must stay in the same numbering series (FY / month), since the doc number
  *    was issued from that series.
  * Source links (quotation/sales order/proforma) are fixed at creation and always preserved.
@@ -444,11 +463,15 @@ export async function updateInvoice(
   businessId: string,
   input: InvoiceWriteInput,
   editedByUserId?: string,
+  paymentChanges?: DocumentPaymentChanges,
 ): Promise<InvoiceWriteResult> {
   await connectToDatabase();
   const existing = await Invoice.findOne({ _id: invoiceId, businessId, deletedAt: { $exists: false } });
   if (!existing) return { ok: false, reason: "not_found" };
   if (!EDITABLE_STATUSES.includes(existing.status)) return { ok: false, reason: "not_editable" };
+  const withPaymentChanges = hasDocumentPaymentChanges(paymentChanges);
+  // Drafts never carry payments — they're recorded when the draft is finalized.
+  if (existing.status === "draft" && withPaymentChanges) return { ok: false, reason: "not_editable" };
 
   const preservedInput: InvoiceWriteInput = {
     ...input,
@@ -473,12 +496,6 @@ export async function updateInvoice(
     return { ok: true, invoice: updated, payments: [] };
   }
 
-  if (prepared.totals.grandTotalMinor < existing.amountPaidMinor) {
-    return { ok: false, reason: "total_below_paid" };
-  }
-  if (existing.amountPaidMinor > 0 && String(existing.customerId) !== input.customerId) {
-    return { ok: false, reason: "customer_locked_by_payments" };
-  }
   if (existing.seriesKey) {
     const numbering = prepared.business.preferences?.documentNumbering;
     const config = resolveNumberingConfig(numbering, "invoice");
@@ -490,10 +507,12 @@ export async function updateInvoice(
   const conn = await connectToDatabase();
   const session = await conn.startSession();
   let result: InvoiceWriteResult;
+  let appliedPayments: AppliedDocumentPaymentChanges | undefined;
   try {
     let txResult!: InvoiceWriteResult;
     try {
       await session.withTransaction(async () => {
+        appliedPayments = undefined;
         // Re-read inside the transaction, pinned to the version we validated against, so a
         // concurrent edit/payment/cancel in between aborts instead of double-moving stock or
         // slipping the total under a just-recorded payment.
@@ -519,10 +538,28 @@ export async function updateInvoice(
           createdByUserId: actorUserId,
         });
 
-        const status = derivePaymentStatus(prepared.totals.grandTotalMinor, current.amountPaidMinor);
+        let amountPaidMinor = current.amountPaidMinor;
+        if (withPaymentChanges && paymentChanges) {
+          appliedPayments = await applyInvoicePaymentChangesInSession(session, {
+            businessId,
+            invoiceId,
+            customerId: input.customerId,
+            changes: paymentChanges,
+            userId: actorUserId,
+          });
+          amountPaidMinor += appliedPayments.paidDeltaMinor;
+        }
+        if (amountPaidMinor < 0 || amountPaidMinor > prepared.totals.grandTotalMinor) {
+          throw new InvoiceEditRuleError("total_below_paid");
+        }
+        if (amountPaidMinor > 0 && String(current.customerId) !== input.customerId) {
+          throw new InvoiceEditRuleError("customer_locked_by_payments");
+        }
+
+        const status = derivePaymentStatus(prepared.totals.grandTotalMinor, amountPaidMinor);
         const updated = await Invoice.findOneAndUpdate(
           { _id: invoiceId, businessId },
-          { $set: { ...buildInvoiceSetFields(preservedInput, prepared), status } },
+          { $set: { ...buildInvoiceSetFields(preservedInput, prepared), status, amountPaidMinor } },
           { returnDocument: "after", session },
         );
         if (!updated) throw new InvoiceChangedConcurrentlyError();
@@ -538,12 +575,16 @@ export async function updateInvoice(
           createdByUserId: actorUserId,
         });
 
-        txResult = { ok: true, invoice: updated, payments: [] };
+        txResult = { ok: true, invoice: updated, payments: appliedPayments?.created ?? [] };
       });
       result = txResult;
     } catch (err) {
       if (err instanceof InvoiceChangedConcurrentlyError) {
         result = { ok: false, reason: "not_editable" };
+      } else if (err instanceof InvoiceEditRuleError) {
+        result = { ok: false, reason: err.reason };
+      } else if (err instanceof DocumentPaymentChangeError) {
+        result = { ok: false, reason: err.reason };
       } else if (err instanceof InsufficientStockError) {
         result = { ok: false, reason: "insufficient_stock" };
       } else {
@@ -560,8 +601,12 @@ export async function updateInvoice(
       { businessId, invoiceId, validationStatus: "success" },
       { $set: { validationStatus: "pending" } },
     );
+    if (appliedPayments) await recordDocumentPaymentChangeAudit(businessId, actorUserId, appliedPayments);
     if (result.invoice.status !== existing.status) {
       await fireWebhookEvent(businessId, "invoice.status_changed", invoiceWebhookPayload(result.invoice));
+    }
+    if (result.payments.length > 0) {
+      await fireWebhookEvent(businessId, "invoice.payment_received", invoiceWebhookPayload(result.invoice));
     }
   }
   return result;

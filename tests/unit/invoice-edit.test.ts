@@ -108,7 +108,7 @@ describe("invoice edit", () => {
       productId,
       warehouseId,
       direction: "in",
-      quantity: 20,
+      quantity: 1_000,
       note: "opening",
       createdByUserId: tenants.userAId,
     });
@@ -162,7 +162,7 @@ describe("invoice edit", () => {
   it("rejects an edit that needs more stock than is available, leaving stock and the invoice unchanged", async () => {
     const id = await finalized();
     const before = await balance();
-    const result = await updateInvoice(id, tenants.businessAId, baseInput({ lineItems: [line(10_000)] }), tenants.userAId);
+    const result = await updateInvoice(id, tenants.businessAId, baseInput({ lineItems: [line(100_000)] }), tenants.userAId);
     expect(result).toEqual({ ok: false, reason: "insufficient_stock" });
     expect(await balance()).toBe(before);
     const reread = await Invoice.findById(id).lean();
@@ -208,6 +208,123 @@ describe("invoice edit", () => {
     lastYear.setUTCFullYear(lastYear.getUTCFullYear() - 2);
     const result = await updateInvoice(id, tenants.businessAId, baseInput({ invoiceDate: lastYear }), tenants.userAId);
     expect(result).toEqual({ ok: false, reason: "date_changes_series" });
+  });
+
+  async function activePayments(invoiceId: string) {
+    return Payment.find({
+      businessId: tenants.businessAId,
+      linkedDocumentType: "invoice",
+      linkedDocumentId: invoiceId,
+      voidedAt: { $exists: false },
+    }).lean();
+  }
+
+  it("edits, voids and adds payments in the same save as the line-item change", async () => {
+    const id = await finalized({ lineItems: [line(4)] }); // 40,000
+    await pay(id, 10_000);
+    await pay(id, 5_000);
+    const [p1, p2] = await activePayments(id);
+
+    const result = await updateInvoice(
+      id,
+      tenants.businessAId,
+      baseInput({ lineItems: [line(3)] }), // 30,000
+      tenants.userAId,
+      {
+        updates: [
+          {
+            paymentId: String(p1._id),
+            amountMinor: 12_000,
+            mode: "upi",
+            bankAccountId,
+            paymentDate: p1.paymentDate,
+            referenceNote: "corrected",
+          },
+        ],
+        voidIds: [String(p2._id)],
+        creates: [{ amountMinor: 18_000, mode: "cash", bankAccountId, paymentDate: new Date() }],
+      },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.invoice.grandTotalMinor).toBe(30_000);
+    expect(result.invoice.amountPaidMinor).toBe(30_000);
+    expect(result.invoice.status).toBe("paid");
+    expect(result.payments).toHaveLength(1);
+
+    const active = await activePayments(id);
+    expect(active.map((p) => p.amountMinor).sort((a, b) => a - b)).toEqual([12_000, 18_000]);
+    const voided = await Payment.findById(p2._id).lean();
+    expect(voided?.voidedAt).toBeTruthy();
+    const edited = await Payment.findById(p1._id).lean();
+    expect(edited?.mode).toBe("upi");
+    expect(edited?.referenceNote).toBe("corrected");
+  });
+
+  it("lowering the total is allowed when a payment is reduced in the same edit", async () => {
+    const id = await finalized({ lineItems: [line(2)] }); // 20,000
+    await pay(id, 20_000);
+    const [p] = await activePayments(id);
+    const result = await updateInvoice(id, tenants.businessAId, baseInput({ lineItems: [line(1)] }), tenants.userAId, {
+      updates: [{ paymentId: String(p._id), amountMinor: 10_000, mode: "cash", bankAccountId, paymentDate: p.paymentDate }],
+      voidIds: [],
+      creates: [],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.invoice.status).toBe("paid");
+  });
+
+  it("rolls back stock, invoice and every payment change when payments would exceed the new total", async () => {
+    const id = await finalized({ lineItems: [line(2)] }); // 20,000
+    await pay(id, 5_000);
+    const [p] = await activePayments(id);
+    const stockBefore = await balance();
+
+    const result = await updateInvoice(id, tenants.businessAId, baseInput({ lineItems: [line(3)] }), tenants.userAId, {
+      updates: [{ paymentId: String(p._id), amountMinor: 8_000, mode: "cash", bankAccountId, paymentDate: p.paymentDate }],
+      voidIds: [],
+      creates: [{ amountMinor: 25_000, mode: "cash", bankAccountId, paymentDate: new Date() }],
+    });
+    expect(result).toEqual({ ok: false, reason: "total_below_paid" });
+
+    expect(await balance()).toBe(stockBefore);
+    const invoice = await Invoice.findById(id).lean();
+    expect(invoice?.lineItems[0].quantity).toBe(2);
+    expect(invoice?.amountPaidMinor).toBe(5_000);
+    const active = await activePayments(id);
+    expect(active.map((x) => x.amountMinor)).toEqual([5_000]);
+  });
+
+  it("rejects touching a payment that belongs to a different invoice", async () => {
+    const a = await finalized();
+    const b = await finalized();
+    await pay(b, 1_000);
+    const [foreign] = await activePayments(b);
+    const result = await updateInvoice(a, tenants.businessAId, baseInput(), tenants.userAId, {
+      updates: [],
+      voidIds: [String(foreign._id)],
+      creates: [],
+    });
+    expect(result).toEqual({ ok: false, reason: "payment_not_found" });
+    expect((await Payment.findById(foreign._id).lean())?.voidedAt).toBeUndefined();
+  });
+
+  it("allows changing the customer once every payment is voided in the same edit", async () => {
+    const id = await finalized();
+    await pay(id, 5_000);
+    const [p] = await activePayments(id);
+    const result = await updateInvoice(
+      id,
+      tenants.businessAId,
+      baseInput({ customerId: otherCustomerId }),
+      tenants.userAId,
+      { updates: [], voidIds: [String(p._id)], creates: [] },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(String(result.invoice.customerId)).toBe(otherCustomerId);
+    expect(result.invoice.amountPaidMinor).toBe(0);
+    expect(result.invoice.status).toBe("pending");
   });
 
   it("does not let another business edit the invoice", async () => {
