@@ -4,6 +4,7 @@ import { Invoice, type InvoiceLineItemDoc } from "@/lib/db/models/Invoice";
 import { Business } from "@/lib/db/models/Business";
 import { Customer } from "@/lib/db/models/Customer";
 import { Payment } from "@/lib/db/models/Payment";
+import { EInvoiceData } from "@/lib/db/models/EInvoiceData";
 import { toPlainAddress } from "@/lib/db/models/shared/address";
 import { paginate, escapeRegex } from "@/lib/db/queryHelpers";
 import { isOwnedSignature } from "@/lib/db/queries/signatures";
@@ -20,7 +21,7 @@ import { reserveNextDocumentNumber, advanceSequenceForImportedNumber } from "@/l
 import { resolveNumberingConfig, resolveSeriesKey, formatDocumentNumber } from "@/lib/documents/numbering";
 import { computeDocumentTotals, derivePaymentStatus, type LineItemCalcInput } from "@/lib/documents/calc";
 import { splitKnownTax } from "@/lib/tax/gstSplit";
-import type { DiscountTarget, InvoiceStatus } from "@/lib/constants/invoices";
+import { INVOICE_EDITABLE_STATUSES, type DiscountTarget, type InvoiceStatus } from "@/lib/constants/invoices";
 import type { PaymentMode } from "@/lib/constants/payments";
 import { fireWebhookEvent } from "@/lib/webhooks/dispatch";
 
@@ -115,13 +116,16 @@ export type InvoiceWriteFailureReason =
   | "not_deletable"
   | "not_payable"
   | "no_payments"
-  | "insufficient_stock";
+  | "insufficient_stock"
+  | "total_below_paid"
+  | "customer_locked_by_payments"
+  | "date_changes_series";
 
 export type InvoiceWriteResult =
   | { ok: true; invoice: InstanceType<typeof Invoice>; payments: InstanceType<typeof Payment>[] }
   | { ok: false; reason: InvoiceWriteFailureReason };
 
-const EDITABLE_STATUSES: InvoiceStatus[] = ["draft", "pending", "partially_paid"];
+const EDITABLE_STATUSES: readonly InvoiceStatus[] = INVOICE_EDITABLE_STATUSES;
 const CANCELLABLE_STATUSES: InvoiceStatus[] = ["draft", "pending", "partially_paid"];
 const DELETABLE_STATUSES: InvoiceStatus[] = ["draft", "cancelled"];
 export const PAYABLE_STATUSES: InvoiceStatus[] = ["pending", "partially_paid"];
@@ -421,34 +425,146 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
   return result;
 }
 
-/** Edits a draft/pending/partially_paid invoice's header and line items; paid/cancelled invoices
- * are immutable (see project_spec.md — editing a settled financial record would corrupt ledger
- * math). Not transactional: a single document update, no numbering, no Payment writes. */
+class InvoiceChangedConcurrentlyError extends Error {}
+
+/**
+ * Edits an invoice's header and line items (invoice date, items, discounts, …). Drafts are a plain
+ * document update. For a finalized (pending/partially_paid/paid) invoice the edit runs in one
+ * transaction that reverses the old line items' stock and moves the new ones, so on-hand counts
+ * always match what the invoice now says. Guards for finalized invoices:
+ *  - the new grand total may not drop below what's already been paid (no silent overpayment —
+ *    reduce/delete the payment first, or issue a credit note);
+ *  - the customer can't change once payments exist (they're recorded against that party);
+ *  - the invoice date must stay in the same numbering series (FY / month), since the doc number
+ *    was issued from that series.
+ * Source links (quotation/sales order/proforma) are fixed at creation and always preserved.
+ */
 export async function updateInvoice(
   invoiceId: string,
   businessId: string,
   input: InvoiceWriteInput,
+  editedByUserId?: string,
 ): Promise<InvoiceWriteResult> {
   await connectToDatabase();
   const existing = await Invoice.findOne({ _id: invoiceId, businessId, deletedAt: { $exists: false } });
   if (!existing) return { ok: false, reason: "not_found" };
   if (!EDITABLE_STATUSES.includes(existing.status)) return { ok: false, reason: "not_editable" };
 
-  const prepared = await prepareInvoiceWrite(input);
+  const preservedInput: InvoiceWriteInput = {
+    ...input,
+    businessId,
+    sourceQuotationId: existing.sourceQuotationId ? String(existing.sourceQuotationId) : undefined,
+    sourceSalesOrderId: existing.sourceSalesOrderId ? String(existing.sourceSalesOrderId) : undefined,
+    sourceProformaInvoiceId: existing.sourceProformaInvoiceId
+      ? String(existing.sourceProformaInvoiceId)
+      : undefined,
+  };
+
+  const prepared = await prepareInvoiceWrite(preservedInput);
   if (!prepared.ok) return prepared;
 
-  const status: InvoiceStatus =
-    existing.status === "draft"
-      ? "draft"
-      : derivePaymentStatus(prepared.totals.grandTotalMinor, existing.amountPaidMinor);
+  if (existing.status === "draft") {
+    const updated = await Invoice.findOneAndUpdate(
+      { _id: invoiceId, businessId, status: "draft", deletedAt: { $exists: false } },
+      { $set: { ...buildInvoiceSetFields(preservedInput, prepared), status: "draft" } },
+      { returnDocument: "after" },
+    );
+    if (!updated) return { ok: false, reason: "not_editable" };
+    return { ok: true, invoice: updated, payments: [] };
+  }
 
-  const updated = await Invoice.findOneAndUpdate(
-    { _id: invoiceId, businessId },
-    { $set: { ...buildInvoiceSetFields(input, prepared), status } },
-    { returnDocument: "after" },
-  );
-  if (!updated) return { ok: false, reason: "not_found" };
-  return { ok: true, invoice: updated, payments: [] };
+  if (prepared.totals.grandTotalMinor < existing.amountPaidMinor) {
+    return { ok: false, reason: "total_below_paid" };
+  }
+  if (existing.amountPaidMinor > 0 && String(existing.customerId) !== input.customerId) {
+    return { ok: false, reason: "customer_locked_by_payments" };
+  }
+  if (existing.seriesKey) {
+    const numbering = prepared.business.preferences?.documentNumbering;
+    const config = resolveNumberingConfig(numbering, "invoice");
+    const newSeriesKey = resolveSeriesKey(input.invoiceDate, numbering?.fyStartMonth ?? 4, config.resetPolicy);
+    if (newSeriesKey !== existing.seriesKey) return { ok: false, reason: "date_changes_series" };
+  }
+
+  const actorUserId = editedByUserId ?? String(existing.createdByUserId);
+  const conn = await connectToDatabase();
+  const session = await conn.startSession();
+  let result: InvoiceWriteResult;
+  try {
+    let txResult!: InvoiceWriteResult;
+    try {
+      await session.withTransaction(async () => {
+        // Re-read inside the transaction, pinned to the version we validated against, so a
+        // concurrent edit/payment/cancel in between aborts instead of double-moving stock or
+        // slipping the total under a just-recorded payment.
+        const current = await Invoice.findOne({
+          _id: invoiceId,
+          businessId,
+          deletedAt: { $exists: false },
+          status: existing.status,
+          updatedAt: existing.updatedAt,
+          amountPaidMinor: existing.amountPaidMinor,
+        }).session(session);
+        if (!current) throw new InvoiceChangedConcurrentlyError();
+
+        // Reverse first, then apply: a pure quantity increase only needs the delta in stock.
+        await writeDocumentStockMovements(session, {
+          businessId,
+          lineItems: current.lineItems as DocumentStockLineItem[],
+          direction: "in",
+          reason: "invoice_edit_reversal",
+          refDocumentType: "invoice",
+          refDocumentId: String(current._id),
+          refDocumentNumber: current.docNumber,
+          createdByUserId: actorUserId,
+        });
+
+        const status = derivePaymentStatus(prepared.totals.grandTotalMinor, current.amountPaidMinor);
+        const updated = await Invoice.findOneAndUpdate(
+          { _id: invoiceId, businessId },
+          { $set: { ...buildInvoiceSetFields(preservedInput, prepared), status } },
+          { returnDocument: "after", session },
+        );
+        if (!updated) throw new InvoiceChangedConcurrentlyError();
+
+        await writeDocumentStockMovements(session, {
+          businessId,
+          lineItems: updated.lineItems as DocumentStockLineItem[],
+          direction: "out",
+          reason: "invoice",
+          refDocumentType: "invoice",
+          refDocumentId: String(updated._id),
+          refDocumentNumber: updated.docNumber,
+          createdByUserId: actorUserId,
+        });
+
+        txResult = { ok: true, invoice: updated, payments: [] };
+      });
+      result = txResult;
+    } catch (err) {
+      if (err instanceof InvoiceChangedConcurrentlyError) {
+        result = { ok: false, reason: "not_editable" };
+      } else if (err instanceof InsufficientStockError) {
+        result = { ok: false, reason: "insufficient_stock" };
+      } else {
+        throw err;
+      }
+    }
+  } finally {
+    await session.endSession();
+  }
+
+  if (result.ok) {
+    // A previously generated e-invoice JSON no longer matches the invoice — force a re-validate.
+    await EInvoiceData.updateOne(
+      { businessId, invoiceId, validationStatus: "success" },
+      { $set: { validationStatus: "pending" } },
+    );
+    if (result.invoice.status !== existing.status) {
+      await fireWebhookEvent(businessId, "invoice.status_changed", invoiceWebhookPayload(result.invoice));
+    }
+  }
+  return result;
 }
 
 /** Turns a draft into a numbered, finalized invoice — the only place a draft ever gets a docNumber. */

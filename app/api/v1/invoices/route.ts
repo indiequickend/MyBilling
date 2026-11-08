@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiV1Context, apiV1ErrorResponse } from "@/lib/api/v1Context";
-import {
-  invoiceHeaderSchema,
-  invoiceLineItemsSchema,
-  invoiceDiscountSchema,
-  invoicePaymentSplitSchema,
-  invoiceListQuerySchema,
-} from "@/lib/validation/invoices";
+import { invoicePaymentSplitSchema, invoiceListQuerySchema } from "@/lib/validation/invoices";
+import { parseV1InvoiceWriteBody } from "@/lib/api/v1InvoiceBody";
 import {
   createInvoice,
   listInvoices,
@@ -47,32 +42,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const context = await requireApiV1Context(request, "sales_invoices", "create");
-    const body = await request.json();
-    if (typeof body !== "object" || body === null) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-    }
-
-    const headerParsed = invoiceHeaderSchema.safeParse(body);
-    if (!headerParsed.success) {
-      return NextResponse.json(
-        { error: headerParsed.error.issues[0]?.message ?? "Invalid input" },
-        { status: 400 },
-      );
-    }
-    const lineItemsParsed = invoiceLineItemsSchema.safeParse((body as { lineItems?: unknown }).lineItems);
-    if (!lineItemsParsed.success) {
-      return NextResponse.json(
-        { error: lineItemsParsed.error.issues[0]?.message ?? "Invalid line items" },
-        { status: 400 },
-      );
-    }
-    const discountParsed = invoiceDiscountSchema.safeParse(body);
-    if (!discountParsed.success) {
-      return NextResponse.json(
-        { error: discountParsed.error.issues[0]?.message ?? "Invalid discount" },
-        { status: 400 },
-      );
-    }
+    const body: unknown = await request.json();
+    const parsed = parseV1InvoiceWriteBody(body, context.businessId);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const input: InvoiceWriteInput = parsed.input;
     const paymentsParsed = z
       .array(invoicePaymentSplitSchema)
       .safeParse((body as { payments?: unknown }).payments ?? []);
@@ -84,31 +57,6 @@ export async function POST(request: Request) {
     }
     const finalize = Boolean((body as { finalize?: unknown }).finalize);
 
-    const h = headerParsed.data;
-    const input: InvoiceWriteInput = {
-      businessId: context.businessId,
-      customerId: h.customerId,
-      invoiceDate: new Date(h.invoiceDate),
-      dueDate: h.dueDate ? new Date(h.dueDate) : undefined,
-      referenceNumber: h.referenceNumber,
-      placeOfSupplyState: h.placeOfSupplyState,
-      reverseCharge: h.reverseCharge,
-      tcsApplicable: h.tcsApplicable,
-      tcsSectionCode: h.tcsSectionCode,
-      tcsRatePercent: h.tcsRatePercent,
-      tcsAmountMinor: h.tcsAmountMinor,
-      lineItems: lineItemsParsed.data,
-      discountType: discountParsed.data.discountType,
-      discountValue: discountParsed.data.discountValue,
-      discountTarget: discountParsed.data.discountTarget,
-      roundOff: h.roundOff,
-      notes: h.notes,
-      terms: h.terms,
-      noteTemplateId: h.noteTemplateId,
-      termTemplateId: h.termTemplateId,
-      signatureId: h.signatureId,
-      bankAccountId: h.bankAccountId,
-    };
     const payments: InvoicePaymentSplitWriteInput[] = paymentsParsed.data.map((p) => ({
       amountMinor: p.amountMinor,
       mode: p.mode,

@@ -4,12 +4,11 @@ import { Download, Pencil } from "lucide-react";
 import { getDashboardContext } from "@/lib/auth/dashboardContext";
 import { can } from "@/lib/rbac/can";
 import { findInvoiceById } from "@/lib/db/queries/invoices";
-import { resolveInvoiceStatusDisplay } from "@/lib/constants/invoices";
+import { resolveInvoiceStatusDisplay, isInvoiceEditable } from "@/lib/constants/invoices";
 import { StatusStamp } from "@/components/ui/StatusStamp";
 import { Button } from "@/components/ui/button";
 import { CancelInvoiceButton, DeleteInvoiceButton } from "./InvoiceActionButtons";
 
-const EDITABLE_STATUSES = ["draft", "pending", "partially_paid"];
 const CANCELLABLE_STATUSES = ["draft", "pending", "partially_paid"];
 const DELETABLE_STATUSES = ["draft", "cancelled"];
 
@@ -34,7 +33,7 @@ export default async function InvoiceDetailLayout({
 
   const statusDisplay = resolveInvoiceStatusDisplay(invoice.status, invoice.dueDate);
 
-  const canEdit = can(context.membership, "sales_invoices", "edit") && EDITABLE_STATUSES.includes(invoice.status);
+  const canEdit = can(context.membership, "sales_invoices", "edit") && isInvoiceEditable(invoice.status);
   const canCancel =
     can(context.membership, "sales_invoices", "edit") && CANCELLABLE_STATUSES.includes(invoice.status);
   const canDelete =

@@ -1,6 +1,14 @@
 export const INVOICE_STATUSES = ["draft", "pending", "partially_paid", "paid", "cancelled"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 
+/** Statuses whose invoice can still be edited. Paid is included (updateInvoice guards the total,
+ * customer and numbering series); cancelled is not — its stock was already reversed. */
+export const INVOICE_EDITABLE_STATUSES = ["draft", "pending", "partially_paid", "paid"] as const;
+export type InvoiceEditableStatus = (typeof INVOICE_EDITABLE_STATUSES)[number];
+export function isInvoiceEditable(status: InvoiceStatus): status is InvoiceEditableStatus {
+  return (INVOICE_EDITABLE_STATUSES as readonly string[]).includes(status);
+}
+
 export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   draft: "Draft",
   pending: "Pending",

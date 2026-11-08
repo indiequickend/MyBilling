@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { FormError } from "@/components/auth/AuthCard";
-import { DISCOUNT_TARGETS, DISCOUNT_TARGET_LABELS } from "@/lib/constants/invoices";
+import { DISCOUNT_TARGETS, DISCOUNT_TARGET_LABELS, type InvoiceEditableStatus } from "@/lib/constants/invoices";
+import { minorToRupeesString } from "@/lib/utils/money";
 import type { CustomFieldType } from "@/lib/validation/shared";
 import { LineItemsEditor, type LineItemRow } from "@/components/documents/LineItemsEditor";
 import { PaymentSplitsEditor } from "@/components/documents/PaymentSplitsEditor";
@@ -73,6 +74,7 @@ export function InvoiceForm({
   mode,
   invoiceId,
   editableStatus,
+  amountPaidMinor = 0,
   customers,
   signatures,
   bankAccounts,
@@ -87,7 +89,9 @@ export function InvoiceForm({
 }: {
   mode: "create" | "edit";
   invoiceId?: string;
-  editableStatus?: "draft" | "pending" | "partially_paid";
+  editableStatus?: InvoiceEditableStatus;
+  /** Already received against this invoice — the edited total may not go below it. */
+  amountPaidMinor?: number;
   customers: Array<{ id: string; label: string }>;
   signatures: Array<{ id: string; name: string }>;
   bankAccounts: BankAccountOption[];
@@ -128,6 +132,15 @@ export function InvoiceForm({
   return (
     <form action={formAction} className="space-y-6">
       <FormError message={state.error} />
+      {mode === "edit" && editableStatus && editableStatus !== "draft" ? (
+        <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          Editing a finalized invoice. Stock is re-adjusted to the new line items on save, and the
+          invoice date must stay in the same financial year as its number.
+          {amountPaidMinor > 0
+            ? ` ₹${minorToRupeesString(amountPaidMinor)} has already been received, so the total can't go below that and the customer can't be changed.`
+            : null}
+        </p>
+      ) : null}
       {invoiceId ? <input type="hidden" name="invoiceId" value={invoiceId} /> : null}
       {defaultValues?.sourceQuotationId ? (
         <input type="hidden" name="sourceQuotationId" value={defaultValues.sourceQuotationId} />

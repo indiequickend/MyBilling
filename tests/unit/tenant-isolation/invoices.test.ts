@@ -209,7 +209,7 @@ describe("invoices — tenant isolation", () => {
     }
   });
 
-  it("a paid invoice cannot be edited", async () => {
+  it("a paid invoice can be edited and stays paid when the total is unchanged", async () => {
     const created = await createInvoice({
       ...baseInput(tenants.businessAId, customerAId),
       createdByUserId: tenants.userAId,
@@ -218,6 +218,27 @@ describe("invoices — tenant isolation", () => {
     });
     if (!created.ok) throw new Error("setup failed");
     expect(created.invoice.status).toBe("paid");
+
+    const result = await updateInvoice(String(created.invoice._id), tenants.businessAId, {
+      ...baseInput(tenants.businessAId, customerAId),
+      notes: "edited after payment",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.invoice.status).toBe("paid");
+      expect(result.invoice.notes).toBe("edited after payment");
+    }
+  });
+
+  it("a cancelled invoice cannot be edited", async () => {
+    const created = await createInvoice({
+      ...baseInput(tenants.businessAId, customerAId),
+      createdByUserId: tenants.userAId,
+      finalize: true,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    const cancelled = await cancelInvoice(String(created.invoice._id), tenants.businessAId);
+    expect(cancelled.ok).toBe(true);
 
     const result = await updateInvoice(
       String(created.invoice._id),

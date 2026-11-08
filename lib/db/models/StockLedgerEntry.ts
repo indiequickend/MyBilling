@@ -10,6 +10,7 @@ export const STOCK_LEDGER_REASONS = [
   "purchase",
   "debit_note",
   "invoice_cancelled",
+  "invoice_edit_reversal",
   "purchase_cancelled",
 ] as const;
 export type StockLedgerReason = (typeof STOCK_LEDGER_REASONS)[number];
