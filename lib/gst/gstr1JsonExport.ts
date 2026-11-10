@@ -311,8 +311,10 @@ function toHsnEntries(rows: HsnJsonRow[]): HsnEntryJson[] {
     num: i + 1,
     hsn_sc: r.hsnOrSac,
     desc: r.description,
-    uqc: r.unit || "NA",
-    qty: r.quantity,
+    // Always filed as "NA"/0 by business decision: line-item units aren't mapped to the portal's
+    // UQC code list, and qty is only meaningful alongside a valid UQC.
+    uqc: "NA",
+    qty: 0,
     rt: r.taxRatePercent,
     txval: minorToRupees(r.taxableAmountMinor),
     iamt: minorToRupees(r.igstMinor),

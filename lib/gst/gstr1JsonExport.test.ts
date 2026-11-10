@@ -178,6 +178,27 @@ describe("buildCdnrJson / buildCdnurJson", () => {
 });
 
 describe("buildHsnJson", () => {
+  it("always files uqc as NA and qty as 0 in both hsn_b2b and hsn_b2c, whatever the line items say", () => {
+    const row: HsnJsonRow = {
+      hsnOrSac: "8471",
+      description: "Laptops",
+      unit: "PCS",
+      quantity: 12,
+      taxRatePercent: 18,
+      taxableAmountMinor: 100_00,
+      cgstMinor: 9_00,
+      sgstMinor: 9_00,
+      igstMinor: 0,
+    };
+    const json = buildHsnJson([row], [{ ...row, unit: "KGS", quantity: 3.5 }]);
+    for (const entry of [...(json?.hsn_b2b ?? []), ...(json?.hsn_b2c ?? [])]) {
+      expect(entry.uqc).toBe("NA");
+      expect(entry.qty).toBe(0);
+    }
+    expect(json?.hsn_b2b).toHaveLength(1);
+    expect(json?.hsn_b2c).toHaveLength(1);
+  });
+
   it("returns undefined when both buckets are empty", () => {
     expect(buildHsnJson([], [])).toBeUndefined();
   });
